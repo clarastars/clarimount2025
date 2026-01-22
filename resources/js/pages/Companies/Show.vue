@@ -93,6 +93,12 @@ const formatLastSync = (lastSync: string | null) => {
                         </Link>
                     </Button>
                     <Button variant="outline" as-child>
+                        <Link :href="route('salary-runs.index', company.id)">
+                            <FileText class="mr-2 h-4 w-4" />
+                            {{ t('salary_runs.title') }}
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
                         <Link :href="route('companies.edit', company.id)">
                             <Edit class="mr-2 h-4 w-4" />
                             {{ t('companies.edit') }}

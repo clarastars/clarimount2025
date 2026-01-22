@@ -31,6 +31,8 @@ class Employee extends Model
         'department',
         'department_id',
         'job_title',
+        'basic_salary',
+        'allowances',
         'manager',
         'direct_manager',
         'additional_approver_2',
@@ -72,6 +74,8 @@ class Employee extends Model
         'exit_reentry_visa_expiry' => 'date',
         'passport_expiry_date' => 'date',
         'insurance_expiry_date' => 'date',
+        'basic_salary' => 'decimal:2',
+        'allowances' => 'decimal:2',
     ];
 
     protected $appends = [
@@ -133,6 +137,14 @@ class Employee extends Model
     public function reportedTickets(): HasMany
     {
         return $this->hasMany(Ticket::class, 'reporter_id');
+    }
+
+    /**
+     * Get all salary run items for this employee.
+     */
+    public function salaryRunItems(): HasMany
+    {
+        return $this->hasMany(SalaryRunItem::class);
     }
 
     /**

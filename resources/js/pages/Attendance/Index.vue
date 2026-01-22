@@ -173,6 +173,9 @@
                       <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.penalty_reason') }}
                       </th>
+                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+                        {{ $t('attendance.penalty_approval') }}
+                      </th>
                       <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         {{ $t('attendance.device_name') }}
                       </th>
@@ -261,6 +264,61 @@
                           <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
+                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-center items-center gap-2">
+                          <template v-if="record.penalty">
+                            <!-- Pending: Show Approve/Reject buttons -->
+                            <template v-if="record.penalty.approval_status === 'pending'">
+                              <Button 
+                                @click="approvePenalty(record.penalty.id)" 
+                                size="sm" 
+                                variant="default"
+                                class="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <Icon name="Check" class="h-4 w-4 mr-1" />
+                                {{ $t('attendance.approve') }}
+                              </Button>
+                              <Button 
+                                @click="openRejectModal(record.penalty)" 
+                                size="sm" 
+                                variant="destructive"
+                              >
+                                <Icon name="X" class="h-4 w-4 mr-1" />
+                                {{ $t('attendance.reject') }}
+                              </Button>
+                            </template>
+                            <!-- Approved: Show approved status -->
+                            <template v-else-if="record.penalty.approval_status === 'approved'">
+                              <Badge variant="default" class="bg-green-600 text-white">
+                                <Icon name="CheckCircle" class="h-3 w-3 mr-1" />
+                                {{ $t('attendance.approved') }}
+                              </Badge>
+                              <span v-if="record.penalty.approved_at" class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ formatDate(record.penalty.approved_at) }}
+                              </span>
+                            </template>
+                            <!-- Rejected: Show rejected status -->
+                            <template v-else-if="record.penalty.approval_status === 'rejected'">
+                              <Badge variant="destructive">
+                                <Icon name="XCircle" class="h-3 w-3 mr-1" />
+                                {{ $t('attendance.rejected') }}
+                              </Badge>
+                              <div v-if="record.penalty.rejection_reason" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ record.penalty.rejection_reason }}
+                              </div>
+                              <a 
+                                v-if="record.penalty.rejection_attachment_path" 
+                                :href="getAttachmentUrl(record.penalty.rejection_attachment_path)"
+                                target="_blank"
+                                class="text-xs text-blue-600 hover:underline mt-1 block"
+                              >
+                                {{ $t('attendance.view_attachment') }}
+                              </a>
+                            </template>
+                          </template>
+                          <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
+                        </div>
+                      </td>
                       <td class="px-6 py-4 text-center">
                         <div class="text-sm text-gray-700 dark:text-gray-300">
                           {{ record.device_name || record.serial_number || '-' }}
@@ -327,6 +385,48 @@
         </Card>
       </div>
     </div>
+
+    <!-- Reject Penalty Modal -->
+    <Dialog :open="rejectModalOpen" @update:open="closeRejectModal">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ $t('attendance.reject_penalty') }}</DialogTitle>
+          <DialogDescription>
+            {{ $t('attendance.reject_penalty_description') }}
+          </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div>
+            <Label for="rejection_reason">{{ $t('attendance.rejection_reason') }} ({{ $t('common.optional') }})</Label>
+            <textarea
+              id="rejection_reason"
+              v-model="rejectionReason"
+              rows="4"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              :placeholder="$t('attendance.rejection_reason_placeholder')"
+            />
+          </div>
+          <div>
+            <Label for="rejection_attachment">{{ $t('attendance.rejection_attachment') }} ({{ $t('common.optional') }})</Label>
+            <Input
+              id="rejection_attachment"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              @change="(e) => rejectionAttachment = e.target.files[0]"
+            />
+            <p class="text-xs text-gray-500 mt-1">{{ $t('attendance.rejection_attachment_hint') }}</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" @click="closeRejectModal">
+            {{ $t('common.cancel') }}
+          </Button>
+          <Button variant="destructive" @click="rejectPenalty">
+            {{ $t('attendance.reject') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </AppLayout>
 </template>
 
@@ -353,6 +453,7 @@ import { router } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { BreadcrumbItem } from '@/types'
 
 const { t } = useI18n()
@@ -652,5 +753,57 @@ const retrySync = (importId) => {
       // Handle success
     }
   })
+}
+
+// Penalty approval functions
+const rejectModalOpen = ref(false)
+const selectedPenalty = ref(null)
+const rejectionReason = ref('')
+const rejectionAttachment = ref(null)
+
+const openRejectModal = (penalty) => {
+  selectedPenalty.value = penalty
+  rejectionReason.value = ''
+  rejectionAttachment.value = null
+  rejectModalOpen.value = true
+}
+
+const closeRejectModal = () => {
+  rejectModalOpen.value = false
+  selectedPenalty.value = null
+  rejectionReason.value = ''
+  rejectionAttachment.value = null
+}
+
+const approvePenalty = (penaltyId) => {
+  router.post(route('attendance-penalties.approve', penaltyId), {}, {
+    preserveScroll: true,
+    onSuccess: () => {
+      // Success handled by Inertia
+    },
+  })
+}
+
+const rejectPenalty = () => {
+  if (!selectedPenalty.value) return
+
+  const formData = new FormData()
+  if (rejectionReason.value) {
+    formData.append('rejection_reason', rejectionReason.value)
+  }
+  if (rejectionAttachment.value) {
+    formData.append('rejection_attachment', rejectionAttachment.value)
+  }
+
+  router.post(route('attendance-penalties.reject', selectedPenalty.value.id), formData, {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeRejectModal()
+    },
+  })
+}
+
+const getAttachmentUrl = (path) => {
+  return `/storage/${path}`
 }
 </script>

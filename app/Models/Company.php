@@ -121,6 +121,14 @@ class Company extends Model
     }
 
     /**
+     * Get all salary runs for this company.
+     */
+    public function salaryRuns(): HasMany
+    {
+        return $this->hasMany(SalaryRun::class);
+    }
+
+    /**
      * Check if user is the owner of this company.
      */
     public function isOwner(User $user): bool

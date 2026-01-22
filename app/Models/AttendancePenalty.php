@@ -22,6 +22,11 @@ class AttendancePenalty extends Model
         'action_value',
         'action_text',
         'reason_text',
+        'approval_status',
+        'approved_by',
+        'approved_at',
+        'rejection_reason',
+        'rejection_attachment_path',
     ];
 
     protected $casts = [
@@ -29,6 +34,7 @@ class AttendancePenalty extends Model
         'late_minutes' => 'integer',
         'repeat_number' => 'integer',
         'action_value' => 'integer',
+        'approved_at' => 'datetime',
     ];
 
     /**
@@ -61,5 +67,53 @@ class AttendancePenalty extends Model
     public function scopeByViolationType($query, string $violationType)
     {
         return $query->where('violation_type', $violationType);
+    }
+
+    /**
+     * Scope to filter by approval status
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('approval_status', 'approved');
+    }
+
+    /**
+     * Scope to filter by pending approval
+     */
+    public function scopePending($query)
+    {
+        return $query->where('approval_status', 'pending');
+    }
+
+    /**
+     * Get the user who approved/rejected this penalty
+     */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Check if penalty is approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->approval_status === 'approved';
+    }
+
+    /**
+     * Check if penalty is rejected
+     */
+    public function isRejected(): bool
+    {
+        return $this->approval_status === 'rejected';
+    }
+
+    /**
+     * Check if penalty is pending
+     */
+    public function isPending(): bool
+    {
+        return $this->approval_status === 'pending';
     }
 }

@@ -70,6 +70,8 @@ const form = useForm({
     department: '',
     department_id: null as number | null,
     job_title: '',
+    basic_salary: '',
+    allowances: '',
     
     // Legal Information
     id_number: '',
@@ -920,6 +922,46 @@ const translateValidationError = (error: string) => {
                                         <div v-if="form.errors.job_title" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />
                                             {{ translateValidationError(form.errors.job_title || "") }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Basic Salary -->
+                                    <div>
+                                        <Label for="basic_salary" class="mb-2">
+                                            {{ t('employees.basic_salary') }}
+                                        </Label>
+                                        <Input 
+                                            id="basic_salary"
+                                            v-model="form.basic_salary" 
+                                            type="number" 
+                                            step="0.01"
+                                            min="0"
+                                            :placeholder="t('employees.basic_salary_placeholder')"
+                                            :class="form.errors.basic_salary ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                        />
+                                        <div v-if="form.errors.basic_salary" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                            <Icon name="AlertCircle" class="h-4 w-4" />
+                                            {{ translateValidationError(form.errors.basic_salary || "") }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Allowances -->
+                                    <div>
+                                        <Label for="allowances" class="mb-2">
+                                            {{ t('employees.allowances') }}
+                                        </Label>
+                                        <Input 
+                                            id="allowances"
+                                            v-model="form.allowances" 
+                                            type="number" 
+                                            step="0.01"
+                                            min="0"
+                                            :placeholder="t('employees.allowances_placeholder')"
+                                            :class="form.errors.allowances ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                        />
+                                        <div v-if="form.errors.allowances" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                            <Icon name="AlertCircle" class="h-4 w-4" />
+                                            {{ translateValidationError(form.errors.allowances || "") }}
                                         </div>
                                     </div>
 

@@ -13,7 +13,9 @@ use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetTemplateController;
 use App\Http\Controllers\PrintJobController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendancePenaltyApprovalController;
 use App\Http\Controllers\BayzatConfigController;
+use App\Http\Controllers\SalaryRunController;
 use App\Http\Controllers\ZKTekoWebhookController;
 use App\Http\Controllers\ZKTekoDebugController;
 use App\Http\Controllers\ZkTecoController;
@@ -197,6 +199,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/attendance/{import}/retry', [AttendanceController::class, 'retrySync'])->name('attendance.retry');
     Route::post('companies/{company}/attendance/batches/{batch}/retry', [AttendanceController::class, 'retrySyncBatch'])->name('attendance.batch.retry');
     Route::get('companies/{company}/attendance/template/download', [AttendanceController::class, 'downloadTemplate'])->name('attendance.template');
+    
+    // Attendance Penalty Approval routes
+    Route::post('attendance-penalties/{penalty}/approve', [AttendancePenaltyApprovalController::class, 'approve'])->name('attendance-penalties.approve');
+    Route::post('attendance-penalties/{penalty}/reject', [AttendancePenaltyApprovalController::class, 'reject'])->name('attendance-penalties.reject');
+    
+    // Salary Runs routes
+    Route::get('companies/{company}/salary-runs', [SalaryRunController::class, 'index'])->name('salary-runs.index');
+    Route::get('companies/{company}/salary-runs/{year}/{month}', [SalaryRunController::class, 'show'])->name('salary-runs.show');
+    Route::post('companies/{company}/salary-runs', [SalaryRunController::class, 'store'])->name('salary-runs.store');
+    Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');
     
     // Bayzat Configuration routes
     Route::get('bayzat-configs', [BayzatConfigController::class, 'index'])->name('bayzat-configs.index');

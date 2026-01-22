@@ -388,6 +388,34 @@
                                         />
                                         <div v-if="form.errors.job_title" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.job_title || "") }}</div>
                                     </div>
+
+                                    <!-- Basic Salary -->
+                                    <div>
+                                        <Label for="basic_salary" class="mb-2">{{ t('employees.basic_salary') }}</Label>
+                                        <Input 
+                                            id="basic_salary"
+                                            v-model="form.basic_salary" 
+                                            type="number" 
+                                            step="0.01"
+                                            min="0"
+                                            :placeholder="t('employees.basic_salary_placeholder')"
+                                        />
+                                        <div v-if="form.errors.basic_salary" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.basic_salary || "") }}</div>
+                                    </div>
+
+                                    <!-- Allowances -->
+                                    <div>
+                                        <Label for="allowances" class="mb-2">{{ t('employees.allowances') }}</Label>
+                                        <Input 
+                                            id="allowances"
+                                            v-model="form.allowances" 
+                                            type="number" 
+                                            step="0.01"
+                                            min="0"
+                                            :placeholder="t('employees.allowances_placeholder')"
+                                        />
+                                        <div v-if="form.errors.allowances" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.allowances || "") }}</div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </CollapsibleContent>
@@ -898,6 +926,8 @@ const form = useForm({
     department: props.employee.department || '',
     department_id: props.employee.department_id || null as number | null,
     job_title: props.employee.job_title || '',
+    basic_salary: props.employee.basic_salary || '',
+    allowances: props.employee.allowances || '',
     
     // Legal Information
     id_number: props.employee.id_number || '',
