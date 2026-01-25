@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AttendancePenalty;
 use App\Models\Employee;
+use App\Models\EmployeeDebt;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
 use Carbon\Carbon;
@@ -71,7 +72,22 @@ class SalaryRunService
                     ];
                 }
 
-                $netSalary = $grossSalary - $penaltiesTotal;
+                // Get existing salary run item to preserve debt_deductions if exists
+                $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
+                    ->where('employee_id', $employee->id)
+                    ->first();
+
+                $debtDeductions = $existingItem?->debt_deductions ?? [];
+                $debtDeductionsTotal = 0;
+
+                // Calculate total debt deductions
+                if (is_array($debtDeductions)) {
+                    foreach ($debtDeductions as $deduction) {
+                        $debtDeductionsTotal += $deduction['amount'] ?? 0;
+                    }
+                }
+
+                $netSalary = $grossSalary - $penaltiesTotal - $debtDeductionsTotal;
 
                 // Upsert salary run item
                 SalaryRunItem::updateOrCreate(
@@ -86,6 +102,7 @@ class SalaryRunService
                         'penalties_total' => $penaltiesTotal,
                         'net_salary' => $netSalary,
                         'breakdown' => $breakdown,
+                        'debt_deductions' => $debtDeductions, // Preserve existing debt deductions
                     ]
                 );
             }
@@ -125,5 +142,47 @@ class SalaryRunService
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Apply debt deductions to employee debts when salary run is finalized
+     */
+    public function applyDebtDeductions(SalaryRun $salaryRun): void
+    {
+        DB::transaction(function () use ($salaryRun) {
+            $items = $salaryRun->items()->with('employee.debts')->get();
+
+            foreach ($items as $item) {
+                $debtDeductions = $item->debt_deductions ?? [];
+
+                if (!is_array($debtDeductions) || empty($debtDeductions)) {
+                    continue;
+                }
+
+                foreach ($debtDeductions as $deduction) {
+                    $debtId = $deduction['debt_id'] ?? null;
+                    $deductedAmount = $deduction['amount'] ?? 0;
+
+                    if (!$debtId || $deductedAmount <= 0) {
+                        continue;
+                    }
+
+                    $debt = EmployeeDebt::find($debtId);
+
+                    if (!$debt || $debt->employee_id !== $item->employee_id) {
+                        continue;
+                    }
+
+                    // Update debt amount
+                    $newAmount = max(0, $debt->amount - $deductedAmount);
+                    $debt->update(['amount' => $newAmount]);
+
+                    // Optionally delete debt if amount becomes 0
+                    if ($newAmount == 0) {
+                        $debt->delete();
+                    }
+                }
+            }
+        });
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useI18n } from 'vue-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -117,6 +117,30 @@ const sectionEmployment = ref(false)
 const sectionManagers = ref(false)
 const sectionEmergency = ref(false)
 const sectionAdditional = ref(false)
+const sectionDebts = ref(false)
+
+// Debts management
+interface Debt {
+    id?: number
+    amount: number
+    debt_type: string
+}
+
+const debts = ref<Debt[]>([])
+const newDebt = ref<Debt>({ amount: 0, debt_type: '' })
+const showAddDebtForm = ref(false)
+
+const addDebt = () => {
+    if (newDebt.value.amount > 0) {
+        debts.value.push({ ...newDebt.value })
+        newDebt.value = { amount: 0, debt_type: '' }
+        showAddDebtForm.value = false
+    }
+}
+
+const removeDebt = (index: number) => {
+    debts.value.splice(index, 1)
+}
 
 // Department search state
 const departmentSearchQuery = ref('')
@@ -232,7 +256,24 @@ const setProbationEndDate = (months: number) => {
 // Remove the unused toggleSection function since we're using direct refs now
 
 const submit = () => {
-    form.post('/employees')
+    form.post('/employees', {
+        onSuccess: (page) => {
+            // After employee is created, add debts if any
+            const employeeId = page.props.employee?.id || page.props.flash?.employee_id
+            if (employeeId && debts.value.length > 0) {
+                // Add each debt
+                debts.value.forEach((debt) => {
+                    router.post(`/employees/${employeeId}/debts`, {
+                        amount: debt.amount,
+                        debt_type: debt.debt_type || null,
+                    }, {
+                        preserveScroll: true,
+                        preserveState: true,
+                    })
+                })
+            }
+        },
+    })
 }
 
 
@@ -569,6 +610,10 @@ const translateValidationError = (error: string) => {
     
     // If no pattern matches, return the original error
     return error
+}
+
+const formatCurrency = (amount: number) => {
+    return amount.toFixed(2) + ' SAR'
 }
 </script>
 
@@ -1733,6 +1778,105 @@ const translateValidationError = (error: string) => {
                                         {{ translateValidationError(form.errors.notes || "") }}
                                     </div>
                                 </div>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
+                </Card>
+
+                <!-- Debts Section -->
+                <Card>
+                    <Collapsible v-model:open="sectionDebts">
+                        <CollapsibleTrigger asChild>
+                            <CardHeader class="cursor-pointer hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <Icon name="CreditCard" class="h-5 w-5 text-purple-600" />
+                                        <CardTitle class="text-xl">{{ t('debts.title') }}</CardTitle>
+                                        <Badge v-if="debts.length > 0" variant="default">{{ debts.length }}</Badge>
+                                    </div>
+                                    <Icon :name="!sectionDebts ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
+                                </div>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent class="space-y-6 pt-6">
+                                <!-- Debts List -->
+                                <div v-if="debts.length > 0" class="space-y-3 mb-6">
+                                    <div 
+                                        v-for="(debt, index) in debts" 
+                                        :key="index"
+                                        class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div class="flex-1">
+                                            <div class="font-medium text-lg mb-1">{{ formatCurrency(debt.amount) }}</div>
+                                            <div v-if="debt.debt_type" class="text-sm text-gray-500">{{ debt.debt_type }}</div>
+                                        </div>
+                                        <Button 
+                                            type="button"
+                                            variant="ghost" 
+                                            size="sm"
+                                            @click="removeDebt(index)"
+                                            class="h-8 w-8 p-0"
+                                        >
+                                            <Icon name="Trash2" class="h-4 w-4 text-red-600" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <!-- Add Debt Form -->
+                                <div v-if="showAddDebtForm" class="space-y-4 p-5 border rounded-lg bg-gray-50 mt-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="space-y-2">
+                                            <Label for="debt_amount" class="text-sm font-medium">{{ t('debts.debt_amount') }}</Label>
+                                            <Input 
+                                                id="debt_amount"
+                                                v-model.number="newDebt.amount" 
+                                                type="number"
+                                                step="0.01"
+                                                min="0.01"
+                                                :placeholder="t('debts.debt_amount')"
+                                                class="mt-1"
+                                            />
+                                        </div>
+                                        <div class="space-y-2">
+                                            <Label for="debt_type" class="text-sm font-medium">
+                                                {{ t('debts.debt_type') }} 
+                                                <span class="text-gray-400 text-xs">({{ t('common.optional') }})</span>
+                                            </Label>
+                                            <Input 
+                                                id="debt_type"
+                                                v-model="newDebt.debt_type" 
+                                                type="text"
+                                                :placeholder="t('debts.debt_type')"
+                                                class="mt-1"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2 pt-2">
+                                        <Button 
+                                            type="button" 
+                                            @click="addDebt" 
+                                            :disabled="!newDebt.amount || newDebt.amount <= 0"
+                                        >
+                                            {{ t('common.add') }}
+                                        </Button>
+                                        <Button type="button" variant="outline" @click="showAddDebtForm = false">
+                                            {{ t('common.cancel') }}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <!-- Add Debt Button -->
+                                <div v-else class="pt-2">
+                                    <Button type="button" variant="outline" @click="showAddDebtForm = true" class="w-full md:w-auto">
+                                        <Icon name="Plus" class="h-4 w-4 mr-2" />
+                                        {{ t('debts.add_debt') }}
+                                    </Button>
+                                </div>
+
+                                <p v-if="debts.length === 0 && !showAddDebtForm" class="text-sm text-gray-500 text-center py-4">
+                                    {{ t('debts.no_debts') }}
+                                </p>
                             </CardContent>
                         </CollapsibleContent>
                     </Collapsible>

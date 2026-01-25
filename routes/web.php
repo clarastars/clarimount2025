@@ -7,6 +7,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LaborLawRuleController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
@@ -156,6 +157,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('employees.expiring-documents.index');
     Route::resource('employees', EmployeeController::class);
     
+    // Employee Debts routes
+    Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {
+        Route::post('/', [EmployeeDebtController::class, 'store'])->name('store');
+        Route::put('/{debt}', [EmployeeDebtController::class, 'update'])->name('update');
+        Route::delete('/{debt}', [EmployeeDebtController::class, 'destroy'])->name('destroy');
+    });
+    
     // Custody management routes
     Route::get('employees/{employee}/custody', [CustodyController::class, 'show'])->name('employees.custody.show');
     Route::post('employees/{employee}/custody', [CustodyController::class, 'store'])->name('employees.custody.store');
@@ -209,6 +217,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('companies/{company}/salary-runs/{year}/{month}', [SalaryRunController::class, 'show'])->name('salary-runs.show');
     Route::post('companies/{company}/salary-runs', [SalaryRunController::class, 'store'])->name('salary-runs.store');
     Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');
+    Route::post('companies/{company}/salary-runs/{salaryRun}/update-debt-deductions', [SalaryRunController::class, 'updateDebtDeductions'])->name('salary-runs.update-debt-deductions');
     
     // Bayzat Configuration routes
     Route::get('bayzat-configs', [BayzatConfigController::class, 'index'])->name('bayzat-configs.index');

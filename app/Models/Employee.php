@@ -148,6 +148,14 @@ class Employee extends Model
     }
 
     /**
+     * Get all debts for this employee.
+     */
+    public function debts(): HasMany
+    {
+        return $this->hasMany(EmployeeDebt::class);
+    }
+
+    /**
      * Get the shift assigned to this employee
      */
     public function shift(): BelongsTo

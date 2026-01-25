@@ -324,6 +324,30 @@
                             </CardContent>
                         </Card>
 
+                        <!-- Debts -->
+                        <Card v-if="employee.debts && employee.debts.length > 0">
+                            <CardHeader>
+                                <CardTitle class="flex items-center gap-2">
+                                    <Icon name="CreditCard" class="h-5 w-5 text-purple-600" />
+                                    {{ t('debts.title') }} ({{ employee.debts.length }})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div class="space-y-3">
+                                    <div 
+                                        v-for="debt in employee.debts" 
+                                        :key="debt.id"
+                                        class="flex items-center justify-between p-3 border rounded-lg"
+                                    >
+                                        <div class="flex-1">
+                                            <div class="font-medium">{{ formatCurrency(parseFloat(debt.amount)) }}</div>
+                                            <div v-if="debt.debt_type" class="text-sm text-gray-500">{{ debt.debt_type }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         <!-- Assets -->
                         <Card v-if="employee.assets && employee.assets.length > 0">
                             <CardHeader>
@@ -514,5 +538,9 @@ const getAssetStatusTranslation = (status: string): string => {
         default:
             return status;
     }
+};
+
+const formatCurrency = (amount: number) => {
+    return amount.toFixed(2) + ' SAR';
 };
 </script> 

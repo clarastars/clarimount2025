@@ -21,6 +21,7 @@ class SalaryRunItem extends Model
         'penalties_total',
         'net_salary',
         'breakdown',
+        'debt_deductions',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class SalaryRunItem extends Model
         'penalties_total' => 'decimal:2',
         'net_salary' => 'decimal:2',
         'breakdown' => 'array',
+        'debt_deductions' => 'array',
     ];
 
     /**

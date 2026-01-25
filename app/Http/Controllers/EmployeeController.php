@@ -333,7 +333,8 @@ class EmployeeController extends Controller
             'shift',
             'assets.assetCategory',
             'assetAssignments.asset.assetCategory',
-            'reportedTickets.ticketCategory'
+            'reportedTickets.ticketCategory',
+            'debts'
         ]);
         $employee->loadCount(['assets', 'reportedTickets']);
 
@@ -364,6 +365,8 @@ class EmployeeController extends Controller
 
         // Get Saudi Arabia as default residence country
         $saudiArabia = Country::where('code', 'SA')->first();
+
+        $employee->load('debts');
 
         return Inertia::render('Employees/Edit', [
             'employee' => $employee,
