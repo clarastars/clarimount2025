@@ -121,6 +121,77 @@ class EmployeeExpiryService
     }
 
     /**
+     * Returns a row for EACH document that has already expired.
+     *
+     * @param  Collection<int, int>|array<int, int>  $companyIds
+     * @return Collection<int, array{
+     *   employee_id:int,
+     *   display_name:string,
+     *   full_name:string,
+     *   expiry_field:string,
+     *   expiry_label_key:string,
+     *   expiry_date:string,
+     *   days_remaining:int
+     * }>
+     */
+    public function getExpiredDocumentRows(Collection|array $companyIds): Collection
+    {
+        $companyIds = $companyIds instanceof Collection ? $companyIds->values()->all() : $companyIds;
+
+        $today = now()->startOfDay();
+
+        $employees = Employee::query()
+            ->active()
+            ->whereIn('company_id', $companyIds)
+            ->where(function ($q) use ($today) {
+                $q->whereDate('probation_end_date', '<', $today)
+                    ->orWhereDate('residence_expiry_date', '<', $today)
+                    ->orWhereDate('contract_end_date', '<', $today)
+                    ->orWhereDate('exit_reentry_visa_expiry', '<', $today)
+                    ->orWhereDate('passport_expiry_date', '<', $today)
+                    ->orWhereDate('insurance_expiry_date', '<', $today);
+            })
+            ->get([
+                'id',
+                'employee_id',
+                'first_name',
+                'last_name',
+                'probation_end_date',
+                'residence_expiry_date',
+                'contract_end_date',
+                'exit_reentry_visa_expiry',
+                'passport_expiry_date',
+                'insurance_expiry_date',
+            ]);
+
+        $rows = $employees->flatMap(function (Employee $employee) use ($today) {
+            $displayName = (string) ($employee->display_name ?? (($employee->employee_id ?? '') . ' - ' . $employee->first_name . ' ' . $employee->last_name));
+            $fullName = (string) ($employee->full_name ?? ($employee->first_name . ' ' . $employee->last_name));
+
+            return collect($this->getEmployeeExpiryCandidates($employee))
+                ->map(function (array $candidate) use ($today, $employee, $displayName, $fullName) {
+                    /** @var CarbonInterface $date */
+                    $date = $candidate['date'];
+                    $daysRemaining = $today->diffInDays($date->copy()->startOfDay(), false);
+
+                    return [
+                        'employee_id' => (int) $employee->id,
+                        'display_name' => $displayName,
+                        'full_name' => $fullName,
+                        'expiry_field' => $candidate['field'],
+                        'expiry_label_key' => $candidate['label_key'],
+                        'expiry_date' => $date->toDateString(),
+                        'days_remaining' => (int) $daysRemaining,
+                    ];
+                })
+                ->filter(fn (array $row) => $row['days_remaining'] < 0)
+                ->values();
+        })->values();
+
+        return $rows->sortByDesc('days_remaining')->values();
+    }
+
+    /**
      * @return array<int, array{field:string,label_key:string,date:CarbonInterface}>
      */
     private function getEmployeeExpiryCandidates(Employee $employee): array

@@ -496,6 +496,7 @@ return [
             'expired_days_ago' => 'Expired {days} days ago',
             'expires_today' => 'Expires today',
             'days_remaining' => '{days} days remaining',
+            'expired_documents' => 'Expired Documents',
 
             'probation_end_date' => 'Probation end date',
             'residence_expiry_date' => 'Residence expiry date',

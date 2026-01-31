@@ -23,10 +23,16 @@ class DashboardController extends Controller
         }
 
         $expiringRows = $employeeExpiryService->getExpiringDocumentRows($ownedCompanyIds, EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD);
+        $expiredRows = $employeeExpiryService->getExpiredDocumentRows($ownedCompanyIds);
+
+        // Combine both expiring and expired, prioritizing expiring ones
+        $allRows = $expiringRows->concat($expiredRows);
 
         return Inertia::render('Dashboard', [
             'expiringEmployeesPreview' => $expiringRows->take(5)->values(),
+            'expiredEmployeesPreview' => $expiredRows->take(5)->values(),
             'expiringEmployeesCount' => $expiringRows->count(),
+            'expiredEmployeesCount' => $expiredRows->count(),
             'expiryDaysThreshold' => EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD,
         ]);
     }

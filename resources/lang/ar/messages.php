@@ -493,6 +493,7 @@ return [
             'expired_days_ago' => 'منتهية منذ {days} يوم',
             'expires_today' => 'تنتهي اليوم',
             'days_remaining' => 'متبقي {days} يوم',
+            'expired_documents' => 'الوثائق المنتهية',
 
             'probation_end_date' => 'انتهاء فترة التجربة',
             'residence_expiry_date' => 'انتهاء الإقامة',
