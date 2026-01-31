@@ -17,9 +17,9 @@ const { isMobile, state } = useSidebar();
         <SidebarMenuItem>
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                    <SidebarMenuButton size="lg" class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                    <SidebarMenuButton size="lg" class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground [&_span]:!text-white [&_div_span]:!text-white [&_div]:!text-white">
                         <UserInfo :user="user" />
-                        <ChevronsUpDown class="ml-auto size-4 text-blue-600 dark:text-blue-400" />
+                        <ChevronsUpDown class="ml-auto size-4 text-white" />
                     </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent

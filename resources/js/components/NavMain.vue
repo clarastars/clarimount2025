@@ -21,8 +21,8 @@ const page = usePage();
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton as-child :is-active="item.href === page.url" :tooltip="item.title">
                     <Link :href="item.href">
-                        <component :is="item.icon" class="text-blue-600 dark:text-blue-400" />
-                        <span>{{ item.title }}</span>
+                        <component :is="item.icon" class="text-white" />
+                        <span class="text-white font-semibold">{{ item.title }}</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

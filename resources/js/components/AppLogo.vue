@@ -9,6 +9,6 @@ const { t } = useI18n();
 <!--        <AppLogoIcon class="size-5 fill-current text-white dark:text-black" />-->
 <!--    </div>-->
     <div class="ml-1 grid flex-1 text-left rtl:text-right text-sm">
-        <span class="mb-0.5 truncate leading-tight font-semibold">{{ t('dashboard.work-portal') }}</span>
+        <span class="mb-0.5 truncate leading-tight font-bold text-white">{{ t('dashboard.work-portal') }}</span>
     </div>
 </template>
