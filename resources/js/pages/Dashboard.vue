@@ -130,54 +130,54 @@ const formatRemainingText = (daysRemaining: number) => {
             </div>
 
             <!-- Expired Documents Section -->
-            <Card v-if="expiredEmployeesPreview && expiredEmployeesPreview.length > 0" class="shadow-sm border border-gray-200 dark:border-gray-800">
-                <CardHeader class="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                    <CardTitle class="flex items-center gap-2 text-gray-900 dark:text-gray-100 text-lg font-semibold">
-                        <AlertTriangle class="h-5 w-5 text-red-600 dark:text-red-400" />
+            <Card v-if="expiredEmployeesPreview && expiredEmployeesPreview.length > 0" class="border border-gray-200 dark:border-gray-700 rounded-lg">
+                <CardHeader class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 px-5 py-4">
+                    <CardTitle class="flex items-center gap-2 text-gray-700 dark:text-gray-300 text-base font-medium">
+                        <AlertTriangle class="h-4 w-4 text-gray-500 dark:text-gray-400" />
                         {{ t('employees.expiry.expired_documents') }}
                     </CardTitle>
                 </CardHeader>
-                <CardContent class="p-6">
-                    <div class="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+                <CardContent class="p-5">
+                    <div class="grid gap-3 md:grid-cols-1 lg:grid-cols-2">
                         <Card
                             v-for="row in expiredEmployeesPreview"
                             :key="'expired-' + row.employee_id + '-' + row.expiry_field"
-                            class="group cursor-pointer transition-shadow duration-200 hover:shadow-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950"
+                            class="group cursor-pointer transition-colors duration-150 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg hover:border-gray-300 dark:hover:border-gray-600"
                             @click="$inertia.visit(route('employees.show', row.employee_id))"
                         >
-                            <CardContent class="p-6">
-                                <div class="flex items-start justify-between gap-6">
-                                    <div class="flex-1 space-y-4">
-                                        <div class="flex items-start gap-4">
-                                            <div class="rounded-md p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 flex-shrink-0">
+                            <CardContent class="p-5">
+                                <div class="flex items-start justify-between gap-5">
+                                    <div class="flex-1 space-y-3 min-w-0">
+                                        <div class="flex items-start gap-3">
+                                            <div class="rounded p-2 bg-gray-100 dark:bg-gray-800 flex-shrink-0">
                                                 <component 
                                                     :is="getToneIcon()" 
-                                                    class="h-5 w-5 text-red-600 dark:text-red-400"
+                                                    class="h-4 w-4 text-gray-500 dark:text-gray-400"
                                                 />
                                             </div>
                                             <div class="flex-1 min-w-0">
-                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100 mb-1.5">
+                                                <h3 class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 leading-tight">
                                                     {{ row.display_name || row.full_name }}
                                                 </h3>
-                                                <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                                                <p class="text-xs text-gray-600 dark:text-gray-400">
                                                     {{ t(row.expiry_label_key) }}
                                                 </p>
                                             </div>
                                         </div>
                                         
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-500 pl-11 border-t border-gray-100 dark:border-gray-800 pt-3">
-                                            <CalendarClock class="h-4 w-4 text-gray-400" />
-                                            <span class="text-gray-600 dark:text-gray-400">{{ t('employees.expiry.expiry_date') }}:</span>
-                                            <span class="font-semibold text-gray-900 dark:text-gray-100">
+                                        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-500 pl-9">
+                                            <CalendarClock class="h-3.5 w-3.5 text-gray-400" />
+                                            <span>{{ t('employees.expiry.expiry_date') }}:</span>
+                                            <span class="font-medium text-gray-700 dark:text-gray-300">
                                                 {{ new Date(row.expiry_date).toLocaleDateString() }}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-col items-end gap-3 flex-shrink-0">
+                                    <div class="flex flex-col items-end gap-2 flex-shrink-0">
                                         <Badge 
                                             variant="outline" 
-                                            class="font-medium text-xs px-3 py-1.5 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                                            class="font-normal text-[10px] px-2 py-0.5 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded"
                                         >
                                             {{ formatRemainingText(row.days_remaining) }}
                                         </Badge>
@@ -186,7 +186,7 @@ const formatRemainingText = (daysRemaining: number) => {
                                             size="sm" 
                                             asChild 
                                             @click.stop 
-                                            class="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 font-medium"
+                                            class="h-7 px-3 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-normal rounded"
                                         >
                                             <Link :href="route('employees.show', row.employee_id)">
                                                 {{ t('employees.view') }}
@@ -201,71 +201,70 @@ const formatRemainingText = (daysRemaining: number) => {
             </Card>
 
             <!-- Upcoming Expirations Section -->
-            <Card class="shadow-sm border border-gray-200 dark:border-gray-800">
-                <CardHeader class="border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                    <CardTitle class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <Card class="border border-gray-200 dark:border-gray-700 rounded-lg">
+                <CardHeader class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 px-5 py-4">
+                    <CardTitle class="text-base font-medium text-gray-700 dark:text-gray-300">
                         {{ t('employees.expiry.upcoming_expirations') }}
                     </CardTitle>
                 </CardHeader>
-                <CardContent class="p-6">
+                <CardContent class="p-5">
                     <div v-if="!expiringEmployeesPreview || expiringEmployeesPreview.length === 0" 
-                         class="py-12 text-center">
-                        <div class="flex flex-col items-center gap-3">
-                            <div class="rounded-full bg-blue-100 dark:bg-blue-900/30 p-4">
-                                <ShieldAlert class="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                         class="py-10 text-center">
+                        <div class="flex flex-col items-center gap-2.5">
+                            <div class="rounded p-3 bg-gray-100 dark:bg-gray-800">
+                                <ShieldAlert class="h-6 w-6 text-gray-400 dark:text-gray-500" />
                             </div>
                             <div>
-                                <p class="text-sm font-medium text-foreground">
+                                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {{ t('employees.expiry.no_upcoming', { days: expiryDaysThreshold }) }}
                                 </p>
-                                <p class="text-xs text-muted-foreground mt-1">
+                                <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">
                                     {{ t('employees.expiry.all_documents_valid') }}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div v-else class="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+                    <div v-else class="grid gap-3 md:grid-cols-1 lg:grid-cols-2">
                         <Card
                             v-for="row in expiringEmployeesPreview"
                             :key="row.employee_id + '-' + row.expiry_field"
-                            class="group cursor-pointer transition-shadow duration-200 hover:shadow-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950"
+                            class="group cursor-pointer transition-colors duration-150 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg hover:border-gray-300 dark:hover:border-gray-600"
                             @click="$inertia.visit(route('employees.show', row.employee_id))"
                         >
-                            <CardContent class="p-6">
-                                <div class="flex items-start justify-between gap-6">
-                                    <div class="flex-1 space-y-4">
-                                        <div class="flex items-start gap-4">
-                                            <div class="rounded-md p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 flex-shrink-0">
+                            <CardContent class="p-5">
+                                <div class="flex items-start justify-between gap-5">
+                                    <div class="flex-1 space-y-3 min-w-0">
+                                        <div class="flex items-start gap-3">
+                                            <div class="rounded p-2 bg-gray-100 dark:bg-gray-800 flex-shrink-0">
                                                 <component 
                                                     :is="getToneIcon()" 
-                                                    class="h-5 w-5 text-blue-600 dark:text-blue-400"
+                                                    class="h-4 w-4 text-gray-500 dark:text-gray-400"
                                                 />
                                             </div>
                                             <div class="flex-1 min-w-0">
-                                                <h3 class="font-semibold text-base text-gray-900 dark:text-gray-100 mb-1.5">
+                                                <h3 class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 leading-tight">
                                                     {{ row.display_name || row.full_name }}
                                                 </h3>
-                                                <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                                                <p class="text-xs text-gray-600 dark:text-gray-400">
                                                     {{ t(row.expiry_label_key) }}
                                                 </p>
                                             </div>
                                         </div>
                                         
-                                        <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-500 pl-11 border-t border-gray-100 dark:border-gray-800 pt-3">
-                                            <CalendarClock class="h-4 w-4 text-gray-400" />
-                                            <span class="text-gray-600 dark:text-gray-400">{{ t('employees.expiry.expiry_date') }}:</span>
-                                            <span class="font-semibold text-gray-900 dark:text-gray-100">
+                                        <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-500 pl-9">
+                                            <CalendarClock class="h-3.5 w-3.5 text-gray-400" />
+                                            <span>{{ t('employees.expiry.expiry_date') }}:</span>
+                                            <span class="font-medium text-gray-700 dark:text-gray-300">
                                                 {{ new Date(row.expiry_date).toLocaleDateString() }}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div class="flex flex-col items-end gap-3 flex-shrink-0">
+                                    <div class="flex flex-col items-end gap-2 flex-shrink-0">
                                         <Badge 
                                             variant="outline" 
-                                            class="font-medium text-xs px-3 py-1.5"
-                                            :class="getBadgeClasses(row.days_remaining)"
+                                            class="font-normal text-[10px] px-2 py-0.5 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded"
                                         >
                                             {{ formatRemainingText(row.days_remaining) }}
                                         </Badge>
@@ -274,7 +273,7 @@ const formatRemainingText = (daysRemaining: number) => {
                                             size="sm" 
                                             asChild 
                                             @click.stop 
-                                            class="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 font-medium"
+                                            class="h-7 px-3 text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-normal rounded"
                                         >
                                             <Link :href="route('employees.show', row.employee_id)">
                                                 {{ t('employees.view') }}
