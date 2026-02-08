@@ -134,6 +134,25 @@ class SalaryRunService
 
             case 'deduction_days':
                 // Days * daily wage
+                // Check if we have separate gross and basic days
+                if ($penalty->action_value_gross_days !== null || $penalty->action_value_basic_days !== null) {
+                    $deduction = 0;
+                    
+                    // Deduct from gross salary
+                    if ($penalty->action_value_gross_days !== null && $penalty->action_value_gross_days > 0) {
+                        $deduction += $penalty->action_value_gross_days * $dailyWage;
+                    }
+                    
+                    // Deduct from basic salary
+                    if ($penalty->action_value_basic_days !== null && $penalty->action_value_basic_days > 0 && $basicSalary !== null) {
+                        $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
+                        $deduction += $penalty->action_value_basic_days * $basicDailyWage;
+                    }
+                    
+                    return $deduction;
+                }
+                
+                // Fallback to old behavior (action_value)
                 $days = $penalty->action_value ?? 0;
                 return $days * $dailyWage;
 

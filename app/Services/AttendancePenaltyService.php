@@ -49,7 +49,12 @@ class AttendancePenaltyService
         }
 
         // Generate action text
-        $actionText = $this->generateActionText($rule->action_type, $rule->action_value);
+        $actionText = $this->generateActionText(
+            $rule->action_type, 
+            $rule->action_value,
+            $rule->action_value_gross_days,
+            $rule->action_value_basic_days
+        );
 
         // Create or get existing penalty (idempotent)
         $penalty = AttendancePenalty::firstOrCreate(
@@ -63,6 +68,8 @@ class AttendancePenaltyService
                 'repeat_number' => $repeatNumber,
                 'action_type' => $rule->action_type,
                 'action_value' => $rule->action_value,
+                'action_value_gross_days' => $rule->action_value_gross_days,
+                'action_value_basic_days' => $rule->action_value_basic_days,
                 'action_text' => $actionText,
                 'reason_text' => $rule->reason_text,
             ]
@@ -130,17 +137,62 @@ class AttendancePenaltyService
 
     /**
      * Calculate and create penalty for absence without permission
-     *
+     * 
+     * @deprecated Use calculateAbsenceWithoutExcusePenalty instead
      * @param int $employeeId
      * @param string $attendanceDate Date in Y-m-d format
      * @return AttendancePenalty|null
      */
     public function calculateAbsencePenalty(int $employeeId, string $attendanceDate): ?AttendancePenalty
     {
-        $violationType = 'absent_without_permission';
+        // Use absent_without_excuse as they are the same
+        return $this->calculateAbsenceWithoutExcusePenalty($employeeId, $attendanceDate);
+    }
+
+    /**
+     * Calculate and create penalty for absence without excuse
+     *
+     * @param int $employeeId
+     * @param string $attendanceDate Date in Y-m-d format
+     * @return AttendancePenalty|null
+     */
+    public function calculateAbsenceWithoutExcusePenalty(int $employeeId, string $attendanceDate): ?AttendancePenalty
+    {
+        $violationType = 'absent_without_excuse';
 
         // Calculate repeat number for this violation type in the same calendar year
         $repeatNumber = $this->calculateRepeatNumber($employeeId, $violationType, $attendanceDate);
+        
+        return $this->createAbsencePenaltyWithRepeatNumber($employeeId, $attendanceDate, $repeatNumber);
+    }
+
+    /**
+     * Calculate and create penalty for absence without excuse with specific repeat number
+     *
+     * @param int $employeeId
+     * @param string $attendanceDate Date in Y-m-d format
+     * @param int $repeatNumber
+     * @return AttendancePenalty|null
+     */
+    public function calculateAbsenceWithoutExcusePenaltyWithRepeatNumber(int $employeeId, string $attendanceDate, int $repeatNumber): ?AttendancePenalty
+    {
+        return $this->createAbsencePenaltyWithRepeatNumber($employeeId, $attendanceDate, $repeatNumber);
+    }
+
+    /**
+     * Create absence penalty with specific repeat number
+     *
+     * @param int $employeeId
+     * @param string $attendanceDate Date in Y-m-d format
+     * @param int $repeatNumber
+     * @return AttendancePenalty|null
+     */
+    private function createAbsencePenaltyWithRepeatNumber(int $employeeId, string $attendanceDate, int $repeatNumber): ?AttendancePenalty
+    {
+        $violationType = 'absent_without_excuse';
+        
+        // Cap repeat number at 4
+        $repeatNumber = min($repeatNumber, 4);
         
         // Get the rule for this violation type and repeat number
         $rule = LaborLawRule::byViolationType($violationType)
@@ -148,7 +200,7 @@ class AttendancePenaltyService
             ->first();
 
         if (!$rule) {
-            Log::warning('No labor law rule found for absence', [
+            Log::warning('No labor law rule found for absence without excuse', [
                 'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
             ]);
@@ -156,10 +208,15 @@ class AttendancePenaltyService
         }
 
         // Generate action text
-        $actionText = $this->generateActionText($rule->action_type, $rule->action_value);
+        $actionText = $this->generateActionText(
+            $rule->action_type, 
+            $rule->action_value,
+            $rule->action_value_gross_days,
+            $rule->action_value_basic_days
+        );
 
-        // Create or get existing penalty (idempotent)
-        $penalty = AttendancePenalty::firstOrCreate(
+        // Create or update penalty (update if exists to ensure correct repeat_number)
+        $penalty = AttendancePenalty::updateOrCreate(
             [
                 'employee_id' => $employeeId,
                 'attendance_date' => $attendanceDate,
@@ -170,6 +227,8 @@ class AttendancePenaltyService
                 'repeat_number' => $repeatNumber,
                 'action_type' => $rule->action_type,
                 'action_value' => $rule->action_value,
+                'action_value_gross_days' => $rule->action_value_gross_days,
+                'action_value_basic_days' => $rule->action_value_basic_days,
                 'action_text' => $actionText,
                 'reason_text' => $rule->reason_text,
             ]
@@ -183,17 +242,54 @@ class AttendancePenaltyService
      *
      * @param string $actionType
      * @param int|null $actionValue
+     * @param int|null $actionValueGrossDays
+     * @param int|null $actionValueBasicDays
      * @return string
      */
-    private function generateActionText(string $actionType, ?int $actionValue): string
+    private function generateActionText(
+        string $actionType, 
+        ?int $actionValue = null,
+        ?int $actionValueGrossDays = null,
+        ?int $actionValueBasicDays = null
+    ): string
     {
         return match ($actionType) {
             'warning' => 'إنذار كتابي',
             'deduction_percentage' => "خصم {$actionValue}% من الأجر اليومي",
-            'deduction_days' => 'خصم أجر يوم',
+            'deduction_days' => $this->generateDeductionDaysText($actionValue, $actionValueGrossDays, $actionValueBasicDays),
             'absent_deduction' => 'خصم يوم من الراتب الإجمالي + خصم من الراتب الأساسي لليوم التالي',
             'termination' => 'إنهاء الخدمة',
             default => 'غير محدد',
         };
+    }
+
+    /**
+     * Generate text for deduction_days action type
+     *
+     * @param int|null $actionValue
+     * @param int|null $actionValueGrossDays
+     * @param int|null $actionValueBasicDays
+     * @return string
+     */
+    private function generateDeductionDaysText(?int $actionValue, ?int $actionValueGrossDays, ?int $actionValueBasicDays): string
+    {
+        // If we have separate gross and basic days, use them
+        if ($actionValueGrossDays !== null || $actionValueBasicDays !== null) {
+            $parts = [];
+            if ($actionValueGrossDays !== null && $actionValueGrossDays > 0) {
+                $parts[] = "خصم {$actionValueGrossDays} يوم من الراتب الإجمالي";
+            }
+            if ($actionValueBasicDays !== null && $actionValueBasicDays > 0) {
+                $parts[] = "خصم {$actionValueBasicDays} يوم من الراتب الأساسي";
+            }
+            return !empty($parts) ? implode(' + ', $parts) : 'خصم أجر يوم';
+        }
+        
+        // Fallback to old behavior
+        if ($actionValue !== null && $actionValue > 0) {
+            return "خصم {$actionValue} يوم من الراتب";
+        }
+        
+        return 'خصم أجر يوم';
     }
 }

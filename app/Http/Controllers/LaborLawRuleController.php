@@ -89,6 +89,8 @@ class LaborLawRuleController extends Controller
             ],
             'action_type' => 'required|string|in:warning,deduction_percentage,deduction_days,termination',
             'action_value' => 'nullable|integer|min:0',
+            'action_value_gross_days' => 'nullable|integer|min:0',
+            'action_value_basic_days' => 'nullable|integer|min:0',
             'reason_text' => 'required|string',
         ]);
 
@@ -142,6 +144,8 @@ class LaborLawRuleController extends Controller
             ],
             'action_type' => 'required|string|in:warning,deduction_percentage,deduction_days,termination',
             'action_value' => 'nullable|integer|min:0',
+            'action_value_gross_days' => 'nullable|integer|min:0',
+            'action_value_basic_days' => 'nullable|integer|min:0',
             'reason_text' => 'required|string',
         ]);
 

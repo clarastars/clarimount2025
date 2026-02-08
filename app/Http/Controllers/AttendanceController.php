@@ -137,10 +137,18 @@ class AttendanceController extends Controller
         }
 
         // Generate all possible attendance records (including absences)
+        // Only include past dates and today (not future dates)
+        $today = Carbon::today('Asia/Riyadh');
         $allRecords = collect();
         $currentDate = $startDate->copy();
 
         while ($currentDate->lte($endDate)) {
+            // Skip future dates - only process past dates and today
+            if ($currentDate->isFuture()) {
+                $currentDate->addDay();
+                continue;
+            }
+
             $dateStr = $currentDate->format('Y-m-d');
             $weekday = $currentDate->dayOfWeek; // 0=Sunday, 6=Saturday
 
@@ -153,10 +161,10 @@ class AttendanceController extends Controller
                 $existingRecord = $existingAttendance->get($key);
 
                 if ($existingRecord) {
-                    // Use existing record
+                    // Use existing record (only if not future date)
                     $allRecords->push($existingRecord);
                 } elseif ($isWorkday) {
-                    // Create virtual record for absence
+                    // Create virtual record for absence (only for past/today dates)
                     $virtualRecord = (object) [
                         'id' => null,
                         'employee_id' => $employee->id,
@@ -180,6 +188,12 @@ class AttendanceController extends Controller
 
             $currentDate->addDay();
         }
+
+        // Also filter out any existing records that are in the future
+        $allRecords = $allRecords->filter(function ($record) use ($today) {
+            $recordDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
+            return !$recordDate->isFuture();
+        })->values();
 
         // Apply search filter if provided
         if (!empty($search)) {
@@ -227,7 +241,86 @@ class AttendanceController extends Controller
 
             // Workday maps already built above
 
-            // Process each attendance record
+            // First: Collect all absent records and process them from oldest to newest
+            // This ensures that repeat_number increases correctly (oldest = 1, newest = highest)
+            // Only process past dates and today (not future dates)
+            $today = Carbon::today('Asia/Riyadh');
+            
+            $allAbsentRecords = $fingerprintAttendance->getCollection()
+                ->filter(function ($record) use ($employees, $shiftWorkdayMaps, $today) {
+                    $employee = $employees->get($record->employee_id);
+                    if (!$employee || !$employee->shift) {
+                        return false;
+                    }
+
+                    $attDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
+                    
+                    // Only process past dates and today (not future dates)
+                    if ($attDate->isFuture()) {
+                        return false;
+                    }
+                    
+                    $weekday = $attDate->dayOfWeek;
+                    $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
+
+                    // Check if it's a workday
+                    if (!in_array($weekday, $workdays)) {
+                        return false;
+                    }
+
+                    // Check if absent (no first punch or virtual record)
+                    return !$record->first_punch || ($record->is_virtual ?? false);
+                })
+                ->sortBy('att_date') // Sort from oldest to newest
+                ->values();
+
+            // Group absent records by employee to process them correctly
+            $absentRecordsByEmployee = $allAbsentRecords->groupBy('employee_id');
+
+            // Process absent records from oldest to newest for each employee
+            foreach ($absentRecordsByEmployee as $employeeId => $employeeAbsentRecords) {
+                $repeatNumber = 0;
+                foreach ($employeeAbsentRecords as $record) {
+                    $repeatNumber++;
+                    if ($record->employee_id) {
+                        $dateStr = is_string($record->att_date) 
+                            ? $record->att_date 
+                            : ($record->att_date instanceof \Carbon\Carbon 
+                                ? $record->att_date->format('Y-m-d') 
+                                : $record->att_date);
+                        // Pass the calculated repeat_number directly
+                        $this->penaltyService->calculateAbsenceWithoutExcusePenaltyWithRepeatNumber(
+                            $record->employee_id, 
+                            $dateStr, 
+                            min($repeatNumber, 4)
+                        );
+                    }
+                }
+            }
+
+            // Delete absence penalties for records that have punches (employee came to work)
+            $recordsWithPunch = $fingerprintAttendance->getCollection()
+                ->filter(function ($record) {
+                    return $record->first_punch && !($record->is_virtual ?? false);
+                });
+
+            foreach ($recordsWithPunch as $record) {
+                if ($record->employee_id) {
+                    $dateStr = is_string($record->att_date) 
+                        ? $record->att_date 
+                        : ($record->att_date instanceof \Carbon\Carbon 
+                            ? $record->att_date->format('Y-m-d') 
+                            : $record->att_date);
+                    
+                    // Delete absence penalty if exists (employee has punch, so not absent)
+                    AttendancePenalty::where('employee_id', $record->employee_id)
+                        ->where('attendance_date', $dateStr)
+                        ->where('violation_type', 'absent_without_excuse')
+                        ->delete();
+                }
+            }
+
+            // Now process all records for display (status, late minutes, etc.)
             $fingerprintAttendance->getCollection()->transform(function ($record) use ($employees, $shiftWorkdayMaps) {
                 $employee = $employees->get($record->employee_id);
 
@@ -254,17 +347,7 @@ class AttendanceController extends Controller
                 if (!$record->first_punch || ($record->is_virtual ?? false)) {
                     $record->status_ar = 'غائب';
                     $record->late_minutes = null;
-                    
-                    // Create absence penalty if not exists
-                    if ($record->employee_id) {
-                        $dateStr = is_string($record->att_date) 
-                            ? $record->att_date 
-                            : ($record->att_date instanceof \Carbon\Carbon 
-                                ? $record->att_date->format('Y-m-d') 
-                                : $record->att_date);
-                        $this->penaltyService->calculateAbsencePenalty($record->employee_id, $dateStr);
-                    }
-                    
+                    // Penalty already created above, no need to create again
                     return $record;
                 }
 

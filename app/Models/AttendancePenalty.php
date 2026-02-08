@@ -20,6 +20,8 @@ class AttendancePenalty extends Model
         'repeat_number',
         'action_type',
         'action_value',
+        'action_value_gross_days',
+        'action_value_basic_days',
         'action_text',
         'reason_text',
         'approval_status',
@@ -34,6 +36,8 @@ class AttendancePenalty extends Model
         'late_minutes' => 'integer',
         'repeat_number' => 'integer',
         'action_value' => 'integer',
+        'action_value_gross_days' => 'integer',
+        'action_value_basic_days' => 'integer',
         'approved_at' => 'datetime',
     ];
 

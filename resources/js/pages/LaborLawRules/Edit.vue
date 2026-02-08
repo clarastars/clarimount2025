@@ -20,6 +20,8 @@ interface LaborLawRule {
     repeat_number: number
     action_type: string
     action_value: number | null
+    action_value_gross_days: number | null
+    action_value_basic_days: number | null
     reason_text: string
 }
 
@@ -51,6 +53,8 @@ const form = useForm({
     repeat_number: props.rule.repeat_number,
     action_type: props.rule.action_type,
     action_value: props.rule.action_value,
+    action_value_gross_days: props.rule.action_value_gross_days,
+    action_value_basic_days: props.rule.action_value_basic_days,
     reason_text: props.rule.reason_text,
 })
 
@@ -59,6 +63,7 @@ const violationTypes = [
     { value: 'late_15_30', label: t('labor_law_rules.violation_late_15_30') },
     { value: 'late_30_60', label: t('labor_law_rules.violation_late_30_60') },
     { value: 'late_over_60', label: t('labor_law_rules.violation_late_over_60') },
+    { value: 'absent_without_excuse', label: t('labor_law_rules.violation_absent_without_excuse') },
 ]
 
 const actionTypes = [
@@ -70,6 +75,14 @@ const actionTypes = [
 
 const showActionValue = computed(() => {
     return form.action_type === 'deduction_percentage' || form.action_type === 'deduction_days'
+})
+
+const showDeductionDaysFields = computed(() => {
+    return form.action_type === 'deduction_days'
+})
+
+const showMinutesRange = computed(() => {
+    return form.violation_type !== 'absent_without_excuse' && form.violation_type !== 'absent_without_permission'
 })
 
 const submit = () => {
@@ -107,7 +120,7 @@ const submit = () => {
                             </div>
 
                             <!-- Minutes Range -->
-                            <div class="grid grid-cols-2 gap-4">
+                            <div v-if="showMinutesRange" class="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label for="min_minutes">{{ $t('labor_law_rules.min_minutes') }}</Label>
                                     <Input
@@ -166,7 +179,7 @@ const submit = () => {
                             </div>
 
                             <!-- Action Value -->
-                            <div v-if="showActionValue">
+                            <div v-if="showActionValue && !showDeductionDaysFields">
                                 <Label for="action_value">{{ $t('labor_law_rules.action_value') }}</Label>
                                 <Input
                                     id="action_value"
@@ -184,6 +197,38 @@ const submit = () => {
                                     </span>
                                 </p>
                                 <InputError :message="form.errors.action_value" />
+                            </div>
+
+                            <!-- Deduction Days Fields (Gross and Basic) -->
+                            <div v-if="showDeductionDaysFields" class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label for="action_value_gross_days">{{ $t('labor_law_rules.action_value_gross_days') }}</Label>
+                                    <Input
+                                        id="action_value_gross_days"
+                                        v-model.number="form.action_value_gross_days"
+                                        type="number"
+                                        min="0"
+                                        placeholder="1"
+                                    />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $t('labor_law_rules.action_value_gross_days_hint') }}
+                                    </p>
+                                    <InputError :message="form.errors.action_value_gross_days" />
+                                </div>
+                                <div>
+                                    <Label for="action_value_basic_days">{{ $t('labor_law_rules.action_value_basic_days') }}</Label>
+                                    <Input
+                                        id="action_value_basic_days"
+                                        v-model.number="form.action_value_basic_days"
+                                        type="number"
+                                        min="0"
+                                        placeholder="1"
+                                    />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $t('labor_law_rules.action_value_basic_days_hint') }}
+                                    </p>
+                                    <InputError :message="form.errors.action_value_basic_days" />
+                                </div>
                             </div>
 
                             <!-- Reason Text -->

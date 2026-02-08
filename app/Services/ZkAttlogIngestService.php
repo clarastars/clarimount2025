@@ -8,6 +8,7 @@ use App\Models\ZkDevice;
 use App\Models\ZkAttendanceRaw;
 use App\Models\ZkDailyAttendance;
 use App\Models\Employee;
+use App\Models\AttendancePenalty;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +160,17 @@ class ZkAttlogIngestService
             }
 
             $dailyAttendance->save();
+
+            // If employee has a punch, delete any absence penalty (employee came to work)
+            if ($dailyAttendance->first_punch) {
+                $employee = Employee::where('fingerprint_device_id', $devicePin)->first();
+                if ($employee) {
+                    AttendancePenalty::where('employee_id', $employee->id)
+                        ->where('attendance_date', $attDate)
+                        ->where('violation_type', 'absent_without_excuse')
+                        ->delete();
+                }
+            }
 
             // Calculate penalty if attendance was created or first_punch was updated
             if ($dailyAttendance->wasRecentlyCreated || 

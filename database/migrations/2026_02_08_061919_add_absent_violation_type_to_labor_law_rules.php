@@ -12,49 +12,57 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Insert absence violation rules
+        // Insert absence violation rules (using absent_without_excuse as unified type)
         $rules = [
             [
-                'violation_type' => 'absent_without_permission',
+                'violation_type' => 'absent_without_excuse',
                 'min_minutes' => null,
                 'max_minutes' => null,
                 'repeat_number' => 1,
-                'action_type' => 'absent_deduction',
+                'action_type' => 'deduction_days',
                 'action_value' => null,
-                'reason_text' => 'غياب بدون إذن - المرة الأولى',
+                'action_value_gross_days' => 1,
+                'action_value_basic_days' => 1,
+                'reason_text' => 'غياب بدون عذر - المرة الأولى',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
-                'violation_type' => 'absent_without_permission',
+                'violation_type' => 'absent_without_excuse',
                 'min_minutes' => null,
                 'max_minutes' => null,
                 'repeat_number' => 2,
-                'action_type' => 'absent_deduction',
+                'action_type' => 'deduction_days',
                 'action_value' => null,
-                'reason_text' => 'غياب بدون إذن - المرة الثانية',
+                'action_value_gross_days' => 1,
+                'action_value_basic_days' => 1,
+                'reason_text' => 'غياب بدون عذر - المرة الثانية',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
-                'violation_type' => 'absent_without_permission',
+                'violation_type' => 'absent_without_excuse',
                 'min_minutes' => null,
                 'max_minutes' => null,
                 'repeat_number' => 3,
-                'action_type' => 'absent_deduction',
+                'action_type' => 'deduction_days',
                 'action_value' => null,
-                'reason_text' => 'غياب بدون إذن - المرة الثالثة',
+                'action_value_gross_days' => 1,
+                'action_value_basic_days' => 1,
+                'reason_text' => 'غياب بدون عذر - المرة الثالثة',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
-                'violation_type' => 'absent_without_permission',
+                'violation_type' => 'absent_without_excuse',
                 'min_minutes' => null,
                 'max_minutes' => null,
                 'repeat_number' => 4,
-                'action_type' => 'absent_deduction',
+                'action_type' => 'termination',
                 'action_value' => null,
-                'reason_text' => 'غياب بدون إذن - المرة الرابعة',
+                'action_value_gross_days' => null,
+                'action_value_basic_days' => null,
+                'reason_text' => 'إنهاء الخدمة بسبب تكرار الغياب بدون عذر',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -80,7 +88,7 @@ return new class extends Migration
     {
         // Remove absence violation rules
         DB::table('labor_law_rules')
-            ->where('violation_type', 'absent_without_permission')
+            ->where('violation_type', 'absent_without_excuse')
             ->delete();
     }
 };
