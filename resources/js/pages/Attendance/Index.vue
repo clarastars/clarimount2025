@@ -202,16 +202,18 @@
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center">
-                          <Badge variant="secondary" class="px-3 py-1">
+                          <Badge v-if="record.device_pin" variant="secondary" class="px-3 py-1">
                             {{ record.device_pin }}
                           </Badge>
+                          <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex flex-col items-center justify-center space-y-1">
-                          <div class="text-base font-semibold text-gray-900 dark:text-white">
+                          <div v-if="record.first_punch" class="text-base font-semibold text-gray-900 dark:text-white">
                             {{ formatDateTime(record.first_punch) }}
                           </div>
+                          <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
                           <Badge v-if="record.first_verify_mode !== null" variant="outline" class="text-xs mt-1">
                             {{ $t('attendance.verify_mode') }}: {{ getVerifyModeName(record.first_verify_mode) }}
                           </Badge>
@@ -219,9 +221,10 @@
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex flex-col items-center justify-center space-y-1">
-                          <div class="text-base font-semibold text-gray-900 dark:text-white">
+                          <div v-if="record.last_punch" class="text-base font-semibold text-gray-900 dark:text-white">
                             {{ formatDateTime(record.last_punch) }}
                           </div>
+                          <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
                           <Badge v-if="record.last_verify_mode !== null" variant="outline" class="text-xs mt-1">
                             {{ $t('attendance.verify_mode') }}: {{ getVerifyModeName(record.last_verify_mode) }}
                           </Badge>

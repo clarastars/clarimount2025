@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ZkDailyAttendance;
 use App\Services\AttendanceImportService;
+use App\Services\AttendancePenaltyService;
 use App\Jobs\ProcessBayzatSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,8 @@ use Carbon\Carbon;
 class AttendanceController extends Controller
 {
     public function __construct(
-        private AttendanceImportService $importService
+        private AttendanceImportService $importService,
+        private AttendancePenaltyService $penaltyService
     ) {}
 
     public function index(Request $request, Company $company): Response
@@ -87,7 +89,13 @@ class AttendanceController extends Controller
                 $endDate = $now->copy()->endOfDay();
         }
 
-        $query = ZkDailyAttendance::query()
+        // Get all employees in the company with their shifts
+        $allEmployees = Employee::with(['shift.workdays'])
+            ->where('company_id', $company->id)
+            ->get();
+
+        // Get existing attendance records
+        $existingAttendance = ZkDailyAttendance::query()
             ->select([
                 'zk_daily_attendance.*',
                 'employees.id as employee_id',
@@ -106,25 +114,104 @@ class AttendanceController extends Controller
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d')
             ])
-            ->where('employees.company_id', $company->id);
+            ->where('employees.company_id', $company->id)
+            ->get()
+            ->keyBy(function ($record) {
+                $dateStr = is_string($record->att_date) 
+                    ? $record->att_date 
+                    : ($record->att_date instanceof \Carbon\Carbon 
+                        ? $record->att_date->format('Y-m-d') 
+                        : $record->att_date);
+                return ($record->employee_id ?? 'no_emp') . '_' . $dateStr;
+            });
+
+        // Build workday maps for quick lookup
+        $shiftWorkdayMaps = [];
+        foreach ($allEmployees as $employee) {
+            if ($employee->shift) {
+                $shiftWorkdayMaps[$employee->id] = $employee->shift->workdays
+                    ->where('is_workday', true)
+                    ->pluck('weekday')
+                    ->toArray();
+            }
+        }
+
+        // Generate all possible attendance records (including absences)
+        $allRecords = collect();
+        $currentDate = $startDate->copy();
+
+        while ($currentDate->lte($endDate)) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $weekday = $currentDate->dayOfWeek; // 0=Sunday, 6=Saturday
+
+            foreach ($allEmployees as $employee) {
+                $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
+                $isWorkday = in_array($weekday, $workdays);
+
+                // Check if there's an existing attendance record
+                $key = $employee->id . '_' . $dateStr;
+                $existingRecord = $existingAttendance->get($key);
+
+                if ($existingRecord) {
+                    // Use existing record
+                    $allRecords->push($existingRecord);
+                } elseif ($isWorkday) {
+                    // Create virtual record for absence
+                    $virtualRecord = (object) [
+                        'id' => null,
+                        'employee_id' => $employee->id,
+                        'first_name' => $employee->first_name,
+                        'last_name' => $employee->last_name,
+                        'emp_code' => $employee->employee_id,
+                        'company_id' => $employee->company_id,
+                        'att_date' => $dateStr,
+                        'device_pin' => $employee->fingerprint_device_id ?? null,
+                        'first_punch' => null,
+                        'last_punch' => null,
+                        'punch_count' => 0,
+                        'device_name' => null,
+                        'serial_number' => null,
+                        'is_virtual' => true, // Flag to identify virtual records
+                    ];
+                    $allRecords->push($virtualRecord);
+                }
+                // If not a workday, skip (no record needed)
+            }
+
+            $currentDate->addDay();
+        }
 
         // Apply search filter if provided
         if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('employees.first_name', 'like', "%{$search}%")
-                  ->orWhere('employees.last_name', 'like', "%{$search}%")
-                  ->orWhereRaw("CONCAT(employees.first_name, ' ', employees.last_name) LIKE ?", ["%{$search}%"])
-                  ->orWhere('employees.employee_id', 'like', "%{$search}%")
-                  ->orWhere('zk_daily_attendance.device_pin', 'like', "%{$search}%");
+            $allRecords = $allRecords->filter(function ($record) use ($search) {
+                $fullName = ($record->first_name ?? '') . ' ' . ($record->last_name ?? '');
+                return stripos($record->first_name ?? '', $search) !== false
+                    || stripos($record->last_name ?? '', $search) !== false
+                    || stripos($fullName, $search) !== false
+                    || stripos($record->emp_code ?? '', $search) !== false
+                    || stripos($record->device_pin ?? '', $search) !== false;
             });
         }
 
-        $fingerprintAttendance = $query
-            ->orderBy('zk_daily_attendance.att_date', 'desc')
-            ->orderBy('employees.first_name', 'asc')
-            ->orderBy('employees.last_name', 'asc')
-            ->paginate(15)
-            ->withQueryString();
+        // Sort records
+        $allRecords = $allRecords->sortBy([
+            ['att_date', 'desc'],
+            ['first_name', 'asc'],
+            ['last_name', 'asc'],
+        ])->values();
+
+        // Paginate manually
+        $perPage = 15;
+        $currentPage = $request->query('page', 1);
+        $items = $allRecords->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        
+        $fingerprintAttendance = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $allRecords->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         // Calculate attendance status and late minutes based on shifts
         // All timezone calculations use Asia/Riyadh timezone
@@ -135,23 +222,10 @@ class AttendanceController extends Controller
             ->values();
 
         if ($employeeIds->isNotEmpty()) {
-            // Eager load employees with shifts and workdays
-            $employees = Employee::with(['shift.workdays'])
-                ->whereIn('id', $employeeIds)
-                ->get()
-                ->keyBy('id');
+            // Eager load employees with shifts and workdays (already loaded above)
+            $employees = $allEmployees->keyBy('id');
 
-            // Build workday maps for quick lookup
-            // Weekday representation: 0=Sunday, 1=Monday, ..., 6=Saturday
-            $shiftWorkdayMaps = [];
-            foreach ($employees as $employee) {
-                if ($employee->shift) {
-                    $shiftWorkdayMaps[$employee->id] = $employee->shift->workdays
-                        ->where('is_workday', true)
-                        ->pluck('weekday')
-                        ->toArray();
-                }
-            }
+            // Workday maps already built above
 
             // Process each attendance record
             $fingerprintAttendance->getCollection()->transform(function ($record) use ($employees, $shiftWorkdayMaps) {
@@ -176,10 +250,21 @@ class AttendanceController extends Controller
                     return $record;
                 }
 
-                // No first punch (absent)
-                if (!$record->first_punch) {
+                // No first punch (absent) or virtual record
+                if (!$record->first_punch || ($record->is_virtual ?? false)) {
                     $record->status_ar = 'غائب';
                     $record->late_minutes = null;
+                    
+                    // Create absence penalty if not exists
+                    if ($record->employee_id) {
+                        $dateStr = is_string($record->att_date) 
+                            ? $record->att_date 
+                            : ($record->att_date instanceof \Carbon\Carbon 
+                                ? $record->att_date->format('Y-m-d') 
+                                : $record->att_date);
+                        $this->penaltyService->calculateAbsencePenalty($record->employee_id, $dateStr);
+                    }
+                    
                     return $record;
                 }
 

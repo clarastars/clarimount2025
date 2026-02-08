@@ -129,6 +129,56 @@ class AttendancePenaltyService
     }
 
     /**
+     * Calculate and create penalty for absence without permission
+     *
+     * @param int $employeeId
+     * @param string $attendanceDate Date in Y-m-d format
+     * @return AttendancePenalty|null
+     */
+    public function calculateAbsencePenalty(int $employeeId, string $attendanceDate): ?AttendancePenalty
+    {
+        $violationType = 'absent_without_permission';
+
+        // Calculate repeat number for this violation type in the same calendar year
+        $repeatNumber = $this->calculateRepeatNumber($employeeId, $violationType, $attendanceDate);
+        
+        // Get the rule for this violation type and repeat number
+        $rule = LaborLawRule::byViolationType($violationType)
+            ->byRepeatNumber($repeatNumber)
+            ->first();
+
+        if (!$rule) {
+            Log::warning('No labor law rule found for absence', [
+                'violation_type' => $violationType,
+                'repeat_number' => $repeatNumber,
+            ]);
+            return null;
+        }
+
+        // Generate action text
+        $actionText = $this->generateActionText($rule->action_type, $rule->action_value);
+
+        // Create or get existing penalty (idempotent)
+        $penalty = AttendancePenalty::firstOrCreate(
+            [
+                'employee_id' => $employeeId,
+                'attendance_date' => $attendanceDate,
+            ],
+            [
+                'late_minutes' => 0, // No late minutes for absence
+                'violation_type' => $violationType,
+                'repeat_number' => $repeatNumber,
+                'action_type' => $rule->action_type,
+                'action_value' => $rule->action_value,
+                'action_text' => $actionText,
+                'reason_text' => $rule->reason_text,
+            ]
+        );
+
+        return $penalty;
+    }
+
+    /**
      * Generate action text based on action type and value
      *
      * @param string $actionType
@@ -141,6 +191,7 @@ class AttendancePenaltyService
             'warning' => 'إنذار كتابي',
             'deduction_percentage' => "خصم {$actionValue}% من الأجر اليومي",
             'deduction_days' => 'خصم أجر يوم',
+            'absent_deduction' => 'خصم يوم من الراتب الإجمالي + خصم من الراتب الأساسي لليوم التالي',
             'termination' => 'إنهاء الخدمة',
             default => 'غير محدد',
         };

@@ -60,7 +60,8 @@ class SalaryRunService
                 $breakdown = [];
 
                 foreach ($approvedPenalties as $penalty) {
-                    $penaltyAmount = $this->calculatePenaltyAmount($penalty, $grossSalary, $dailyWage);
+                    $basicSalary = $employee->basic_salary ? (float) $employee->basic_salary : null;
+                    $penaltyAmount = $this->calculatePenaltyAmount($penalty, $grossSalary, $dailyWage, $basicSalary);
                     $penaltiesTotal += $penaltyAmount;
 
                     $breakdown[] = [
@@ -117,9 +118,10 @@ class SalaryRunService
      * @param AttendancePenalty $penalty
      * @param float $grossSalary
      * @param float $dailyWage
+     * @param float|null $basicSalary
      * @return float
      */
-    public function calculatePenaltyAmount(AttendancePenalty $penalty, float $grossSalary, float $dailyWage): float
+    public function calculatePenaltyAmount(AttendancePenalty $penalty, float $grossSalary, float $dailyWage, ?float $basicSalary = null): float
     {
         switch ($penalty->action_type) {
             case 'warning':
@@ -134,6 +136,19 @@ class SalaryRunService
                 // Days * daily wage
                 $days = $penalty->action_value ?? 0;
                 return $days * $dailyWage;
+
+            case 'absent_deduction':
+                // Absence penalty: deduct one day from gross salary + one day from basic salary for next day
+                // For the absence day: deduct full day from gross salary
+                $deduction = $dailyWage;
+                
+                // For the next day: deduct one day from basic salary
+                if ($basicSalary !== null) {
+                    $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
+                    $deduction += $basicDailyWage;
+                }
+                
+                return $deduction;
 
             case 'termination':
                 // Not calculated in salary (or flag only)
