@@ -27,6 +27,12 @@
                                     {{ t('custody.update_custody') }}
                                 </Link>
                             </Button>
+                            <Button variant="default" asChild>
+                                <Link :href="route('employees.leaves.create', employee.id)">
+                                    <Icon name="CalendarPlus" class="mr-2 h-4 w-4" />
+                                    {{ t('leaves.create_leave') }}
+                                </Link>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -142,6 +148,49 @@
                                 <div v-if="employee.work_address" class="md:col-span-2">
                                     <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('employees.work_address') }}</Label>
                                     <p class="text-sm">{{ employee.work_address }}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <!-- Annual Leave Balance -->
+                        <Card v-if="employee.annual_leave_balance != null && employee.annual_leave_balance >= 0">
+                            <CardHeader>
+                                <CardTitle class="flex items-center gap-2">
+                                    <Icon name="Calendar" class="h-5 w-5 text-amber-600" />
+                                    {{ t('leaves.annual_leave_section') }}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('leaves.annual_leave_balance') }}</Label>
+                                        <p class="text-sm font-medium">{{ employee.annual_leave_balance }} {{ t('leaves.days') }}</p>
+                                    </div>
+                                    <div>
+                                        <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('leaves.remaining_balance') }}</Label>
+                                        <p class="text-sm font-medium">{{ employee.remaining_annual_leave_balance }} {{ t('leaves.days') }}</p>
+                                    </div>
+                                </div>
+                                <!-- Leave History -->
+                                <div>
+                                    <Label class="text-sm font-medium text-muted-foreground mb-2 block">{{ t('leaves.leave_history') }}</Label>
+                                    <div v-if="employee.leaves && employee.leaves.length > 0" class="space-y-2">
+                                        <div
+                                            v-for="leave in employee.leaves"
+                                            :key="leave.id"
+                                            class="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                                        >
+                                            <div class="flex items-center gap-2">
+                                                <Icon name="Calendar" class="h-4 w-4 text-amber-600" />
+                                                <span class="text-sm font-medium">{{ t(`leaves.type_${leave.leave_type}`) }}</span>
+                                            </div>
+                                            <div class="text-sm text-muted-foreground">
+                                                {{ new Date(leave.start_date).toLocaleDateString() }} — {{ new Date(leave.end_date).toLocaleDateString() }}
+                                                <span class="text-xs">({{ leave.days }} {{ t('leaves.days') }})</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p v-else class="text-sm text-muted-foreground py-2">{{ t('leaves.no_leaves_yet') }}</p>
                                 </div>
                             </CardContent>
                         </Card>

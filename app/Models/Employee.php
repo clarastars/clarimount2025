@@ -33,6 +33,7 @@ class Employee extends Model
         'job_title',
         'basic_salary',
         'allowances',
+        'annual_leave_balance',
         'manager',
         'direct_manager',
         'additional_approver_2',
@@ -76,12 +77,21 @@ class Employee extends Model
         'insurance_expiry_date' => 'date',
         'basic_salary' => 'decimal:2',
         'allowances' => 'decimal:2',
+        'annual_leave_balance' => 'integer',
     ];
 
     protected $appends = [
         'full_name',
         'display_name',
     ];
+
+    /**
+     * Get all leaves for this employee.
+     */
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(Leave::class);
+    }
 
     /**
      * Get the company this employee belongs to.
@@ -177,6 +187,19 @@ class Employee extends Model
     public function getDisplayNameAttribute(): string
     {
         return $this->employee_id . ' - ' . $this->full_name;
+    }
+
+    /**
+     * Get remaining annual leave balance (annual_leave_balance minus deducted days).
+     */
+    public function getRemainingAnnualLeaveBalanceAttribute(): int
+    {
+        $balance = (int) ($this->attributes['annual_leave_balance'] ?? 0);
+        $deducted = (int) $this->leaves()
+            ->where('deduct_from_balance', true)
+            ->sum('days');
+
+        return max(0, $balance - $deducted);
     }
 
     /**

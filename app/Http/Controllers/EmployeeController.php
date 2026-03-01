@@ -268,6 +268,7 @@ class EmployeeController extends Controller
             'emergency_contact_email' => 'nullable|email|max:255',
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
+            'annual_leave_balance' => 'nullable|integer|min:0',
         ]);
 
         \Log::info('Validation passed, checking department...');
@@ -334,9 +335,11 @@ class EmployeeController extends Controller
             'assets.assetCategory',
             'assetAssignments.asset.assetCategory',
             'reportedTickets.ticketCategory',
-            'debts'
+            'debts',
+            'leaves' => fn ($q) => $q->orderBy('start_date', 'desc'),
         ]);
         $employee->loadCount(['assets', 'reportedTickets']);
+        $employee->append('remaining_annual_leave_balance');
 
         return Inertia::render('Employees/Show', [
             'employee' => $employee,
@@ -447,6 +450,7 @@ class EmployeeController extends Controller
             'emergency_contact_email' => 'nullable|email|max:255',
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
+            'annual_leave_balance' => 'nullable|integer|min:0',
         ]);
 
         // Validate department belongs to selected company if specified

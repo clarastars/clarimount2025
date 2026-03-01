@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AttendancePenalty;
 use App\Models\Employee;
 use App\Models\EmployeeDebt;
+use App\Models\Leave;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
 use Carbon\Carbon;
@@ -88,7 +89,27 @@ class SalaryRunService
                     }
                 }
 
-                $netSalary = $grossSalary - $penaltiesTotal - $debtDeductionsTotal;
+                // Unpaid leave deduction: get leaves where is_paid = false overlapping this month
+                $unpaidLeaves = Leave::where('employee_id', $employee->id)
+                    ->where('is_paid', false)
+                    ->get()
+                    ->filter(fn (Leave $leave) => $leave->overlapsMonth($year, $month));
+
+                $unpaidLeaveTotal = 0;
+                foreach ($unpaidLeaves as $leave) {
+                    $daysInMonth = $leave->daysInMonth($year, $month);
+                    $amount = round($daysInMonth * $dailyWage, 2);
+                    $unpaidLeaveTotal += $amount;
+                    $breakdown[] = [
+                        'date' => $leave->start_date->format('Y-m-d') . ' / ' . $leave->end_date->format('Y-m-d'),
+                        'action_type' => 'unpaid_leave',
+                        'action_value' => $daysInMonth,
+                        'action_text' => 'Unpaid leave',
+                        'amount' => $amount,
+                    ];
+                }
+
+                $netSalary = $grossSalary - $penaltiesTotal - (float) $unpaidLeaveTotal - $debtDeductionsTotal;
 
                 // Upsert salary run item
                 SalaryRunItem::updateOrCreate(
@@ -101,6 +122,7 @@ class SalaryRunService
                         'allowances' => $employee->allowances ?? 0,
                         'gross_salary' => $grossSalary,
                         'penalties_total' => $penaltiesTotal,
+                        'unpaid_leave_total' => $unpaidLeaveTotal,
                         'net_salary' => $netSalary,
                         'breakdown' => $breakdown,
                         'debt_deductions' => $debtDeductions, // Preserve existing debt deductions

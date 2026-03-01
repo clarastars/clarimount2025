@@ -422,6 +422,34 @@
                     </Collapsible>
                 </Card>
 
+                <!-- Annual Leave Section -->
+                <Card>
+                    <CardHeader class="cursor-pointer hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <Icon name="Calendar" class="h-5 w-5 text-amber-600" />
+                                <CardTitle class="text-xl">{{ t('leaves.annual_leave_section') }}</CardTitle>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <Label for="annual_leave_balance" class="mb-2">{{ t('leaves.annual_leave_balance') }}</Label>
+                                <Input
+                                    id="annual_leave_balance"
+                                    v-model.number="form.annual_leave_balance"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    :placeholder="t('leaves.annual_leave_balance_placeholder')"
+                                />
+                                <div v-if="form.errors.annual_leave_balance" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.annual_leave_balance || "") }}</div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <!-- Legal Information Section -->
                 <Card>
                     <Collapsible v-model:open="sectionLegal">
@@ -1038,7 +1066,8 @@ const form = useForm({
     job_title: props.employee.job_title || '',
     basic_salary: props.employee.basic_salary || '',
     allowances: props.employee.allowances || '',
-    
+    annual_leave_balance: props.employee.annual_leave_balance ?? 21,
+
     // Legal Information
     id_number: props.employee.id_number || '',
     residence_expiry_date: props.employee.residence_expiry_date || '',

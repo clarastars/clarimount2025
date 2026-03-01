@@ -8,6 +8,7 @@ use App\Http\Controllers\LaborLawRuleController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
+use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
@@ -156,7 +157,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])
         ->name('employees.expiring-documents.index');
     Route::resource('employees', EmployeeController::class);
-    
+
+    // Employee Leaves routes
+    Route::get('employees/{employee}/leaves/create', [LeaveController::class, 'create'])->name('employees.leaves.create');
+    Route::post('employees/{employee}/leaves', [LeaveController::class, 'store'])->name('employees.leaves.store');
+
     // Employee Debts routes
     Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {
         Route::post('/', [EmployeeDebtController::class, 'store'])->name('store');
