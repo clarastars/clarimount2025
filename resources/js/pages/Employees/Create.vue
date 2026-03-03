@@ -157,7 +157,7 @@ const selectedDepartment = ref<Department | null>(null)
 // Form completion tracking
 const completedSections = computed(() => {
     const sections = {
-        general: form.first_name && form.last_name && form.email,
+        general: form.first_name && form.last_name,
         work: form.job_title || form.department || form.employment_date,
         legal: form.id_number || form.passport_number,
         insurance: form.insurance_policy,
@@ -838,14 +838,13 @@ const formatCurrency = (amount: number) => {
                             <!-- Personal Email -->
                             <div>
                                 <Label for="email" class="mb-2">
-                                    {{ t('employees.email') }} *
+                                    {{ t('employees.email') }}
                                     <span v-if="form.errors.email" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <Input 
                                     id="email"
                                     v-model="form.email" 
-                                    type="email" 
-                                    required
+                                    type="email"
                                     :placeholder="t('employees.email_placeholder')"
                                     :class="form.errors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
                                 />

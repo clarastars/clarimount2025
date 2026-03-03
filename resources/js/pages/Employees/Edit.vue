@@ -129,13 +129,12 @@
 
                                     <!-- Email -->
                                     <div>
-                                        <Label for="email" class="mb-2">{{ t('employees.email') }} *</Label>
+                                        <Label for="email" class="mb-2">{{ t('employees.email') }}</Label>
                                         <Input 
                                             id="email"
                                             v-model="form.email" 
                                             type="email" 
                                             :placeholder="t('employees.email_placeholder')"
-                                            required
                                         />
                                         <div v-if="form.errors.email" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.email || "") }}</div>
                                     </div>
@@ -1250,7 +1249,7 @@ if (props.employee.department_id) {
 // Form completion tracking
 const completedSections = computed(() => {
     const sections = {
-        general: form.first_name && form.last_name && form.email,
+        general: form.first_name && form.last_name,
         work: form.job_title || form.department || form.employment_date,
         legal: form.id_number || form.passport_number,
         insurance: form.insurance_policy,

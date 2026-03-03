@@ -230,7 +230,7 @@ class EmployeeController extends Controller
             'nationality_id' => 'nullable|exists:nationalities,id',
             'residence_country_id' => 'nullable|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'email' => 'required|email|max:255|unique:employees,email',
+            'email' => 'nullable|email|max:255|unique:employees,email',
             'personal_email' => 'nullable|email|max:255',
             'work_email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
@@ -294,6 +294,10 @@ class EmployeeController extends Controller
         // Set default employment status if not provided
         if (empty($validated['employment_status'])) {
             $validated['employment_status'] = 'active';
+        }
+
+        if (isset($validated['email']) && $validated['email'] === '') {
+            $validated['email'] = null;
         }
 
         try {
@@ -417,7 +421,7 @@ class EmployeeController extends Controller
             'nationality_id' => 'nullable|exists:nationalities,id',
             'residence_country_id' => 'nullable|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'email' => 'required|email|max:255|unique:employees,email,' . $employee->id,
+            'email' => 'nullable|email|max:255|unique:employees,email,' . $employee->id,
             'personal_email' => 'nullable|email|max:255',
             'work_email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
@@ -472,6 +476,10 @@ class EmployeeController extends Controller
             if (!$department) {
                 return back()->withErrors(['department_id' => 'Invalid department selection for the chosen company.']);
             }
+        }
+
+        if (isset($validated['email']) && $validated['email'] === '') {
+            $validated['email'] = null;
         }
 
         $employee->update($validated);
