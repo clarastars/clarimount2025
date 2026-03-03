@@ -417,6 +417,37 @@
                                         <div v-if="form.errors.allowances" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.allowances || "") }}</div>
                                     </div>
                                 </div>
+                                <!-- Allowance breakdown (display detail only) -->
+                                <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <p class="text-sm font-medium text-muted-foreground mb-3">{{ t('employees.allowances_breakdown') }}</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div>
+                                            <Label for="allowance_housing" class="mb-1 text-sm">{{ t('employees.allowance_housing') }}</Label>
+                                            <Input id="allowance_housing" v-model="form.allowance_housing" type="number" step="0.01" min="0" class="h-9" />
+                                            <div v-if="form.errors.allowance_housing" class="text-red-500 text-xs mt-1">{{ form.errors.allowance_housing }}</div>
+                                        </div>
+                                        <div>
+                                            <Label for="allowance_transportation" class="mb-1 text-sm">{{ t('employees.allowance_transportation') }}</Label>
+                                            <Input id="allowance_transportation" v-model="form.allowance_transportation" type="number" step="0.01" min="0" class="h-9" />
+                                            <div v-if="form.errors.allowance_transportation" class="text-red-500 text-xs mt-1">{{ form.errors.allowance_transportation }}</div>
+                                        </div>
+                                        <div>
+                                            <Label for="allowance_other" class="mb-1 text-sm">{{ t('employees.allowance_other') }}</Label>
+                                            <Input id="allowance_other" v-model="form.allowance_other" type="number" step="0.01" min="0" class="h-9" />
+                                            <div v-if="form.errors.allowance_other" class="text-red-500 text-xs mt-1">{{ form.errors.allowance_other }}</div>
+                                        </div>
+                                        <div>
+                                            <Label for="allowance_food" class="mb-1 text-sm">{{ t('employees.allowance_food') }}</Label>
+                                            <Input id="allowance_food" v-model="form.allowance_food" type="number" step="0.01" min="0" class="h-9" />
+                                            <div v-if="form.errors.allowance_food" class="text-red-500 text-xs mt-1">{{ form.errors.allowance_food }}</div>
+                                        </div>
+                                        <div>
+                                            <Label for="allowance_personal_car" class="mb-1 text-sm">{{ t('employees.allowance_personal_car') }}</Label>
+                                            <Input id="allowance_personal_car" v-model="form.allowance_personal_car" type="number" step="0.01" min="0" class="h-9" />
+                                            <div v-if="form.errors.allowance_personal_car" class="text-red-500 text-xs mt-1">{{ form.errors.allowance_personal_car }}</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </CollapsibleContent>
                     </Collapsible>
@@ -1066,6 +1097,11 @@ const form = useForm({
     job_title: props.employee.job_title || '',
     basic_salary: props.employee.basic_salary || '',
     allowances: props.employee.allowances || '',
+    allowance_housing: props.employee.allowance_housing ?? '',
+    allowance_transportation: props.employee.allowance_transportation ?? '',
+    allowance_other: props.employee.allowance_other ?? '',
+    allowance_food: props.employee.allowance_food ?? '',
+    allowance_personal_car: props.employee.allowance_personal_car ?? '',
     annual_leave_balance: props.employee.annual_leave_balance ?? 21,
 
     // Legal Information

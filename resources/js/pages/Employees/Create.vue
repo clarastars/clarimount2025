@@ -72,6 +72,11 @@ const form = useForm({
     job_title: '',
     basic_salary: '',
     allowances: '',
+    allowance_housing: '',
+    allowance_transportation: '',
+    allowance_other: '',
+    allowance_food: '',
+    allowance_personal_car: '',
     
     // Legal Information
     id_number: '',
@@ -1007,6 +1012,33 @@ const formatCurrency = (amount: number) => {
                                         <div v-if="form.errors.allowances" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />
                                             {{ translateValidationError(form.errors.allowances || "") }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Allowance breakdown -->
+                                    <div class="md:col-span-2 lg:col-span-3 mt-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <p class="text-sm font-medium text-muted-foreground mb-3">{{ t('employees.allowances_breakdown') }}</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div>
+                                                <Label for="allowance_housing" class="mb-1 text-sm">{{ t('employees.allowance_housing') }}</Label>
+                                                <Input id="allowance_housing" v-model="form.allowance_housing" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
+                                            <div>
+                                                <Label for="allowance_transportation" class="mb-1 text-sm">{{ t('employees.allowance_transportation') }}</Label>
+                                                <Input id="allowance_transportation" v-model="form.allowance_transportation" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
+                                            <div>
+                                                <Label for="allowance_other" class="mb-1 text-sm">{{ t('employees.allowance_other') }}</Label>
+                                                <Input id="allowance_other" v-model="form.allowance_other" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
+                                            <div>
+                                                <Label for="allowance_food" class="mb-1 text-sm">{{ t('employees.allowance_food') }}</Label>
+                                                <Input id="allowance_food" v-model="form.allowance_food" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
+                                            <div>
+                                                <Label for="allowance_personal_car" class="mb-1 text-sm">{{ t('employees.allowance_personal_car') }}</Label>
+                                                <Input id="allowance_personal_car" v-model="form.allowance_personal_car" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
                                         </div>
                                     </div>
 

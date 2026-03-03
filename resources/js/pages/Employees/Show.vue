@@ -149,6 +149,42 @@
                                     <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('employees.work_address') }}</Label>
                                     <p class="text-sm">{{ employee.work_address }}</p>
                                 </div>
+
+                                <div v-if="employee.basic_salary != null && employee.basic_salary !== ''">
+                                    <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('employees.basic_salary') }}</Label>
+                                    <p class="text-sm font-medium">{{ formatCurrency(parseFloat(employee.basic_salary)) }}</p>
+                                </div>
+                                <div v-if="employee.allowances != null && employee.allowances !== ''">
+                                    <Label class="text-sm font-medium text-muted-foreground mb-2">{{ t('employees.allowances') }}</Label>
+                                    <p class="text-sm font-medium">{{ formatCurrency(parseFloat(employee.allowances)) }}</p>
+                                </div>
+                                <template v-if="hasAllowanceBreakdown">
+                                    <div class="md:col-span-2 w-full mt-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <Label class="text-sm font-medium text-muted-foreground mb-2 block">{{ t('employees.allowances_breakdown') }}</Label>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div v-if="employee.allowance_housing != null && parseFloat(employee.allowance_housing) > 0" class="flex justify-between text-sm py-1">
+                                                <span class="text-muted-foreground">{{ t('employees.allowance_housing') }}</span>
+                                                <span class="font-medium">{{ formatCurrency(parseFloat(employee.allowance_housing)) }}</span>
+                                            </div>
+                                            <div v-if="employee.allowance_transportation != null && parseFloat(employee.allowance_transportation) > 0" class="flex justify-between text-sm py-1">
+                                                <span class="text-muted-foreground">{{ t('employees.allowance_transportation') }}</span>
+                                                <span class="font-medium">{{ formatCurrency(parseFloat(employee.allowance_transportation)) }}</span>
+                                            </div>
+                                            <div v-if="employee.allowance_other != null && parseFloat(employee.allowance_other) > 0" class="flex justify-between text-sm py-1">
+                                                <span class="text-muted-foreground">{{ t('employees.allowance_other') }}</span>
+                                                <span class="font-medium">{{ formatCurrency(parseFloat(employee.allowance_other)) }}</span>
+                                            </div>
+                                            <div v-if="employee.allowance_food != null && parseFloat(employee.allowance_food) > 0" class="flex justify-between text-sm py-1">
+                                                <span class="text-muted-foreground">{{ t('employees.allowance_food') }}</span>
+                                                <span class="font-medium">{{ formatCurrency(parseFloat(employee.allowance_food)) }}</span>
+                                            </div>
+                                            <div v-if="employee.allowance_personal_car != null && parseFloat(employee.allowance_personal_car) > 0" class="flex justify-between text-sm py-1">
+                                                <span class="text-muted-foreground">{{ t('employees.allowance_personal_car') }}</span>
+                                                <span class="font-medium">{{ formatCurrency(parseFloat(employee.allowance_personal_car)) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                             </CardContent>
                         </Card>
 
@@ -545,6 +581,12 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
         href: `/employees/${props.employee.id}`,
     },
 ]);
+
+const hasAllowanceBreakdown = computed(() => {
+    const e = props.employee as Record<string, unknown>;
+    const vals = ['allowance_housing', 'allowance_transportation', 'allowance_other', 'allowance_food', 'allowance_personal_car'];
+    return vals.some((k) => e[k] != null && parseFloat(String(e[k])) > 0);
+});
 
 const getStatusBadgeClass = (status: string): string => {
     switch (status) {

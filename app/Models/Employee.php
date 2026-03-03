@@ -33,6 +33,11 @@ class Employee extends Model
         'job_title',
         'basic_salary',
         'allowances',
+        'allowance_housing',
+        'allowance_transportation',
+        'allowance_other',
+        'allowance_food',
+        'allowance_personal_car',
         'annual_leave_balance',
         'manager',
         'direct_manager',
@@ -77,6 +82,11 @@ class Employee extends Model
         'insurance_expiry_date' => 'date',
         'basic_salary' => 'decimal:2',
         'allowances' => 'decimal:2',
+        'allowance_housing' => 'decimal:2',
+        'allowance_transportation' => 'decimal:2',
+        'allowance_other' => 'decimal:2',
+        'allowance_food' => 'decimal:2',
+        'allowance_personal_car' => 'decimal:2',
         'annual_leave_balance' => 'integer',
     ];
 

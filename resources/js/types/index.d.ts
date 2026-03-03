@@ -121,6 +121,13 @@ export interface Employee {
     department?: string | Department;
     department_id?: number;
     job_title?: string;
+    basic_salary?: string | number;
+    allowances?: string | number;
+    allowance_housing?: string | number;
+    allowance_transportation?: string | number;
+    allowance_other?: string | number;
+    allowance_food?: string | number;
+    allowance_personal_car?: string | number;
     manager?: string;
     direct_manager?: string;
     additional_approver_2?: string;
