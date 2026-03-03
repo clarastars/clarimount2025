@@ -385,6 +385,8 @@ return [
         'additional_information' => 'Additional Information',
         'employee_id' => 'Employee ID',
         'employee_id_placeholder' => 'EMP001 (optional)',
+        'employee_id_already_used' => 'This employee number is already in use. Choose a different number or leave the field empty.',
+        'email_already_used' => 'This email is already in use by another employee.',
         'first_name' => 'First Name',
         'first_name_placeholder' => 'First name',
         'last_name' => 'Last Name',

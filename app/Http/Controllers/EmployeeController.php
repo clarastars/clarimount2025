@@ -274,6 +274,9 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+        ], [
+            'employee_id.unique' => __('employees.employee_id_already_used'),
+            'email.unique' => __('employees.email_already_used'),
         ]);
 
         \Log::info('Validation passed, checking department...');
@@ -298,6 +301,9 @@ class EmployeeController extends Controller
 
         if (isset($validated['email']) && $validated['email'] === '') {
             $validated['email'] = null;
+        }
+        if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
+            $validated['employee_id'] = null;
         }
 
         try {
@@ -465,6 +471,9 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+        ], [
+            'employee_id.unique' => __('employees.employee_id_already_used'),
+            'email.unique' => __('employees.email_already_used'),
         ]);
 
         // Validate department belongs to selected company if specified
@@ -480,6 +489,9 @@ class EmployeeController extends Controller
 
         if (isset($validated['email']) && $validated['email'] === '') {
             $validated['email'] = null;
+        }
+        if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
+            $validated['employee_id'] = null;
         }
 
         $employee->update($validated);

@@ -383,6 +383,8 @@ return [
         'additional_information' => 'معلومات إضافية',
         'employee_id' => 'رقم الموظف',
         'employee_id_placeholder' => 'EMP001 (اختياري)',
+        'employee_id_already_used' => 'رقم الموظف مستخدم مسبقاً. اختر رقماً آخر أو اترك الحقل فارغاً.',
+        'email_already_used' => 'البريد الإلكتروني مستخدم مسبقاً لموظف آخر.',
         'first_name' => 'الاسم الأول',
         'first_name_placeholder' => 'الاسم الأول',
         'last_name' => 'الاسم الأخير',
