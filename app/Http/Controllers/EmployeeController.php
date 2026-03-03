@@ -221,6 +221,12 @@ class EmployeeController extends Controller
 
         \Log::info('Starting validation...');
 
+        // Convert empty strings to null for unique fields so validation allows multiple nulls
+        $request->merge([
+            'employee_id' => trim((string) $request->input('employee_id', '')) === '' ? null : $request->input('employee_id'),
+            'email' => trim((string) $request->input('email', '')) === '' ? null : $request->input('email'),
+        ]);
+
         $validated = $request->validate([
             'company_id' => ['required', 'integer', Rule::in($ownedCompanyIds)],
             'employee_id' => 'nullable|string|max:50|unique:employees,employee_id',
@@ -417,6 +423,12 @@ class EmployeeController extends Controller
         if (!$ownedCompanyIds->contains($employee->company_id)) {
             abort(403);
         }
+
+        // Convert empty strings to null for unique fields
+        $request->merge([
+            'employee_id' => trim((string) $request->input('employee_id', '')) === '' ? null : $request->input('employee_id'),
+            'email' => trim((string) $request->input('email', '')) === '' ? null : $request->input('email'),
+        ]);
 
         $validated = $request->validate([
             'company_id' => ['required', 'integer', Rule::in($ownedCompanyIds)],
