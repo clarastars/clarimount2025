@@ -312,6 +312,15 @@ class EmployeeController extends Controller
             $validated['employee_id'] = null;
         }
 
+        // Ensure non-nullable salary columns have default 0 (DB does not allow null)
+        $validated['basic_salary'] = $validated['basic_salary'] ?? 0;
+        $validated['allowances'] = $validated['allowances'] ?? 0;
+        $validated['allowance_housing'] = $validated['allowance_housing'] ?? null;
+        $validated['allowance_transportation'] = $validated['allowance_transportation'] ?? null;
+        $validated['allowance_other'] = $validated['allowance_other'] ?? null;
+        $validated['allowance_food'] = $validated['allowance_food'] ?? null;
+        $validated['allowance_personal_car'] = $validated['allowance_personal_car'] ?? null;
+
         try {
             \Log::info('Creating employee...');
             $employee = Employee::create($validated);
@@ -505,6 +514,10 @@ class EmployeeController extends Controller
         if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
             $validated['employee_id'] = null;
         }
+
+        // Ensure non-nullable salary columns have default 0 (DB does not allow null)
+        $validated['basic_salary'] = $validated['basic_salary'] ?? 0;
+        $validated['allowances'] = $validated['allowances'] ?? 0;
 
         $employee->update($validated);
 
