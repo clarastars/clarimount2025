@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Settings, Scale } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Settings, Scale, Clock } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -59,6 +59,11 @@ const assetInventoryNavItems = computed((): NavItem[] => [
 ]);
 
 const settingsNavItems = computed((): NavItem[] => [
+    {
+        title: t('nav.shifts'),
+        href: '/shifts',
+        icon: Clock,
+    },
     {
         title: t('nav.labor_law_rules'),
         href: '/labor-law-rules',

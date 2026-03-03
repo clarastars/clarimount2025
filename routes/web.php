@@ -5,6 +5,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustodyController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\LaborLawRuleController;
+use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
@@ -125,6 +126,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Labor Law Rules management routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('labor-law-rules', LaborLawRuleController::class);
+});
+
+// Shifts management (Settings)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::resource('shifts', ShiftController::class);
 });
 
 // IT Asset Management & Ticketing System routes
