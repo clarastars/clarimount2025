@@ -2,7 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Edit, Globe, Mail, Calendar, User, Package, Settings, CheckCircle, XCircle, Clock, FileText } from 'lucide-vue-next';
+import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,12 @@ const formatLastSync = (lastSync: string | null) => {
                     <Badge :variant="company.is_active ? 'default' : 'secondary'">
                         {{ company.is_active ? t('companies.active') : t('companies.inactive') }}
                     </Badge>
+                    <Button variant="outline" as-child>
+                        <Link :href="route('employees.index', { company_id: company.id })">
+                            <Users class="mr-2 h-4 w-4" />
+                            {{ t('nav.employees') }}
+                        </Link>
+                    </Button>
                     <Button variant="outline" as-child>
                         <Link :href="route('attendance.index', company.id)">
                             <FileText class="mr-2 h-4 w-4" />
