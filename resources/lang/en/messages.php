@@ -433,6 +433,7 @@ return [
         'delete' => 'Delete',
         'confirm_delete' => 'Are you sure you want to delete this employee?',
         'cannot_delete_with_assets' => 'Cannot delete employee that has assets assigned.',
+        'cannot_delete_with_tickets' => 'Cannot delete employee who has open tickets. Please resolve all tickets first.',
         'deleted_successfully' => 'Employee deleted successfully.',
         'created_successfully' => 'Employee created successfully.',
         'updated_successfully' => 'Employee updated successfully.',

@@ -188,6 +188,14 @@ const bulkUpdateStatus = (status: string) => {
     console.log(`Updating ${selectedEmployees.value.length} employees to status: ${status}`);
 };
 
+const deleteEmployee = (employee: Employee) => {
+    if (!confirm(t('employees.confirm_delete'))) return;
+    const url = companyFilter.value
+        ? `${route('employees.destroy', employee.id)}?company_id=${companyFilter.value}`
+        : route('employees.destroy', employee.id);
+    router.delete(url, { preserveScroll: true });
+};
+
 // Debounced search
 let searchTimeout: number;
 watch([search, statusFilter, departmentFilter, companyFilter], () => {
@@ -413,12 +421,14 @@ const clearFilters = () => {
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-gray-50 dark:bg-gray-800">
-                            <tr class="text-left rtl:text-right">
+                            <tr class="text-center">
                                 <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    <Checkbox 
-                                        :checked="selectAll"
-                                        @update:checked="toggleSelectAll"
-                                    />
+                                    <div class="flex justify-center">
+                                        <Checkbox 
+                                            :checked="selectAll"
+                                            @update:checked="toggleSelectAll"
+                                        />
+                                    </div>
                                 </th>
                                 <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     {{ t('employees.employee') }}
@@ -435,7 +445,7 @@ const clearFilters = () => {
                                 <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     {{ t('employees.metrics') }}
                                 </th>
-                                <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right rtl:text-left">
+                                <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     {{ t('common.actions') }}
                                 </th>
                             </tr>
@@ -445,14 +455,16 @@ const clearFilters = () => {
                                 class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                                 :class="{ 'bg-blue-50 dark:bg-blue-900/20': selectedEmployees.includes(employee.id) }"
                             >
-                                <td class="px-6 py-4">
-                                    <Checkbox 
-                                        :checked="selectedEmployees.includes(employee.id)"
-                                        @update:checked="() => toggleEmployeeSelection(employee.id)"
-                                    />
+                                <td class="px-6 py-4 text-center">
+                                    <div class="flex justify-center">
+                                        <Checkbox 
+                                            :checked="selectedEmployees.includes(employee.id)"
+                                            @update:checked="() => toggleEmployeeSelection(employee.id)"
+                                        />
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center">
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex items-center justify-center">
                                         <div class="flex-shrink-0 h-12 w-12">
                                             <div class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
                                                 <span class="text-sm font-semibold text-white">
@@ -460,7 +472,7 @@ const clearFilters = () => {
                                                 </span>
                                             </div>
                                         </div>
-                                        <div class="ml-4 rtl:ml-0 rtl:mr-4">
+                                        <div class="ml-4 rtl:ml-0 rtl:mr-4 text-left rtl:text-right">
                                             <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                 {{ employee.first_name }} {{ employee.last_name }}
                                             </div>
@@ -470,7 +482,7 @@ const clearFilters = () => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                         {{ employee.job_title || '-' }}
                                     </div>
@@ -481,7 +493,7 @@ const clearFilters = () => {
                                         {{ employee.company?.name_en || 'No Company' }}
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <div class="text-sm text-gray-900 dark:text-gray-100">
                                         {{ employee.email }}
                                     </div>
@@ -489,26 +501,26 @@ const clearFilters = () => {
                                         {{ employee.phone || '-' }}
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                                                         <div class="flex items-center">
-                                         <Icon :name="getStatusIcon(employee.employment_status)" 
-                                               :class="`h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2 ${
-                                                 employee.employment_status === 'active' ? 'text-green-600' : 
-                                                 employee.employment_status === 'inactive' ? 'text-yellow-600' : 
-                                                 employee.employment_status === 'terminated' ? 'text-red-600' : 
-                                                 'text-gray-500'
-                                               }`"
-                                         />
-                                         <Badge :variant="getStatusVariant(employee.employment_status)">
-                                             {{ t(`employees.status_${employee.employment_status}`) }}
-                                         </Badge>
-                                     </div>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex items-center justify-center">
+                                        <Icon :name="getStatusIcon(employee.employment_status)" 
+                                              :class="`h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2 ${
+                                                employee.employment_status === 'active' ? 'text-green-600' : 
+                                                employee.employment_status === 'inactive' ? 'text-yellow-600' : 
+                                                employee.employment_status === 'terminated' ? 'text-red-600' : 
+                                                'text-gray-500'
+                                              }`"
+                                        />
+                                        <Badge :variant="getStatusVariant(employee.employment_status)">
+                                            {{ t(`employees.status_${employee.employment_status}`) }}
+                                        </Badge>
+                                    </div>
                                     <div v-if="employee.hire_date" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {{ t('employees.since') }} {{ formatDate(employee.hire_date) }}
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex flex-col gap-1">
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex flex-col gap-1 items-center">
                                         <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
                                             <Icon name="Package" class="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2 text-blue-600" />
                                             <span>{{ employee.assets_count || 0 }} {{ t('employees.assets') }}</span>
@@ -519,8 +531,8 @@ const clearFilters = () => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right rtl:text-left">
-                                    <div class="flex justify-end rtl:justify-start gap-1">
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex justify-center gap-1">
                                         <Button variant="ghost" size="sm" asChild>
                                             <Link :href="route('employees.show', employee.id)">
                                                 <Icon name="Eye" class="h-4 w-4" />
@@ -561,6 +573,14 @@ const clearFilters = () => {
                                                 <DropdownMenuItem>
                                                     <Icon name="Mail" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
                                                     {{ t('employees.send_email') }}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    class="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                                                    @click="deleteEmployee(employee)"
+                                                >
+                                                    <Icon name="Trash2" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
+                                                    {{ t('common.delete') }}
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>

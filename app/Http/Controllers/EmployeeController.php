@@ -528,7 +528,7 @@ class EmployeeController extends Controller
     /**
      * Remove the specified employee from storage.
      */
-    public function destroy(Employee $employee): RedirectResponse
+    public function destroy(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
         $company = $user->currentCompany();
@@ -546,20 +546,20 @@ class EmployeeController extends Controller
 
         // Check if employee has assets assigned
         if ($employee->assets()->count() > 0) {
-            return redirect()->route('employees.index')
-                ->with('error', 'Cannot delete employee who has assets assigned. Please return all assets first.');
+            return redirect()->route('employees.index', $request->only('company_id'))
+                ->with('error', __('employees.cannot_delete_with_assets'));
         }
 
         // Check if employee has open tickets
         if ($employee->reportedTickets()->whereNotIn('status', ['resolved', 'closed'])->count() > 0) {
-            return redirect()->route('employees.index')
-                ->with('error', 'Cannot delete employee who has open tickets. Please resolve all tickets first.');
+            return redirect()->route('employees.index', $request->only('company_id'))
+                ->with('error', __('employees.cannot_delete_with_tickets'));
         }
 
         $employee->delete();
 
-        return redirect()->route('employees.index')
-            ->with('success', 'Employee deleted successfully.');
+        return redirect()->route('employees.index', $request->only('company_id'))
+            ->with('success', __('employees.deleted_successfully'));
     }
 
     /**

@@ -430,6 +430,7 @@ return [
         'delete' => 'حذف',
         'confirm_delete' => 'هل أنت متأكد من حذف هذا الموظف؟',
         'cannot_delete_with_assets' => 'لا يمكن حذف موظف له أصول مخصصة.',
+        'cannot_delete_with_tickets' => 'لا يمكن حذف موظف لديه تذاكر مفتوحة. يرجى حل جميع التذاكر أولاً.',
         'deleted_successfully' => 'تم حذف الموظف بنجاح.',
         'created_successfully' => 'تم إضافة الموظف بنجاح.',
         'updated_successfully' => 'تم تحديث الموظف بنجاح.',
