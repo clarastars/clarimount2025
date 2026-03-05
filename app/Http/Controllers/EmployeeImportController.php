@@ -297,7 +297,6 @@ class EmployeeImportController extends Controller
         return [
             'first_name' => 'First Name',
             'last_name' => 'Last Name',
-            'email' => 'Email Address',
         ];
     }
 
@@ -313,6 +312,7 @@ class EmployeeImportController extends Controller
             'nationality' => 'Nationality',
             'residence_country' => 'Residence Country',
             'birth_date' => 'Birth Date (YYYY-MM-DD)',
+            'email' => 'Email Address (optional)',
             'personal_email' => 'Personal Email',
             'work_email' => 'Work Email',
             'phone' => 'Phone Number',
@@ -322,6 +322,14 @@ class EmployeeImportController extends Controller
             'work_address' => 'Work Address',
             'department' => 'Department',
             'job_title' => 'Job Title',
+            'shift_id' => 'Shift ID',
+            'basic_salary' => 'Basic Salary',
+            'allowances' => 'Allowances',
+            'allowance_housing' => 'Housing Allowance',
+            'allowance_transportation' => 'Transportation Allowance',
+            'allowance_other' => 'Other Allowances',
+            'allowance_food' => 'Food Allowance',
+            'allowance_personal_car' => 'Personal Car Allowance',
             'manager' => 'Manager',
             'direct_manager' => 'Direct Manager',
             'additional_approver_2' => 'Additional Approver 2',

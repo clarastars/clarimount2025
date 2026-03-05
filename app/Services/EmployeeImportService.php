@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Country;
 use App\Models\Nationality;
 use App\Models\Department;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -41,6 +42,14 @@ class EmployeeImportService
             'work_address',
             'department',
             'job_title',
+            'shift_id',
+            'basic_salary',
+            'allowances',
+            'allowance_housing',
+            'allowance_transportation',
+            'allowance_other',
+            'allowance_food',
+            'allowance_personal_car',
             'manager',
             'direct_manager',
             'additional_approver_2',
@@ -86,6 +95,14 @@ class EmployeeImportService
             '123 Main St, City',
             'IT Department',
             'Software Engineer',
+            '1',
+            '5000.00',
+            '1000.00',
+            '500.00',
+            '200.00',
+            '0.00',
+            '200.00',
+            '100.00',
             'Jane Smith',
             'Bob Johnson',
             'Alice Brown',
@@ -144,6 +161,14 @@ class EmployeeImportService
             'work_address',
             'department',
             'job_title',
+            'shift_id',
+            'basic_salary',
+            'allowances',
+            'allowance_housing',
+            'allowance_transportation',
+            'allowance_other',
+            'allowance_food',
+            'allowance_personal_car',
             'manager',
             'direct_manager',
             'additional_approver_2',
@@ -192,6 +217,14 @@ class EmployeeImportService
                 $employee->work_address,
                 $employee->department,
                 $employee->job_title,
+                $employee->shift_id,
+                $employee->basic_salary ?? '',
+                $employee->allowances ?? '',
+                $employee->allowance_housing ?? '',
+                $employee->allowance_transportation ?? '',
+                $employee->allowance_other ?? '',
+                $employee->allowance_food ?? '',
+                $employee->allowance_personal_car ?? '',
                 $employee->manager,
                 $employee->direct_manager,
                 $employee->additional_approver_2,
@@ -246,8 +279,8 @@ class EmployeeImportService
             $errors = [];
             $rowNumber = 2; // Start from row 2 (after headers)
 
-            // Validate headers
-            $requiredHeaders = ['first_name', 'last_name', 'email'];
+            // Validate headers (email is optional)
+            $requiredHeaders = ['first_name', 'last_name'];
             $missingHeaders = array_diff($requiredHeaders, $headers);
             if (!empty($missingHeaders)) {
                 return [
@@ -270,11 +303,12 @@ class EmployeeImportService
                 ];
             })->toArray();
             $departments = Department::where('company_id', $company->id)->pluck('name', 'id')->toArray();
+            $shiftIds = Shift::pluck('id')->toArray();
             $existingEmployees = Employee::where('company_id', $company->id)->pluck('email', 'id')->toArray();
 
             foreach ($csvData as $row) {
                 $rowData = array_combine($headers, $row);
-                $validationResult = $this->validateRow($rowData, $rowNumber, $company, $countries, $nationalities, $departments, $existingEmployees);
+                $validationResult = $this->validateRow($rowData, $rowNumber, $company, $countries, $nationalities, $departments, $shiftIds, $existingEmployees);
                 
                 if (!empty($validationResult['errors'])) {
                     $errors = array_merge($errors, $validationResult['errors']);
@@ -330,7 +364,7 @@ class EmployeeImportService
     /**
      * Validate a single row of CSV data.
      */
-    protected function validateRow(array $rowData, int $rowNumber, Company $company, array $countries, array $nationalities, array $departments, array $existingEmployees): array
+    protected function validateRow(array $rowData, int $rowNumber, Company $company, array $countries, array $nationalities, array $departments, array $shiftIds, array $existingEmployees): array
     {
         $errors = [];
         $data = [];
@@ -350,27 +384,26 @@ class EmployeeImportService
             }
         }
 
-        // Validate required fields
-        $requiredFields = ['first_name', 'last_name', 'email'];
+        // Validate required fields (email is optional)
+        $requiredFields = ['first_name', 'last_name'];
         foreach ($requiredFields as $field) {
-            if (empty($rowData[$field])) {
+            if (empty(trim($rowData[$field] ?? ''))) {
                 $errors[] = "Row {$rowNumber}: {$field} is required.";
             }
         }
 
-        // Validate email format
-        if (!empty($rowData['email']) && !filter_var($rowData['email'], FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "Row {$rowNumber}: Invalid email format.";
-        }
-
-        // Check for duplicate email (only if not updating the same employee)
-        if (!empty($rowData['email'])) {
-            $existingEmailEmployee = Employee::where('email', $rowData['email'])
-                ->where('company_id', $company->id)
-                ->first();
-            
-            if ($existingEmailEmployee && (!$isUpdate || $existingEmailEmployee->id !== $existingEmployee->id)) {
-                $errors[] = "Row {$rowNumber}: Email already exists for another employee.";
+        // Validate email format and uniqueness only when email is provided
+        $email = isset($rowData['email']) ? trim($rowData['email']) : '';
+        if ($email !== '') {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Row {$rowNumber}: Invalid email format.";
+            } else {
+                $existingEmailEmployee = Employee::where('email', $email)
+                    ->where('company_id', $company->id)
+                    ->first();
+                if ($existingEmailEmployee && (!$isUpdate || $existingEmailEmployee->id !== $existingEmployee->id)) {
+                    $errors[] = "Row {$rowNumber}: Email already exists for another employee.";
+                }
             }
         }
 
@@ -428,12 +461,39 @@ class EmployeeImportService
             }
         }
 
+        // Validate shift_id if provided
+        if (isset($rowData['shift_id']) && $rowData['shift_id'] !== '' && $rowData['shift_id'] !== null) {
+            $shiftId = is_numeric($rowData['shift_id']) ? (int) $rowData['shift_id'] : null;
+            if ($shiftId === null || !in_array($shiftId, $shiftIds, true)) {
+                $errors[] = "Row {$rowNumber}: Invalid or unknown shift_id.";
+            } else {
+                $data['shift_id'] = $shiftId;
+            }
+        }
+
+        // Validate numeric salary/allowance fields
+        $numericFields = [
+            'basic_salary', 'allowances', 'allowance_housing', 'allowance_transportation',
+            'allowance_other', 'allowance_food', 'allowance_personal_car',
+        ];
+        foreach ($numericFields as $field) {
+            if (isset($rowData[$field]) && $rowData[$field] !== '' && $rowData[$field] !== null) {
+                if (!is_numeric($rowData[$field])) {
+                    $errors[] = "Row {$rowNumber}: {$field} must be a number.";
+                }
+            }
+        }
+
         // If there are errors, return them
         if (!empty($errors)) {
             return ['errors' => $errors, 'data' => null];
         }
 
         // Build clean data array
+        $basicSalary = isset($rowData['basic_salary']) && $rowData['basic_salary'] !== '' && is_numeric($rowData['basic_salary'])
+            ? (float) $rowData['basic_salary'] : 0;
+        $allowances = isset($rowData['allowances']) && $rowData['allowances'] !== '' && is_numeric($rowData['allowances'])
+            ? (float) $rowData['allowances'] : 0;
         $data = array_merge($data, [
             'id' => $isUpdate ? $existingEmployee->id : null,
             'company_id' => $company->id,
@@ -442,7 +502,7 @@ class EmployeeImportService
             'last_name' => $rowData['last_name'],
             'father_name' => $rowData['father_name'] ?? null,
             'birth_date' => !empty($rowData['birth_date']) ? $rowData['birth_date'] : null,
-            'email' => $rowData['email'],
+            'email' => $email !== '' ? $email : null,
             'personal_email' => $rowData['personal_email'] ?? null,
             'work_email' => $rowData['work_email'] ?? null,
             'phone' => $rowData['phone'] ?? null,
@@ -452,6 +512,14 @@ class EmployeeImportService
             'work_address' => $rowData['work_address'] ?? null,
             'department' => $rowData['department'] ?? null,
             'job_title' => $rowData['job_title'] ?? null,
+            'shift_id' => $data['shift_id'] ?? null,
+            'basic_salary' => $basicSalary,
+            'allowances' => $allowances,
+            'allowance_housing' => isset($rowData['allowance_housing']) && $rowData['allowance_housing'] !== '' && is_numeric($rowData['allowance_housing']) ? (float) $rowData['allowance_housing'] : null,
+            'allowance_transportation' => isset($rowData['allowance_transportation']) && $rowData['allowance_transportation'] !== '' && is_numeric($rowData['allowance_transportation']) ? (float) $rowData['allowance_transportation'] : null,
+            'allowance_other' => isset($rowData['allowance_other']) && $rowData['allowance_other'] !== '' && is_numeric($rowData['allowance_other']) ? (float) $rowData['allowance_other'] : null,
+            'allowance_food' => isset($rowData['allowance_food']) && $rowData['allowance_food'] !== '' && is_numeric($rowData['allowance_food']) ? (float) $rowData['allowance_food'] : null,
+            'allowance_personal_car' => isset($rowData['allowance_personal_car']) && $rowData['allowance_personal_car'] !== '' && is_numeric($rowData['allowance_personal_car']) ? (float) $rowData['allowance_personal_car'] : null,
             'manager' => $rowData['manager'] ?? null,
             'direct_manager' => $rowData['direct_manager'] ?? null,
             'additional_approver_2' => $rowData['additional_approver_2'] ?? null,
