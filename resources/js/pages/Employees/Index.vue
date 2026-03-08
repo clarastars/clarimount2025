@@ -227,6 +227,11 @@ const clearFilters = () => {
     departmentFilter.value = '';
     companyFilter.value = '';
 };
+
+const handlePagination = (url: string | null) => {
+    if (!url) return;
+    router.visit(url, { preserveState: true });
+};
 </script>
 
 <template>
@@ -595,6 +600,37 @@ const clearFilters = () => {
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Pagination -->
+                <div
+                    v-if="employees?.last_page > 1"
+                    class="mt-6 px-6 pb-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-200 dark:border-gray-700 pt-4"
+                >
+                    <p class="text-sm text-gray-700 dark:text-gray-300">
+                        {{ t('common.showing_results', {
+                            from: employees?.from ?? 0,
+                            to: employees?.to ?? 0,
+                            total: employees?.total ?? 0
+                        }) }}
+                    </p>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px rtl:space-x-reverse rtl:-space-x-px" aria-label="Pagination">
+                        <Button
+                            v-for="link in employees?.links"
+                            :key="link.label"
+                            variant="ghost"
+                            size="sm"
+                            :disabled="!link.url"
+                            :class="[
+                                'min-w-[2.25rem]',
+                                link.active
+                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                            ]"
+                            @click="handlePagination(link.url)"
+                            v-html="link.label"
+                        />
+                    </nav>
                 </div>
             </Card>
         </div>

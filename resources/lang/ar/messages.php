@@ -146,6 +146,7 @@ return [
         'image' => 'الصورة',
         'previous' => 'السابق',
         'showing' => 'عرض',
+        'showing_results' => 'عرض {from} إلى {to} من {total} نتيجة',
         'to' => 'إلى',
         'of' => 'من',
         'results' => 'نتيجة',

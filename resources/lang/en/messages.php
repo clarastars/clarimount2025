@@ -146,6 +146,7 @@ return [
         'image' => 'Image',
         'previous' => 'Previous',
         'showing' => 'Showing',
+        'showing_results' => 'Showing {from} to {to} of {total} results',
         'to' => 'to',
         'of' => 'of',
         'results' => 'results',
