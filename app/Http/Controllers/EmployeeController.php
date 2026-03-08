@@ -531,27 +531,50 @@ class EmployeeController extends Controller
     public function destroy(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
+        $queryParams = $request->only(['search', 'status', 'department', 'company_id']);
+
+        \Log::info('Employee destroy attempted', [
+            'employee_id' => $employee->id,
+            'user_id' => $user->id,
+            'employee_company_id' => $employee->company_id,
+        ]);
 
         // Allow delete only if the employee's company is one of the user's owned companies
         if (!$user->ownedCompanies()->where('id', $employee->company_id)->exists()) {
+            \Log::warning('Employee destroy forbidden: user does not own company', [
+                'employee_id' => $employee->id,
+                'user_id' => $user->id,
+            ]);
             abort(403);
         }
 
-        $queryParams = $request->only(['search', 'status', 'department', 'company_id']);
-
-        // Check if employee has assets assigned
-        if ($employee->assets()->count() > 0) {
-            return redirect()->route('employees.index', $queryParams)
-                ->with('error', __('employees.cannot_delete_with_assets'));
+        // Unassign all assets from this employee (assets remain in system, assigned_to = null)
+        $assetsCount = $employee->assets()->count();
+        if ($assetsCount > 0) {
+            $employee->assets()->update(['assigned_to' => null]);
+            \Log::info('Employee destroy: unassigned assets', ['employee_id' => $employee->id, 'assets_count' => $assetsCount]);
         }
 
         // Check if employee has open tickets
-        if ($employee->reportedTickets()->whereNotIn('status', ['resolved', 'closed'])->count() > 0) {
+        $openTicketsCount = $employee->reportedTickets()->whereNotIn('status', ['resolved', 'closed'])->count();
+        if ($openTicketsCount > 0) {
+            \Log::info('Employee destroy blocked: has open tickets', ['employee_id' => $employee->id, 'open_tickets' => $openTicketsCount]);
             return redirect()->route('employees.index', $queryParams)
                 ->with('error', __('employees.cannot_delete_with_tickets'));
         }
 
-        $employee->delete();
+        try {
+            $employee->delete();
+            \Log::info('Employee deleted successfully', ['employee_id' => $employee->id]);
+        } catch (\Throwable $e) {
+            \Log::error('Employee delete failed', [
+                'employee_id' => $employee->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->route('employees.index', $queryParams)
+                ->with('error', __('employees.delete_failed'));
+        }
 
         return redirect()->route('employees.index', $queryParams)
             ->with('success', __('employees.deleted_successfully'));

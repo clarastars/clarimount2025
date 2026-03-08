@@ -435,6 +435,7 @@ return [
         'cannot_delete_with_assets' => 'Cannot delete employee that has assets assigned.',
         'cannot_delete_with_tickets' => 'Cannot delete employee who has open tickets. Please resolve all tickets first.',
         'deleted_successfully' => 'Employee deleted successfully.',
+        'delete_failed' => 'Failed to delete employee. Check logs.',
         'created_successfully' => 'Employee created successfully.',
         'updated_successfully' => 'Employee updated successfully.',
         
