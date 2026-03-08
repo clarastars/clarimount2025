@@ -531,16 +531,9 @@ class EmployeeController extends Controller
     public function destroy(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
 
-        // If user doesn't have a company, redirect to create one
-        if (!$company) {
-            return redirect()->route('companies.create')
-                ->with('info', 'Please create a company first to manage employees.');
-        }
-
-        // Check if user has access to this employee
-        if ($employee->company_id !== $company->id) {
+        // Allow delete only if the employee's company is one of the user's owned companies
+        if (!$user->ownedCompanies()->where('id', $employee->company_id)->exists()) {
             abort(403);
         }
 
