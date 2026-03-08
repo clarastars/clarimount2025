@@ -1138,6 +1138,20 @@ const form = useForm({
     notes: props.employee.notes || '',
 })
 
+// Auto-calculate total allowances from allowance details
+const allowanceDetailFields = () => [
+    form.allowance_housing,
+    form.allowance_transportation,
+    form.allowance_other,
+    form.allowance_food,
+    form.allowance_personal_car,
+]
+watch(allowanceDetailFields, () => {
+    const sum = [form.allowance_housing, form.allowance_transportation, form.allowance_other, form.allowance_food, form.allowance_personal_car]
+        .reduce((acc, val) => acc + (parseFloat(String(val)) || 0), 0)
+    form.allowances = sum === 0 ? '' : sum
+}, { deep: true, immediate: true })
+
 // Section collapse states
 const sectionGeneral = ref(true)
 const sectionWork = ref(true)
