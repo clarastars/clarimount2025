@@ -537,21 +537,23 @@ class EmployeeController extends Controller
             abort(403);
         }
 
+        $queryParams = $request->only(['search', 'status', 'department', 'company_id']);
+
         // Check if employee has assets assigned
         if ($employee->assets()->count() > 0) {
-            return redirect()->route('employees.index', $request->only('company_id'))
+            return redirect()->route('employees.index', $queryParams)
                 ->with('error', __('employees.cannot_delete_with_assets'));
         }
 
         // Check if employee has open tickets
         if ($employee->reportedTickets()->whereNotIn('status', ['resolved', 'closed'])->count() > 0) {
-            return redirect()->route('employees.index', $request->only('company_id'))
+            return redirect()->route('employees.index', $queryParams)
                 ->with('error', __('employees.cannot_delete_with_tickets'));
         }
 
         $employee->delete();
 
-        return redirect()->route('employees.index', $request->only('company_id'))
+        return redirect()->route('employees.index', $queryParams)
             ->with('success', __('employees.deleted_successfully'));
     }
 

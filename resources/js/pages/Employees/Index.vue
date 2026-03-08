@@ -190,10 +190,16 @@ const bulkUpdateStatus = (status: string) => {
 
 const deleteEmployee = (employee: Employee) => {
     if (!confirm(t('employees.confirm_delete'))) return;
-    const url = companyFilter.value
-        ? `${route('employees.destroy', employee.id)}?company_id=${companyFilter.value}`
+    const params = new URLSearchParams();
+    if (search.value) params.set('search', search.value);
+    if (statusFilter.value) params.set('status', statusFilter.value);
+    if (departmentFilter.value) params.set('department', departmentFilter.value);
+    if (companyFilter.value) params.set('company_id', companyFilter.value);
+    const query = params.toString();
+    const url = query
+        ? `${route('employees.destroy', employee.id)}?${query}`
         : route('employees.destroy', employee.id);
-    router.delete(url, { preserveScroll: true });
+    router.delete(url, { preserveScroll: false });
 };
 
 // Debounced search
