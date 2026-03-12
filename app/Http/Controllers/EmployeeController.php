@@ -415,6 +415,30 @@ class EmployeeController extends Controller
     }
 
     /**
+     * Update the fingerprint device link for an employee (link to fingerprint device API employee).
+     */
+    public function updateFingerprintLink(Request $request, Employee $employee): JsonResponse
+    {
+        $user = Auth::user();
+        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+
+        if (! $ownedCompanyIds->contains($employee->company_id)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'fingerprint_device_id' => 'nullable|string|max:100',
+        ]);
+
+        $employee->update(['fingerprint_device_id' => $validated['fingerprint_device_id'] ?? null]);
+
+        return response()->json([
+            'success' => true,
+            'fingerprint_device_id' => $employee->fingerprint_device_id,
+        ]);
+    }
+
+    /**
      * Update the specified employee in storage.
      */
     public function update(Request $request, Employee $employee): Response|RedirectResponse

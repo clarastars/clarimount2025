@@ -160,8 +160,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('employees/import/process', [EmployeeImportController::class, 'processUpload'])->name('employees.import.process');
     Route::post('employees/import/execute', [EmployeeImportController::class, 'executeImport'])->name('employees.import.execute');
     Route::get('employees/fingerprint-device', [FingerprintDeviceEmployeeController::class, 'index'])->name('employees.fingerprint-device');
+    Route::get('api/employees/fingerprint-device-list', [FingerprintDeviceEmployeeController::class, 'listForSelect'])->name('api.employees.fingerprint-device-list');
 
     // Employees management
+    Route::put('employees/{employee}/fingerprint-link', [EmployeeController::class, 'updateFingerprintLink'])->name('employees.fingerprint-link');
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])
         ->name('employees.expiring-documents.index');
     Route::resource('employees', EmployeeController::class);

@@ -7,11 +7,26 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog';
 import Icon from '@/components/Icon.vue';
 import Heading from '@/components/Heading.vue';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, watch } from 'vue';
 import type { Employee, Company, BreadcrumbItem } from '@/types';
+
+interface FingerprintEmployee {
+    id: string;
+    first_name: string;
+    dept_name: string;
+    position_name: string;
+}
 
 const { t } = useI18n();
 
@@ -47,6 +62,15 @@ const departmentFilter = ref(props.filters?.department || '');
 const companyFilter = ref(props.filters?.company_id || '');
 const selectedEmployees = ref<number[]>([]);
 const selectAll = ref(false);
+
+// Fingerprint link dialog
+const fingerprintLinkDialogOpen = ref(false);
+const linkingEmployee = ref<Employee | null>(null);
+const fingerprintEmployees = ref<FingerprintEmployee[]>([]);
+const fingerprintSearch = ref('');
+const loadingFingerprint = ref(false);
+const linking = ref(false);
+const fingerprintListError = ref<string | null>(null);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     {
@@ -232,6 +256,93 @@ const handlePagination = (url: string | null) => {
     if (!url) return;
     router.visit(url, { preserveState: true });
 };
+
+const filteredFingerprintEmployees = computed(() => {
+    const q = fingerprintSearch.value.trim().toLowerCase();
+    if (!q) return fingerprintEmployees.value;
+    return fingerprintEmployees.value.filter(
+        (fp) =>
+            (fp.first_name || '').toLowerCase().includes(q) ||
+            (fp.dept_name || '').toLowerCase().includes(q) ||
+            (fp.position_name || '').toLowerCase().includes(q)
+    );
+});
+
+async function openFingerprintLinkDialog(emp: Employee) {
+    linkingEmployee.value = emp;
+    fingerprintLinkDialogOpen.value = true;
+    fingerprintSearch.value = '';
+    fingerprintListError.value = null;
+    fingerprintEmployees.value = [];
+    loadingFingerprint.value = true;
+    try {
+        const res = await fetch(route('api.employees.fingerprint-device-list'));
+        const data = await res.json();
+        fingerprintEmployees.value = (data.employees || []).filter((e: FingerprintEmployee) => e.id);
+        if (data.error) fingerprintListError.value = data.error;
+    } catch (e) {
+        fingerprintListError.value = (e as Error).message;
+    } finally {
+        loadingFingerprint.value = false;
+    }
+}
+
+function closeFingerprintLinkDialog() {
+    fingerprintLinkDialogOpen.value = false;
+    linkingEmployee.value = null;
+    fingerprintSearch.value = '';
+    fingerprintListError.value = null;
+}
+
+async function selectFingerprintEmployee(fpEmp: FingerprintEmployee) {
+    if (!linkingEmployee.value || !fpEmp.id) return;
+    linking.value = true;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    try {
+        const res = await fetch(route('employees.fingerprint-link', linkingEmployee.value.id), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({ fingerprint_device_id: fpEmp.id }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeFingerprintLinkDialog();
+            router.reload({ preserveScroll: true });
+        }
+    } finally {
+        linking.value = false;
+    }
+}
+
+async function unlinkFingerprint() {
+    if (!linkingEmployee.value) return;
+    linking.value = true;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    try {
+        const res = await fetch(route('employees.fingerprint-link', linkingEmployee.value.id), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({ fingerprint_device_id: null }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeFingerprintLinkDialog();
+            router.reload({ preserveScroll: true });
+        }
+    } finally {
+        linking.value = false;
+    }
+}
 </script>
 
 <template>
@@ -460,6 +571,9 @@ const handlePagination = (url: string | null) => {
                                     {{ t('employees.status') }}
                                 </th>
                                 <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    {{ t('employees.fingerprint_link') }}
+                                </th>
+                                <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     {{ t('employees.metrics') }}
                                 </th>
                                 <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -534,6 +648,29 @@ const handlePagination = (url: string | null) => {
                                     </div>
                                     <div v-if="employee.hire_date" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {{ t('employees.since') }} {{ formatDate(employee.hire_date) }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex items-center justify-center">
+                                        <Button
+                                            v-if="employee.fingerprint_device_id"
+                                            variant="outline"
+                                            size="sm"
+                                            class="border-green-600 text-green-700 dark:text-green-400"
+                                            @click="openFingerprintLinkDialog(employee)"
+                                        >
+                                            <Icon name="Link" class="h-4 w-4 mr-1 rtl:mr-0 rtl:ml-1" />
+                                            {{ t('employees.fingerprint_linked') }}
+                                        </Button>
+                                        <Button
+                                            v-else
+                                            variant="outline"
+                                            size="sm"
+                                            @click="openFingerprintLinkDialog(employee)"
+                                        >
+                                            <Icon name="Fingerprint" class="h-4 w-4 mr-1 rtl:mr-0 rtl:ml-1" />
+                                            {{ t('employees.fingerprint_not_linked') }}
+                                        </Button>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -639,6 +776,70 @@ const handlePagination = (url: string | null) => {
                     </nav>
                 </div>
             </Card>
+
+            <!-- Fingerprint link dialog -->
+            <Dialog v-model:open="fingerprintLinkDialogOpen" @update:open="(v) => !v && closeFingerprintLinkDialog()">
+                <DialogContent class="max-w-lg max-h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>{{ t('employees.fingerprint_link_dialog_title') }}</DialogTitle>
+                        <DialogDescription>
+                            {{ linkingEmployee ? `${linkingEmployee.first_name} ${linkingEmployee.last_name}` : '' }}
+                            — {{ t('employees.fingerprint_link_dialog_description') }}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div class="flex flex-col gap-3 flex-1 min-h-0">
+                        <Input
+                            v-model="fingerprintSearch"
+                            :placeholder="t('employees.fingerprint_search_placeholder')"
+                            class="shrink-0"
+                        />
+                        <div v-if="loadingFingerprint" class="py-8 text-center text-sm text-muted-foreground">
+                            {{ t('common.loading') }}
+                        </div>
+                        <div v-else-if="fingerprintListError" class="py-4 text-center text-sm text-destructive">
+                            {{ fingerprintListError }}
+                        </div>
+                        <div
+                            v-else
+                            class="border rounded-md overflow-auto flex-1 min-h-[200px] divide-y"
+                        >
+                            <button
+                                v-for="fp in filteredFingerprintEmployees"
+                                :key="fp.id"
+                                type="button"
+                                class="w-full px-4 py-3 text-start text-sm hover:bg-muted transition-colors"
+                                :disabled="linking"
+                                @click="selectFingerprintEmployee(fp)"
+                            >
+                                <span class="font-medium">{{ fp.first_name || '—' }}</span>
+                                <span class="text-muted-foreground ms-2">{{ fp.dept_name || '—' }}</span>
+                                <span class="text-muted-foreground ms-2">·</span>
+                                <span class="text-muted-foreground ms-2">{{ fp.position_name || '—' }}</span>
+                            </button>
+                            <div
+                                v-if="!loadingFingerprint && !fingerprintListError && filteredFingerprintEmployees.length === 0"
+                                class="py-8 text-center text-sm text-muted-foreground"
+                            >
+                                {{ t('employees.fingerprint_no_results') }}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter class="shrink-0">
+                        <Button
+                            v-if="linkingEmployee?.fingerprint_device_id"
+                            variant="outline"
+                            class="text-destructive border-destructive"
+                            :disabled="linking"
+                            @click="unlinkFingerprint"
+                        >
+                            {{ t('employees.fingerprint_unlink') }}
+                        </Button>
+                        <Button variant="outline" @click="closeFingerprintLinkDialog()">
+                            {{ t('common.cancel') }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     </AppLayout>
 </template> 

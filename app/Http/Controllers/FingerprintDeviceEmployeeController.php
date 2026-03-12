@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -76,6 +77,43 @@ class FingerprintDeviceEmployeeController extends Controller
     }
 
     /**
+     * Return JSON list of fingerprint device employees for linking (e.g. select dropdown).
+     */
+    public function listForSelect(Request $request): JsonResponse
+    {
+        $baseUrl = rtrim(config('services.fingerprint_device.base_url'), '/');
+        $token = config('services.fingerprint_device.token');
+        $timeout = (int) config('services.fingerprint_device.timeout', 15);
+
+        $employees = [];
+        $url = $baseUrl . '/personnel/api/employees/';
+
+        if (empty($token) || empty($baseUrl)) {
+            return response()->json(['employees' => [], 'error' => __('messages.employees.fingerprint_device_not_configured')], 200);
+        }
+
+        try {
+            $response = Http::timeout($timeout)
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Authorization' => 'Token ' . $token,
+                ])
+                ->get($url);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $rawList = $this->collectEmployeesFromResponse($data, $baseUrl, $token, $timeout);
+                $employees = array_values(array_map([$this, 'normalizeEmployee'], $rawList));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Fingerprint device API exception (listForSelect)', ['exception' => $e->getMessage()]);
+            return response()->json(['employees' => [], 'error' => $e->getMessage()], 200);
+        }
+
+        return response()->json(['employees' => $employees]);
+    }
+
+    /**
      * Collect all employees from API response, following pagination (next) if present.
      *
      * @param array<string, mixed> $data
@@ -139,14 +177,15 @@ class FingerprintDeviceEmployeeController extends Controller
     }
 
     /**
-     * Normalize one employee from API to first_name, dept_name, position_name.
+     * Normalize one employee from API to id, first_name, dept_name, position_name.
      * Tries multiple possible key names and nested structures.
      *
      * @param array<string, mixed> $emp
-     * @return array{first_name: string, dept_name: string, position_name: string}
+     * @return array{id: string, first_name: string, dept_name: string, position_name: string}
      */
     private function normalizeEmployee(array $emp): array
     {
+        $id = $this->getFingerprintEmployeeId($emp);
         $firstName = $this->getString($emp, [
             'first_name', 'firstname', 'name', 'full_name', 'fullname', 'emp_name', 'employee_name',
         ]);
@@ -164,10 +203,30 @@ class FingerprintDeviceEmployeeController extends Controller
         }
 
         return [
+            'id' => $id,
             'first_name' => $firstName,
             'dept_name' => $deptName,
             'position_name' => $positionName,
         ];
+    }
+
+    /**
+     * Extract unique identifier for fingerprint device employee (for linking).
+     *
+     * @param array<string, mixed> $emp
+     */
+    private function getFingerprintEmployeeId(array $emp): string
+    {
+        $keys = ['id', 'emp_id', 'pin', 'emp_code', 'employee_id', 'pk', 'code', 'emp_code_id'];
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $emp)) {
+                $v = $emp[$key];
+                if (is_scalar($v)) {
+                    return (string) $v;
+                }
+            }
+        }
+        return '';
     }
 
     /**
