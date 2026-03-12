@@ -543,6 +543,14 @@ return [
         
         // Import/Export translations
         'import_csv' => 'Import CSV',
+        'fingerprint_device_employees' => 'Fingerprint Device Employees',
+        'fingerprint_device_employees_description' => 'View employees registered on the fingerprint device via API.',
+        'fingerprint_device_not_configured' => 'Fingerprint device URL or token is not configured. Add FINGERPRINT_DEVICE_URL and FINGERPRINT_DEVICE_TOKEN to .env',
+        'fingerprint_device_error' => 'Failed to fetch data from fingerprint device (status: :status).',
+        'fingerprint_device_connection_error' => 'Could not connect to fingerprint device: :message',
+        'fingerprint_device_no_employees' => 'No employees on the fingerprint device or the API returned no data.',
+        'fingerprint_dept_name' => 'Department',
+        'fingerprint_position_name' => 'Job Title',
         'export_csv' => 'Export CSV',
         'import_instructions' => 'Import Instructions',
         'import_instructions_subtitle' => 'Follow these steps to import employee data from a CSV file',

@@ -42,4 +42,10 @@ return [
         'max_retry_attempts' => env('BAYZAT_MAX_RETRY_ATTEMPTS', 5),
     ],
 
+    'fingerprint_device' => [
+        'base_url' => env('FINGERPRINT_DEVICE_URL', 'http://192.168.10.74:8081'),
+        'token' => env('FINGERPRINT_DEVICE_TOKEN'),
+        'timeout' => env('FINGERPRINT_DEVICE_TIMEOUT', 15),
+    ],
+
 ];

@@ -540,6 +540,14 @@ return [
         
         // Import/Export translations
         'import_csv' => 'استيراد CSV',
+        'fingerprint_device_employees' => 'موظفين جهاز البصمة',
+        'fingerprint_device_employees_description' => 'عرض الموظفين المسجلين في جهاز البصمة عبر الواجهة البرمجية.',
+        'fingerprint_device_not_configured' => 'لم يتم تكوين عنوان أو رمز واجهة جهاز البصمة. أضف FINGERPRINT_DEVICE_URL و FINGERPRINT_DEVICE_TOKEN في ملف .env',
+        'fingerprint_device_error' => 'فشل جلب البيانات من جهاز البصمة (الحالة: :status).',
+        'fingerprint_device_connection_error' => 'تعذر الاتصال بجهاز البصمة: :message',
+        'fingerprint_device_no_employees' => 'لا يوجد موظفين في جهاز البصمة أو لم تُرجع الواجهة أي بيانات.',
+        'fingerprint_dept_name' => 'القسم',
+        'fingerprint_position_name' => 'المسمى الوظيفي',
         'export_csv' => 'تصدير CSV',
         'import_instructions' => 'تعليمات الاستيراد',
         'import_instructions_subtitle' => 'اتبع هذه الخطوات لاستيراد بيانات الموظفين من ملف CSV',

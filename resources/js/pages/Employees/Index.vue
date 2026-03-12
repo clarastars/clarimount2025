@@ -248,6 +248,12 @@ const handlePagination = (url: string | null) => {
                     </p>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-2">
+                    <Button variant="outline" asChild>
+                        <Link :href="route('employees.fingerprint-device')">
+                            <Icon name="Fingerprint" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
+                            {{ t('employees.fingerprint_device_employees') }}
+                        </Link>
+                    </Button>
                     <Button variant="outline" asChild class="bg-blue-600 hover:bg-blue-700 text-white font-semibold border-blue-600">
                         <Link :href="route('employees.import')">
                             <Icon name="Upload" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />

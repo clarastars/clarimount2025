@@ -11,6 +11,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\EmployeeImportController;
+use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetTemplateController;
@@ -158,7 +159,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('employees/export-csv', [EmployeeImportController::class, 'exportCsv'])->name('employees.export-csv');
     Route::post('employees/import/process', [EmployeeImportController::class, 'processUpload'])->name('employees.import.process');
     Route::post('employees/import/execute', [EmployeeImportController::class, 'executeImport'])->name('employees.import.execute');
-    
+    Route::get('employees/fingerprint-device', [FingerprintDeviceEmployeeController::class, 'index'])->name('employees.fingerprint-device');
+
     // Employees management
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])
         ->name('employees.expiring-documents.index');
