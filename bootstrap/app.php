@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetLocale::class,
             HandleInertiaRequests::class,
             \App\Http\Middleware\SetTeamContext::class,
+            \App\Http\Middleware\RedirectIfEmployeePortalUser::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
         
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'team.access' => \App\Http\Middleware\EnsureTeamAccess::class,
             'super-admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'employee.portal' => \App\Http\Middleware\RedirectIfEmployeePortalUser::class,
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,

@@ -4,13 +4,15 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Settings, Scale, Clock } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
+const page = usePage();
+const isEmployee = computed(() => (page.props.auth as { is_employee?: boolean })?.is_employee ?? false);
 
 const mainNavItems = computed((): NavItem[] => [
     {
@@ -100,13 +102,16 @@ const footerNavItems = computed((): NavItem[] => [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
-            <NavMain :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
-            <NavMain :items="settingsNavItems" :label="t('nav.settings')" />
+            <NavMain v-if="isEmployee" :items="mainNavItems.filter((item) => item.href === '/dashboard')" />
+            <template v-else>
+                <NavMain :items="mainNavItems" />
+                <NavMain :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
+                <NavMain :items="settingsNavItems" :label="t('nav.settings')" />
+            </template>
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+            <NavFooter v-if="!isEmployee" :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

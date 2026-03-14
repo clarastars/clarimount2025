@@ -46,6 +46,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
+                'is_employee' => $request->user()?->roles()->where('name', 'employee')->wherePivotNull('team_id')->exists() ?? false,
             ],
             'locale' => $userLanguage,
             'translations' => $this->getTranslations($userLanguage),

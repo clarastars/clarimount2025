@@ -68,6 +68,9 @@ class RolesAndPermissionsSeeder extends Seeder
             $superAdminRole->givePermissionTo(Permission::all());
         }
 
+        // Employee portal role: for employees who log in to see their leave balance etc.
+        Role::firstOrCreate(['name' => 'employee']);
+
         // Create team-specific roles (these will be used within teams)
         $teamOwnerPermissions = [
             'view team', 'edit team', 'delete team', 'manage team settings',

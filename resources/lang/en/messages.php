@@ -43,7 +43,13 @@ return [
     'dashboard' => [
         'welcome' => 'Welcome to your dashboard',
         'work-portal' => 'Work Portal',
+        'employee_welcome' => 'Welcome',
+        'employee_subtitle' => 'This is the employee dashboard. You can view your leave balance below.',
+        'leave_balance' => 'Leave Balance',
+        'leave_balance_description' => 'Your remaining annual leave days.',
+        'days' => 'days',
     ],
+    'employee_portal_no_employee' => 'No employee record is linked to this account.',
     'settings' => [
         'title' => 'Settings',
         'description' => 'Manage your profile and account settings',

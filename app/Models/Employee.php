@@ -63,6 +63,7 @@ class Employee extends Model
         'emergency_contact_email',
         'emergency_contact_address',
         'company_id',
+        'user_id',
         'notes',
         'settings',
     ];
@@ -181,6 +182,14 @@ class Employee extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class, 'shift_id');
+    }
+
+    /**
+     * Get the portal user linked to this employee (for employee self-service login).
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

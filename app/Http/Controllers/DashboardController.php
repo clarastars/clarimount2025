@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
 use App\Services\EmployeeExpiryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -15,18 +16,27 @@ class DashboardController extends Controller
     public function index(EmployeeExpiryService $employeeExpiryService): Response|RedirectResponse
     {
         $user = Auth::user();
+
+        if ($this->isEmployeePortalUser($user)) {
+            $employee = $user->employee;
+            if (! $employee) {
+                return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
+            }
+            $employee->append('remaining_annual_leave_balance');
+            return Inertia::render('DashboardEmployee', [
+                'employee' => $employee->only(['id', 'first_name', 'last_name', 'full_name', 'annual_leave_balance', 'remaining_annual_leave_balance']),
+            ]);
+        }
+
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
 
-        if (!$ownedCompanyIds) {
+        if (! $ownedCompanyIds->count()) {
             return redirect()->route('companies.create')
                 ->with('info', 'Please create a company first to manage employees.');
         }
 
         $expiringRows = $employeeExpiryService->getExpiringDocumentRows($ownedCompanyIds, EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD);
         $expiredRows = $employeeExpiryService->getExpiredDocumentRows($ownedCompanyIds);
-
-        // Combine both expiring and expired, prioritizing expiring ones
-        $allRows = $expiringRows->concat($expiredRows);
 
         return Inertia::render('Dashboard', [
             'expiringEmployeesPreview' => $expiringRows->take(5)->values(),
@@ -35,6 +45,14 @@ class DashboardController extends Controller
             'expiredEmployeesCount' => $expiredRows->count(),
             'expiryDaysThreshold' => EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD,
         ]);
+    }
+
+    private function isEmployeePortalUser($user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        return $user->roles()->where('name', 'employee')->wherePivotNull('team_id')->exists();
     }
 }
 

@@ -43,7 +43,13 @@ return [
     'dashboard' => [
         'welcome' => 'مرحباً بك في لوحة التحكم',
         'work-portal' => 'بوابة العمل',
+        'employee_welcome' => 'مرحباً بك',
+        'employee_subtitle' => 'هذه لوحة تحكم الموظف. يمكنك الاطلاع على رصيد إجازاتك أدناه.',
+        'leave_balance' => 'رصيد الإجازات',
+        'leave_balance_description' => 'عدد أيام الإجازة السنوية المتبقية لك.',
+        'days' => 'يوم',
     ],
+    'employee_portal_no_employee' => 'لا يوجد سجل موظف مرتبط بهذا الحساب.',
     'settings' => [
         'title' => 'الإعدادات',
         'description' => 'إدارة ملفك الشخصي وإعدادات الحساب',

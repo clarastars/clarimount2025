@@ -7,6 +7,7 @@ use App\Models\Country;
 use App\Models\Nationality;
 use App\Models\Shift;
 use App\Services\EmployeeExpiryService;
+use App\Services\EmployeePortalUserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
@@ -325,6 +326,8 @@ class EmployeeController extends Controller
             \Log::info('Creating employee...');
             $employee = Employee::create($validated);
             \Log::info('Employee created successfully', ['employee_id' => $employee->id]);
+
+            app(EmployeePortalUserService::class)->createOrSyncPortalUser($employee);
 
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Employee created successfully.');
