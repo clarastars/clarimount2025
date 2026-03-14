@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AttendancePenalty;
+use App\Models\Employee;
 use App\Models\LaborLawRule;
+use App\Models\ZkDailyAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -76,6 +78,45 @@ class AttendancePenaltyService
         );
 
         return $penalty;
+    }
+
+    /**
+     * Calculate and create penalty for a daily attendance record (e.g. from iClock API or device ingest).
+     * Uses employee shift to compute late minutes and then create/update penalty.
+     *
+     * @param ZkDailyAttendance $attendance
+     * @param string $attDate Date in Y-m-d format
+     * @return void
+     */
+    public function calculatePenaltyForDailyAttendance(ZkDailyAttendance $attendance, string $attDate): void
+    {
+        $employee = Employee::with('shift.workdays')->where('fingerprint_device_id', $attendance->device_pin)->first();
+
+        if (! $employee || ! $employee->shift) {
+            return;
+        }
+
+        $attDateCarbon = Carbon::parse($attDate, 'Asia/Riyadh');
+        $weekday = $attDateCarbon->dayOfWeek;
+
+        $workdays = $employee->shift->workdays()->where('is_workday', true)->pluck('weekday')->toArray();
+        if (! in_array($weekday, $workdays)) {
+            return;
+        }
+
+        if (! $attendance->first_punch) {
+            return;
+        }
+
+        $expectedStart = Carbon::parse($attDate . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
+        $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
+        $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
+        $graceMinutes = (int) ($employee->shift->grace_minutes ?? 0);
+        $lateMinutes = max(0, $actualLateMinutes - $graceMinutes);
+
+        if ($lateMinutes > 0) {
+            $this->calculatePenalty($employee->id, $attDate, $lateMinutes);
+        }
     }
 
     /**

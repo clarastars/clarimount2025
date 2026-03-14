@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AttendancePenalty;
 use App\Models\Employee;
 use App\Models\ZkDevice;
 use App\Models\ZkDailyAttendance;
+use App\Services\AttendancePenaltyService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -81,7 +83,7 @@ class FingerprintIclockAttendanceService
         $firstPunch = Carbon::parse($punchTimes[0], 'Asia/Riyadh')->utc();
         $lastPunch = Carbon::parse($punchTimes[count($punchTimes) - 1], 'Asia/Riyadh')->utc();
 
-        ZkDailyAttendance::updateOrCreate(
+        $attendance = ZkDailyAttendance::updateOrCreate(
             [
                 'device_id' => $device->id,
                 'device_pin' => $empCode,
@@ -95,6 +97,19 @@ class FingerprintIclockAttendanceService
                 'punch_count' => count($punchTimes),
             ]
         );
+
+        // Remove absence penalty if employee has punched (same as ZkAttlogIngestService)
+        $employee = Employee::where('fingerprint_device_id', $empCode)->first();
+        if ($employee) {
+            AttendancePenalty::where('employee_id', $employee->id)
+                ->where('attendance_date', $attDate)
+                ->where('violation_type', 'absent_without_excuse')
+                ->delete();
+        }
+
+        // Calculate late penalty so "الإجراء المتخذ / سبب الإجراء / اعتماد الجزاء" appear in UI
+        $penaltyService = new AttendancePenaltyService();
+        $penaltyService->calculatePenaltyForDailyAttendance($attendance, $attDate);
     }
 
     /**
