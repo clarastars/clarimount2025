@@ -94,7 +94,7 @@ class AttendanceController extends Controller
             ->where('company_id', $company->id)
             ->get();
 
-        // Get existing attendance records
+        // Get existing attendance records. Prefer iClock API source when multiple exist per employee/date.
         $existingAttendance = ZkDailyAttendance::query()
             ->select([
                 'zk_daily_attendance.*',
@@ -115,6 +115,7 @@ class AttendanceController extends Controller
                 $endDate->format('Y-m-d')
             ])
             ->where('employees.company_id', $company->id)
+            ->orderByRaw("(zk_devices.serial_number = 'FINGERPRINT_ICLOCK_API') ASC") // API record overwrites when keyBy
             ->get()
             ->keyBy(function ($record) {
                 $dateStr = is_string($record->att_date) 

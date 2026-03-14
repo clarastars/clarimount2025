@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // Scheduled tasks for Bayzat attendance system
 Schedule::command('bayzat:retry-failed')->hourly()->description('Retry failed Bayzat sync records');
 Schedule::command('attendance:cleanup-imports --days=30')->monthly()->description('Clean up old attendance import files');
+
+// Fingerprint iClock API: sync today's attendance (first punch = check-in, last punch = check-out) every 10 minutes
+Schedule::job(new \App\Jobs\SyncFingerprintIclockAttendanceJob())->everyTenMinutes()->description('Sync fingerprint iClock attendance for today');
