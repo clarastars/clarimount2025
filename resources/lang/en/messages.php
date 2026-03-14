@@ -549,6 +549,7 @@ return [
         'fingerprint_device_error' => 'Failed to fetch data from fingerprint device (status: :status).',
         'fingerprint_device_connection_error' => 'Could not connect to fingerprint device: :message',
         'fingerprint_device_no_employees' => 'No employees on the fingerprint device or the API returned no data.',
+        'fingerprint_id' => 'Fingerprint ID',
         'fingerprint_dept_name' => 'Department',
         'fingerprint_position_name' => 'Job Title',
         'fingerprint_link' => 'Fingerprint Link',

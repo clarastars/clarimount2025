@@ -202,8 +202,11 @@ class FingerprintDeviceEmployeeController extends Controller
             $positionName = $this->getString($emp['position'], ['name', 'name_ar', 'name_en', 'position_name']);
         }
 
+        $empCode = $this->getString($emp, ['emp_code', 'code', 'employee_id', 'pin']);
+
         return [
             'id' => $id,
+            'emp_code' => $empCode,
             'first_name' => $firstName,
             'dept_name' => $deptName,
             'position_name' => $positionName,

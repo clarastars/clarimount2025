@@ -23,6 +23,7 @@ import type { Employee, Company, BreadcrumbItem } from '@/types';
 
 interface FingerprintEmployee {
     id: string;
+    emp_code: string;
     first_name: string;
     dept_name: string;
     position_name: string;
@@ -278,7 +279,7 @@ async function openFingerprintLinkDialog(emp: Employee) {
     try {
         const res = await fetch(route('api.employees.fingerprint-device-list'));
         const data = await res.json();
-        fingerprintEmployees.value = (data.employees || []).filter((e: FingerprintEmployee) => e.id);
+        fingerprintEmployees.value = (data.employees || []).filter((e: FingerprintEmployee) => e.emp_code || e.id);
         if (data.error) fingerprintListError.value = data.error;
     } catch (e) {
         fingerprintListError.value = (e as Error).message;
@@ -295,7 +296,8 @@ function closeFingerprintLinkDialog() {
 }
 
 async function selectFingerprintEmployee(fpEmp: FingerprintEmployee) {
-    if (!linkingEmployee.value || !fpEmp.id) return;
+    const linkValue = fpEmp.emp_code || fpEmp.id;
+    if (!linkingEmployee.value || !linkValue) return;
     linking.value = true;
     const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     try {
@@ -307,7 +309,7 @@ async function selectFingerprintEmployee(fpEmp: FingerprintEmployee) {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': csrfToken,
             },
-            body: JSON.stringify({ fingerprint_device_id: fpEmp.id }),
+            body: JSON.stringify({ fingerprint_device_id: linkValue }),
         });
         const data = await res.json();
         if (data.success) {

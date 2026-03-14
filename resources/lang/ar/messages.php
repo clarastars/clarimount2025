@@ -546,6 +546,7 @@ return [
         'fingerprint_device_error' => 'فشل جلب البيانات من جهاز البصمة (الحالة: :status).',
         'fingerprint_device_connection_error' => 'تعذر الاتصال بجهاز البصمة: :message',
         'fingerprint_device_no_employees' => 'لا يوجد موظفين في جهاز البصمة أو لم تُرجع الواجهة أي بيانات.',
+        'fingerprint_id' => 'معرف البصمة',
         'fingerprint_dept_name' => 'القسم',
         'fingerprint_position_name' => 'المسمى الوظيفي',
         'fingerprint_link' => 'الربط بالبصمة',

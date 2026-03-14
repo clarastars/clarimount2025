@@ -12,6 +12,8 @@ import type { BreadcrumbItem } from '@/types';
 const { t } = useI18n();
 
 interface FingerprintEmployee {
+    id: string;
+    emp_code: string;
     first_name: string;
     dept_name: string;
     position_name: string;
@@ -91,6 +93,9 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
                                 <tr class="border-b text-muted-foreground">
                                     <th class="py-3 px-4 text-start font-medium">#</th>
                                     <th class="py-3 px-4 text-start font-medium">
+                                        {{ t('employees.fingerprint_id') }}
+                                    </th>
+                                    <th class="py-3 px-4 text-start font-medium">
                                         {{ t('employees.first_name') }}
                                     </th>
                                     <th class="py-3 px-4 text-start font-medium">
@@ -104,10 +109,11 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
                             <tbody>
                                 <tr
                                     v-for="(emp, index) in props.employees"
-                                    :key="index"
+                                    :key="emp.id || index"
                                     class="border-b last:border-0 hover:bg-muted/40"
                                 >
                                     <td class="py-3 px-4">{{ index + 1 }}</td>
+                                    <td class="py-3 px-4 font-mono">{{ emp.emp_code || emp.id || '—' }}</td>
                                     <td class="py-3 px-4 font-medium">{{ emp.first_name || '—' }}</td>
                                     <td class="py-3 px-4">{{ emp.dept_name || '—' }}</td>
                                     <td class="py-3 px-4">{{ emp.position_name || '—' }}</td>
