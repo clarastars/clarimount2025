@@ -1501,6 +1501,7 @@ return [
         'create_first_salary_run' => 'أنشئ مسير رواتب جديد',
         'view_details' => 'عرض التفاصيل',
         'employees_count' => 'عدد الموظفين',
+        'export_excel' => 'إصدار إكسل',
         'no_penalties' => 'لا توجد خصومات',
         'cannot_update_finalized' => 'لا يمكن تحديث مسير رواتب معتمد',
         'approvals_section' => 'اعتمادات مسير الرواتب (يحتاج الاعتماد من 4 أشخاص)',

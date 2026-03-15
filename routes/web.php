@@ -234,6 +234,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Salary Runs routes
     Route::get('companies/{company}/salary-runs', [SalaryRunController::class, 'index'])->name('salary-runs.index');
+    Route::get('companies/{company}/salary-runs/export-excel/{salaryRun}', [SalaryRunController::class, 'exportExcel'])->name('salary-runs.export-excel');
     Route::get('companies/{company}/salary-runs/{year}/{month}', [SalaryRunController::class, 'show'])->name('salary-runs.show');
     Route::post('companies/{company}/salary-runs', [SalaryRunController::class, 'store'])->name('salary-runs.store');
     Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');

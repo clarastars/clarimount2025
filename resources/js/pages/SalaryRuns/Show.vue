@@ -10,10 +10,20 @@
             {{ getMonthName(salaryRun.month) }} {{ salaryRun.year }}
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
           <Badge :variant="salaryRun.status === 'finalized' ? 'default' : 'secondary'">
             {{ salaryRun.status === 'finalized' ? t('salary_runs.status_finalized') : t('salary_runs.status_draft') }}
           </Badge>
+          <Button
+            as="a"
+            :href="route('salary-runs.export-excel', [company.id, salaryRun.id])"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="gap-2 bg-green-600 hover:bg-green-700 text-white border-0"
+          >
+            <Icon name="FileSpreadsheet" class="h-4 w-4" />
+            {{ t('salary_runs.export_excel') }}
+          </Button>
           <Button
             v-if="salaryRun.status === 'draft'"
             @click="finalizeSalaryRun"

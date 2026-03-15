@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exports\SalaryRunExcelExport;
 use App\Models\Company;
 use App\Models\EmployeeDebt;
 use App\Models\SalaryRun;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SalaryRunController extends Controller
 {
@@ -92,6 +95,29 @@ class SalaryRunController extends Controller
             'salaryRun' => $salaryRun,
             'approvals' => $approvals,
         ]);
+    }
+
+    /**
+     * Export salary run to Excel
+     */
+    public function exportExcel(Company $company, SalaryRun $salaryRun): BinaryFileResponse
+    {
+        $user = Auth::user();
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+            abort(403, 'You do not have access to this company.');
+        }
+        if ($salaryRun->company_id !== $company->id) {
+            abort(403, 'Salary run does not belong to this company.');
+        }
+
+        $filename = sprintf(
+            'salary-run-%s-%s-%s.xlsx',
+            $company->id,
+            $salaryRun->year,
+            str_pad((string) $salaryRun->month, 2, '0', STR_PAD_LEFT)
+        );
+
+        return Excel::download(new SalaryRunExcelExport($salaryRun), $filename, \Maatwebsite\Excel\Excel::XLSX);
     }
 
     /**

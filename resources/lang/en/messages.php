@@ -1489,6 +1489,7 @@ return [
         'create_first_salary_run' => 'Create a new salary run',
         'view_details' => 'View Details',
         'employees_count' => 'Employees Count',
+        'export_excel' => 'Export Excel',
         'no_penalties' => 'No penalties',
         'cannot_update_finalized' => 'Cannot update a finalized salary run',
         'approvals_section' => 'Salary run approvals (requires 4 approvals)',
