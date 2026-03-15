@@ -128,4 +128,45 @@ class DeductionsController extends Controller
             ->route('attendance.deductions', ['company' => $company->id])
             ->with('success', __('messages.attendance.deduction_created'));
     }
+
+    /**
+     * Update a manual deduction.
+     */
+    public function update(Request $request, EmployeeDeduction $deduction): RedirectResponse
+    {
+        $user = Auth::user();
+        if (! $user->ownedCompanies()->where('id', $deduction->employee->company_id)->exists()) {
+            abort(403, 'You do not have access to this deduction.');
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'deduction_date' => ['required', 'date'],
+            'reason' => ['required', 'string', 'max:65535'],
+        ]);
+
+        $deduction->update($validated);
+
+        return redirect()
+            ->route('attendance.deductions', ['company' => $deduction->employee->company_id])
+            ->with('success', __('messages.attendance.deduction_updated'));
+    }
+
+    /**
+     * Delete a manual deduction.
+     */
+    public function destroy(EmployeeDeduction $deduction): RedirectResponse
+    {
+        $user = Auth::user();
+        if (! $user->ownedCompanies()->where('id', $deduction->employee->company_id)->exists()) {
+            abort(403, 'You do not have access to this deduction.');
+        }
+
+        $companyId = $deduction->employee->company_id;
+        $deduction->delete();
+
+        return redirect()
+            ->route('attendance.deductions', ['company' => $companyId])
+            ->with('success', __('messages.attendance.deduction_deleted'));
+    }
 }

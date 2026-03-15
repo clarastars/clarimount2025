@@ -1203,6 +1203,11 @@ return [
         'all_employees' => 'All employees',
         'approved_by_label' => 'Approved by',
         'created_by_label' => 'Created by',
+        'edit_deduction' => 'Edit deduction',
+        'delete_deduction' => 'Delete deduction',
+        'deduction_updated' => 'Deduction updated successfully.',
+        'deduction_deleted' => 'Deduction deleted successfully.',
+        'delete_deduction_confirm' => 'Are you sure you want to delete this deduction?',
     ],
 
     // Labor Law Rules

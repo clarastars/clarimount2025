@@ -1215,6 +1215,11 @@ return [
         'all_employees' => 'جميع الموظفين',
         'approved_by_label' => 'اعتمد بواسطة',
         'created_by_label' => 'أنشئ بواسطة',
+        'edit_deduction' => 'تعديل الخصم',
+        'delete_deduction' => 'حذف الخصم',
+        'deduction_updated' => 'تم تحديث الخصم بنجاح.',
+        'deduction_deleted' => 'تم حذف الخصم بنجاح.',
+        'delete_deduction_confirm' => 'هل أنت متأكد من حذف هذا الخصم؟',
     ],
 
     // قوانين مكتب العمل

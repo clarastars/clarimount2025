@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Banknote, Plus } from 'lucide-vue-next'
+import { Banknote, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import axios from 'axios'
 
 const { t } = useI18n()
@@ -131,6 +131,43 @@ function submitCreate() {
       createForm.reset()
     },
   })
+}
+
+const editModalOpen = ref(false)
+const selectedDeduction = ref<ManualDeduction | null>(null)
+const editForm = useForm({
+  amount: '',
+  deduction_date: '',
+  reason: '',
+})
+
+function openEditModal(row: ManualDeduction) {
+  selectedDeduction.value = row
+  editForm.reset()
+  editForm.amount = String(row.amount)
+  editForm.deduction_date = row.date
+  editForm.reason = row.reason
+  editModalOpen.value = true
+}
+
+function closeEditModal() {
+  editModalOpen.value = false
+  selectedDeduction.value = null
+}
+
+function submitEdit() {
+  if (!selectedDeduction.value) return
+  editForm.put(route('attendance.deductions.update', selectedDeduction.value.id), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeEditModal()
+    },
+  })
+}
+
+function confirmDelete(row: ManualDeduction) {
+  if (!confirm(t('attendance.delete_deduction_confirm'))) return
+  router.delete(route('attendance.deductions.destroy', row.id), { preserveScroll: true })
 }
 
 const mergedList = computed((): DeductionRow[] => {
@@ -302,6 +339,9 @@ function isManual(row: DeductionRow): row is ManualDeduction {
                     <th class="px-4 py-3 text-start text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       {{ t('attendance.approved_by_label') }} / {{ t('attendance.created_by_label') }}
                     </th>
+                    <th class="px-4 py-3 text-start text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-28">
+                      {{ t('common.actions') }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -339,6 +379,19 @@ function isManual(row: DeductionRow): row is ManualDeduction {
                       <template v-else>
                         {{ row.approver_name || '-' }}
                       </template>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <template v-if="isManual(row)">
+                        <div class="flex gap-1">
+                          <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditModal(row)" :title="t('attendance.edit_deduction')">
+                            <Pencil class="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" class="h-8 w-8 p-0 text-red-600 hover:text-red-700" @click="confirmDelete(row)" :title="t('attendance.delete_deduction')">
+                            <Trash2 class="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </template>
+                      <span v-else class="text-muted-foreground">-</span>
                     </td>
                   </tr>
                 </tbody>
@@ -437,6 +490,62 @@ function isManual(row: DeductionRow): row is ManualDeduction {
               {{ t('common.cancel') }}
             </Button>
             <Button type="submit" :disabled="createForm.processing">
+              {{ t('common.save') }}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Edit deduction modal -->
+    <Dialog :open="editModalOpen" @update:open="(v: boolean) => !v && closeEditModal()">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{{ t('attendance.edit_deduction') }}</DialogTitle>
+          <DialogDescription v-if="selectedDeduction">
+            {{ selectedDeduction.employee_name }}
+          </DialogDescription>
+        </DialogHeader>
+        <form v-if="selectedDeduction" @submit.prevent="submitEdit" class="space-y-4">
+          <div>
+            <Label class="text-muted-foreground">{{ t('attendance.filter_employee') }}</Label>
+            <p class="mt-1 text-sm font-medium">{{ selectedDeduction.employee_name }}</p>
+          </div>
+          <div>
+            <Label for="edit-amount">{{ t('attendance.deduction_amount') }}</Label>
+            <Input
+              id="edit-amount"
+              v-model="editForm.amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              class="mt-1"
+              required
+            />
+            <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
+          </div>
+          <div>
+            <Label for="edit-date">{{ t('attendance.deduction_date') }}</Label>
+            <Input id="edit-date" v-model="editForm.deduction_date" type="date" class="mt-1" required />
+            <p v-if="editForm.errors.deduction_date" class="text-sm text-red-500 mt-1">{{ editForm.errors.deduction_date }}</p>
+          </div>
+          <div>
+            <Label for="edit-reason">{{ t('attendance.deduction_reason') }}</Label>
+            <textarea
+              id="edit-reason"
+              v-model="editForm.reason"
+              rows="3"
+              class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              :placeholder="t('attendance.deduction_reason_placeholder')"
+              required
+            />
+            <p v-if="editForm.errors.reason" class="text-sm text-red-500 mt-1">{{ editForm.errors.reason }}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" @click="closeEditModal">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button type="submit" :disabled="editForm.processing">
               {{ t('common.save') }}
             </Button>
           </DialogFooter>
