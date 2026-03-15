@@ -61,12 +61,36 @@ class SalaryRunController extends Controller
         $salaryRun = SalaryRun::where('company_id', $company->id)
             ->where('year', $year)
             ->where('month', $month)
-            ->with(['items.employee.debts', 'creator'])
+            ->with(['items.employee.debts', 'creator', 'approverHr', 'approverDirector', 'approverAccountant', 'approverCeo'])
             ->firstOrFail();
+
+        $approvals = [
+            'hr' => [
+                'approved_at' => $salaryRun->hr_approved_at?->toIso8601String(),
+                'approver_name' => $salaryRun->approverHr?->name,
+                'can_approve' => $user->can('approve_salary_run_hr'),
+            ],
+            'director' => [
+                'approved_at' => $salaryRun->director_approved_at?->toIso8601String(),
+                'approver_name' => $salaryRun->approverDirector?->name,
+                'can_approve' => $user->can('approve_salary_run_director'),
+            ],
+            'accountant' => [
+                'approved_at' => $salaryRun->accountant_approved_at?->toIso8601String(),
+                'approver_name' => $salaryRun->approverAccountant?->name,
+                'can_approve' => $user->can('approve_salary_run_accountant'),
+            ],
+            'ceo' => [
+                'approved_at' => $salaryRun->ceo_approved_at?->toIso8601String(),
+                'approver_name' => $salaryRun->approverCeo?->name,
+                'can_approve' => $user->can('approve_salary_run_ceo'),
+            ],
+        ];
 
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
             'salaryRun' => $salaryRun,
+            'approvals' => $approvals,
         ]);
     }
 
@@ -125,6 +149,50 @@ class SalaryRunController extends Controller
         });
 
         return back()->with('success', __('Salary run finalized successfully.'));
+    }
+
+    private function approveStep(Company $company, SalaryRun $salaryRun, string $permission, string $approvedAtColumn, string $approvedByColumn): RedirectResponse
+    {
+        $user = Auth::user();
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+            abort(403, 'You do not have access to this company.');
+        }
+        if ($salaryRun->company_id !== $company->id) {
+            abort(403, 'Salary run does not belong to this company.');
+        }
+        if (! $user->can($permission)) {
+            abort(403, 'You do not have permission to perform this approval.');
+        }
+        if ($salaryRun->$approvedAtColumn !== null) {
+            return back()->with('info', __('messages.salary_runs.already_approved'));
+        }
+
+        $salaryRun->update([
+            $approvedAtColumn => now(),
+            $approvedByColumn => $user->id,
+        ]);
+
+        return back()->with('success', __('messages.salary_runs.approval_saved'));
+    }
+
+    public function approveHr(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        return $this->approveStep($company, $salaryRun, 'approve_salary_run_hr', 'hr_approved_at', 'hr_approved_by');
+    }
+
+    public function approveDirector(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        return $this->approveStep($company, $salaryRun, 'approve_salary_run_director', 'director_approved_at', 'director_approved_by');
+    }
+
+    public function approveAccountant(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        return $this->approveStep($company, $salaryRun, 'approve_salary_run_accountant', 'accountant_approved_at', 'accountant_approved_by');
+    }
+
+    public function approveCeo(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        return $this->approveStep($company, $salaryRun, 'approve_salary_run_ceo', 'ceo_approved_at', 'ceo_approved_by');
     }
 
     /**

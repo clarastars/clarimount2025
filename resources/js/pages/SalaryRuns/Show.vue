@@ -26,6 +26,53 @@
         </div>
       </div>
 
+      <!-- Approvals (4 steps) -->
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">{{ t('salary_runs.approvals_section') }}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div
+              v-for="(approval, key) in approvalList"
+              :key="key"
+              class="rounded-lg border p-4 flex flex-col justify-between"
+              :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
+            >
+              <div class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
+                {{ approval.label }}
+              </div>
+              <div v-if="approval.approved_at" class="text-sm space-y-1">
+                <div class="text-gray-600 dark:text-gray-400">
+                  <span class="text-muted-foreground">{{ t('salary_runs.approval_date_label') }}:</span>
+                  {{ formatApprovalDate(approval.approved_at) }}
+                </div>
+                <div class="text-gray-600 dark:text-gray-400">
+                  <span class="text-muted-foreground">{{ t('salary_runs.approval_time_label') }}:</span>
+                  {{ formatApprovalTime(approval.approved_at) }}
+                </div>
+                <div class="font-medium text-gray-900 dark:text-gray-100 pt-0.5">
+                  <span class="text-muted-foreground">{{ t('salary_runs.approval_by_label') }}:</span>
+                  {{ approval.approver_name || '-' }}
+                </div>
+              </div>
+              <div v-else class="space-y-2">
+                <p class="text-sm text-amber-600 dark:text-amber-400">{{ t('salary_runs.approval_pending') }}</p>
+                <Button
+                  v-if="approval.can_approve"
+                  size="sm"
+                  class="w-full"
+                  :disabled="approvingStep === approval.key"
+                  @click="openApprovalConfirm(approval.key)"
+                >
+                  {{ approvingStep === approval.key ? '...' : t('salary_runs.approval_approve') }}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <!-- Summary Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -297,6 +344,26 @@
           </form>
         </DialogContent>
       </Dialog>
+
+      <!-- Approval confirmation dialog -->
+      <Dialog :open="!!approvalConfirmStep" @update:open="(open) => !open && (approvalConfirmStep = null)">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{{ t('salary_runs.approval_confirm_title') }}</DialogTitle>
+            <DialogDescription>
+              {{ t('salary_runs.approval_confirm_message') }}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" @click="approvalConfirmStep = null">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button @click="confirmApprovalSubmit">
+              {{ t('salary_runs.approval_approve') }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   </AppLayout>
 </template>
@@ -317,6 +384,12 @@ import { computed, ref } from 'vue';
 import type { Company, BreadcrumbItem } from '@/types';
 
 const { t, locale } = useI18n();
+
+interface ApprovalState {
+  approved_at: string | null;
+  approver_name: string | null;
+  can_approve: boolean;
+}
 
 interface Props {
   company: Company;
@@ -359,9 +432,69 @@ interface Props {
       }>;
     }>;
   };
+  approvals?: {
+    hr: ApprovalState;
+    director: ApprovalState;
+    accountant: ApprovalState;
+    ceo: ApprovalState;
+  };
 }
 
 const props = defineProps<Props>();
+
+const defaultApproval = { approved_at: null, approver_name: null, can_approve: false };
+const approvalList = computed(() => {
+  const a = props.approvals ?? { hr: defaultApproval, director: defaultApproval, accountant: defaultApproval, ceo: defaultApproval };
+  return [
+    { key: 'hr', label: t('salary_runs.approval_hr'), ...a.hr },
+    { key: 'director', label: t('salary_runs.approval_director'), ...a.director },
+    { key: 'accountant', label: t('salary_runs.approval_accountant'), ...a.accountant },
+    { key: 'ceo', label: t('salary_runs.approval_ceo'), ...a.ceo },
+  ].map((item) => ({ ...item, approved_at: item.approved_at ?? null, approver_name: item.approver_name ?? null, can_approve: item.can_approve ?? false }));
+});
+
+const approvingStep = ref<string | null>(null);
+const approvalConfirmStep = ref<string | null>(null);
+
+function openApprovalConfirm(stepKey: string) {
+  approvalConfirmStep.value = stepKey;
+}
+
+function confirmApprovalSubmit() {
+  if (approvalConfirmStep.value) {
+    submitApproval(approvalConfirmStep.value);
+    approvalConfirmStep.value = null;
+  }
+}
+
+function formatApprovalDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: undefined });
+  } catch {
+    return iso;
+  }
+}
+
+function formatApprovalTime(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function submitApproval(stepKey: string) {
+  const routeName = `salary-runs.approve-${stepKey}` as 'salary-runs.approve-hr' | 'salary-runs.approve-director' | 'salary-runs.approve-accountant' | 'salary-runs.approve-ceo';
+  approvingStep.value = stepKey;
+  router.post(route(routeName, [props.company.id, props.salaryRun.id]), {}, {
+    preserveScroll: true,
+    onFinish: () => {
+      approvingStep.value = null;
+    },
+  });
+}
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
   {

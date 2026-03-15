@@ -19,11 +19,23 @@ class SalaryRun extends Model
         'month',
         'status',
         'created_by',
+        'hr_approved_at',
+        'hr_approved_by',
+        'director_approved_at',
+        'director_approved_by',
+        'accountant_approved_at',
+        'accountant_approved_by',
+        'ceo_approved_at',
+        'ceo_approved_by',
     ];
 
     protected $casts = [
         'year' => 'integer',
         'month' => 'integer',
+        'hr_approved_at' => 'datetime',
+        'director_approved_at' => 'datetime',
+        'accountant_approved_at' => 'datetime',
+        'ceo_approved_at' => 'datetime',
     ];
 
     /**
@@ -40,6 +52,26 @@ class SalaryRun extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approverHr(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'hr_approved_by');
+    }
+
+    public function approverDirector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'director_approved_by');
+    }
+
+    public function approverAccountant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'accountant_approved_by');
+    }
+
+    public function approverCeo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ceo_approved_by');
     }
 
     /**

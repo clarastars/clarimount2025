@@ -56,17 +56,21 @@ class RolesAndPermissionsSeeder extends Seeder
             // Profile management (per user)
             'edit own profile',
             'view own profile',
+
+            // Salary run approvals (4-step workflow)
+            'approve_salary_run_hr',
+            'approve_salary_run_director',
+            'approve_salary_run_accountant',
+            'approve_salary_run_ceo',
         ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        // Create global system roles (no team_id)
+        // Create global system role (no team_id) – super-admin has ALL permissions always
         $superAdminRole = Role::firstOrCreate(['name' => 'super-admin']);
-        if (!$superAdminRole->permissions->count()) {
-            $superAdminRole->givePermissionTo(Permission::all());
-        }
+        $superAdminRole->syncPermissions(Permission::all());
 
         // Employee portal role: for employees who log in to see their leave balance etc.
         Role::firstOrCreate(['name' => 'employee']);
@@ -79,6 +83,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view admin panel', 'manage billing', 'view analytics', 'export data',
             'view departments', 'create departments', 'edit departments', 'delete departments',
             'edit own profile', 'view own profile',
+            'approve_salary_run_hr', 'approve_salary_run_director', 'approve_salary_run_accountant', 'approve_salary_run_ceo',
         ];
 
         $teamAdminPermissions = [
