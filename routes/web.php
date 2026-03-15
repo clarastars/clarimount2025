@@ -18,6 +18,7 @@ use App\Http\Controllers\AssetTemplateController;
 use App\Http\Controllers\PrintJobController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendancePenaltyApprovalController;
+use App\Http\Controllers\DeductionsController;
 use App\Http\Controllers\BayzatConfigController;
 use App\Http\Controllers\SalaryRunController;
 use App\Http\Controllers\ZKTekoWebhookController;
@@ -216,6 +217,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Attendance Management routes
     Route::get('companies/{company}/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
     Route::get('companies/{company}/attendance/late', [AttendanceController::class, 'late'])->name('attendance.late');
+    Route::get('companies/{company}/attendance/deductions', [DeductionsController::class, 'index'])->name('attendance.deductions');
+    Route::post('attendance/deductions', [DeductionsController::class, 'store'])->name('attendance.deductions.store');
     Route::get('companies/{company}/attendance/create', [AttendanceController::class, 'create'])->name('attendance.create');
     Route::post('companies/{company}/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
     Route::get('companies/{company}/attendance/{import}', [AttendanceController::class, 'show'])->name('attendance.show');

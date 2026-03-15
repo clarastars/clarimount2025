@@ -12,10 +12,16 @@
               {{ $t('attendance.fingerprint_attendance') }}
             </p>
           </div>
-          <Button @click="router.visit(route('attendance.late', props.company.id))" variant="destructive" class="gap-2 cursor-pointer">
-            <AlertTriangle class="w-4 h-4" />
-            {{ $t('attendance.view_late') }}
-          </Button>
+          <div class="flex gap-2">
+            <Button @click="router.visit(route('attendance.deductions', props.company.id))" class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700">
+              <Banknote class="w-4 h-4" />
+              {{ $t('attendance.deductions') }}
+            </Button>
+            <Button @click="router.visit(route('attendance.late', props.company.id))" variant="destructive" class="gap-2 cursor-pointer">
+              <AlertTriangle class="w-4 h-4" />
+              {{ $t('attendance.view_late') }}
+            </Button>
+          </div>
         </div>
 
         <!-- Fingerprint Attendance Section -->
@@ -444,6 +450,7 @@ import {
   FileText,
   Clock,
   AlertTriangle,
+  Banknote,
   Plus,
   Eye,
   RotateCcw,
