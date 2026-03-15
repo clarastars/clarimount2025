@@ -211,11 +211,14 @@
               :key="index"
               class="flex justify-between items-center p-3 border rounded-lg"
             >
-              <div>
+              <div class="min-w-0 flex-1">
                 <div class="font-medium">{{ penalty.date }}</div>
-                <div class="text-sm text-gray-500">{{ penalty.action_text }}</div>
+                <div v-if="penalty.source === 'manual_deduction'" class="text-xs text-blue-600 dark:text-blue-400 mb-0.5">
+                  {{ t('attendance.deduction_type_manual') }}
+                </div>
+                <div class="text-sm text-gray-500 break-words">{{ penalty.action_text }}</div>
               </div>
-              <div class="text-sm font-medium text-orange-600">
+              <div class="text-sm font-medium text-orange-600 dark:text-orange-400 shrink-0 ms-2">
                 {{ formatCurrency(penalty.amount) }}
               </div>
             </div>
@@ -349,9 +352,10 @@ interface Props {
       breakdown: Array<{
         date: string;
         action_type: string;
-        action_value: number;
+        action_value: number | null;
         action_text: string;
         amount: number;
+        source?: 'penalty' | 'manual_deduction';
       }>;
     }>;
   };

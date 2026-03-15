@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AttendancePenalty;
 use App\Models\Employee;
 use App\Models\EmployeeDebt;
+use App\Models\EmployeeDeduction;
 use App\Models\Leave;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
@@ -71,6 +72,29 @@ class SalaryRunService
                         'action_value' => $penalty->action_value,
                         'action_text' => $penalty->action_text,
                         'amount' => $penaltyAmount,
+                        'source' => 'penalty',
+                    ];
+                }
+
+                // Manual deductions (employee_deductions) for this month
+                $manualDeductions = EmployeeDeduction::where('employee_id', $employee->id)
+                    ->whereBetween('deduction_date', [
+                        $startDate->format('Y-m-d'),
+                        $endDate->format('Y-m-d'),
+                    ])
+                    ->orderBy('deduction_date')
+                    ->get();
+
+                foreach ($manualDeductions as $deduction) {
+                    $amount = (float) $deduction->amount;
+                    $penaltiesTotal += $amount;
+                    $breakdown[] = [
+                        'date' => $deduction->deduction_date->format('Y-m-d'),
+                        'action_type' => 'manual_deduction',
+                        'action_value' => null,
+                        'action_text' => $deduction->reason,
+                        'amount' => $amount,
+                        'source' => 'manual_deduction',
                     ];
                 }
 
