@@ -254,6 +254,11 @@ class AttendanceController extends Controller
                         return false;
                     }
 
+                    // If employee is not linked to a fingerprint device, skip absence penalties
+                    if (!$employee->fingerprint_device_id) {
+                        return false;
+                    }
+
                     $attDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
                     
                     // Only process past dates and today (not future dates)
@@ -328,6 +333,13 @@ class AttendanceController extends Controller
                 // No employee or no shift assigned
                 if (!$employee || !$employee->shift) {
                     $record->status_ar = 'غير محدد';
+                    $record->late_minutes = null;
+                    return $record;
+                }
+
+                // If employee is not linked to a fingerprint device, do not apply any attendance status or penalties
+                if (!$employee->fingerprint_device_id) {
+                    $record->status_ar = 'غير مربوط ببصمة';
                     $record->late_minutes = null;
                     return $record;
                 }

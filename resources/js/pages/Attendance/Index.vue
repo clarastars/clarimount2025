@@ -182,9 +182,6 @@
                       <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.penalty_approval') }}
                       </th>
-                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                        {{ $t('attendance.device_name') }}
-                      </th>
                     </tr>
                   </thead>
                   <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -206,12 +203,17 @@
                           </Badge>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                    <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center">
                           <Badge v-if="record.device_pin" variant="secondary" class="px-3 py-1">
                             {{ record.device_pin }}
                           </Badge>
-                          <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
+                          <span
+                            v-else
+                            class="text-sm text-red-600 dark:text-red-400 font-medium"
+                          >
+                            غير مربوط ببصمة
+                          </span>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
@@ -328,11 +330,7 @@
                           <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center">
-                        <div class="text-sm text-gray-700 dark:text-gray-300">
-                          {{ record.device_name || record.serial_number || '-' }}
-                        </div>
-                      </td>
+                      
                     </tr>
                   </tbody>
                 </table>
