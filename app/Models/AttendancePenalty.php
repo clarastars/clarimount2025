@@ -58,11 +58,13 @@ class AttendancePenalty extends Model
     }
 
     /**
-     * Scope to filter by year (calendar year)
+     * Scope to filter by year and month (calendar month)
      */
-    public function scopeForYear($query, int $year)
+    public function scopeForMonthYear($query, int $year, int $month)
     {
-        return $query->whereYear('attendance_date', $year);
+        return $query
+            ->whereYear('attendance_date', $year)
+            ->whereMonth('attendance_date', $month);
     }
 
     /**

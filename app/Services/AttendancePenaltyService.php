@@ -164,12 +164,14 @@ class AttendancePenaltyService
      */
     private function calculateRepeatNumber(int $employeeId, string $violationType, string $attendanceDate): int
     {
-        $year = Carbon::parse($attendanceDate)->year;
+        $date = Carbon::parse($attendanceDate);
+        $year = (int) $date->year;
+        $month = (int) $date->month;
 
-        // Count existing penalties for the same violation type in the same calendar year
+        // Count existing penalties for the same violation type in the same calendar month
         $count = AttendancePenalty::forEmployee($employeeId)
             ->byViolationType($violationType)
-            ->forYear($year)
+            ->forMonthYear($year, $month)
             ->count();
 
         // Repeat number is count + 1, capped at 4
