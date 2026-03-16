@@ -174,8 +174,14 @@ class AttendancePenaltyService
             ->forMonthYear($year, $month)
             ->count();
 
-        // Repeat number is count + 1, capped at 4
-        return min($count + 1, 4);
+        // Actual repeat number for this occurrence
+        $repeatNumber = $count + 1;
+
+        // Find the maximum defined repeat_number for this violation_type in labor law rules
+        $maxDefinedRepeat = LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1;
+
+        // If actual repeat exceeds the maximum defined, cap it to the maximum defined rule
+        return (int) min($repeatNumber, $maxDefinedRepeat);
     }
 
     /**
@@ -233,9 +239,12 @@ class AttendancePenaltyService
     private function createAbsencePenaltyWithRepeatNumber(int $employeeId, string $attendanceDate, int $repeatNumber): ?AttendancePenalty
     {
         $violationType = 'absent_without_excuse';
-        
-        // Cap repeat number at 4
-        $repeatNumber = min($repeatNumber, 4);
+
+        // Find the maximum defined repeat_number for this violation_type in labor law rules
+        $maxDefinedRepeat = LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1;
+
+        // Cap repeat number so that any repeat above the maximum defined uses the maximum defined rule
+        $repeatNumber = (int) min($repeatNumber, $maxDefinedRepeat);
         
         // Get the rule for this violation type and repeat number
         $rule = LaborLawRule::byViolationType($violationType)
