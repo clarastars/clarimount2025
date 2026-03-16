@@ -37,16 +37,41 @@ class FingerprintIclockAttendanceService
      */
     public function syncToday(): void
     {
+        $today = Carbon::today('Asia/Riyadh');
+        $this->syncForDate($today);
+    }
+
+    /**
+     * Sync attendance for the current month from the 1st day until today (inclusive).
+     * This is useful when starting the system mid‑month and needing to backfill data.
+     */
+    public function syncCurrentMonthUntilToday(): void
+    {
+        $now = Carbon::now('Asia/Riyadh');
+        $startOfMonth = $now->copy()->startOfMonth();
+        $today = $now->copy()->startOfDay();
+
+        $current = $startOfMonth->copy();
+        while ($current->lte($today)) {
+            $this->syncForDate($current);
+            $current->addDay();
+        }
+    }
+
+    /**
+     * Sync attendance for a specific date from iClock API for all employees with fingerprint_device_id.
+     */
+    public function syncForDate(Carbon $date): void
+    {
         if (empty($this->baseUrl) || empty($this->token)) {
             Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured');
             return;
         }
 
         $device = $this->getOrCreateApiDevice();
-        $today = Carbon::today('Asia/Riyadh');
-        $startTime = $today->copy()->startOfDay()->format('Y-m-d H:i:s');
-        $endTime = $today->copy()->endOfDay()->format('Y-m-d H:i:s');
-        $attDate = $today->format('Y-m-d');
+        $startTime = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endTime = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
+        $attDate = $date->format('Y-m-d');
 
         $employees = Employee::whereNotNull('fingerprint_device_id')
             ->where('fingerprint_device_id', '!=', '')
