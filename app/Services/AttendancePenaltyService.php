@@ -179,10 +179,11 @@ class AttendancePenaltyService
         $repeatNumber = $count + 1;
 
         // Find the maximum defined repeat_number for this violation_type in labor law rules
-        $maxDefinedRepeat = LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1;
+        $maxDefinedRepeat = (int) (LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1);
+        $maxDefinedRepeat = max(1, $maxDefinedRepeat);
 
-        // If actual repeat exceeds the maximum defined, cap it to the maximum defined rule
-        return (int) min($repeatNumber, $maxDefinedRepeat);
+        // If actual repeat exceeds the maximum defined, cycle back from 1 (e.g. 1,2,1,2,1,2…)
+        return (int) ((($repeatNumber - 1) % $maxDefinedRepeat) + 1);
     }
 
     /**
@@ -242,10 +243,11 @@ class AttendancePenaltyService
         $violationType = 'absent_without_excuse';
 
         // Find the maximum defined repeat_number for this violation_type in labor law rules
-        $maxDefinedRepeat = LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1;
+        $maxDefinedRepeat = (int) (LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1);
+        $maxDefinedRepeat = max(1, $maxDefinedRepeat);
 
-        // Cap repeat number so that any repeat above the maximum defined uses the maximum defined rule
-        $repeatNumber = (int) min($repeatNumber, $maxDefinedRepeat);
+        // If repeat exceeds the maximum defined, cycle back from 1 (e.g. 1,2,1,2,1,2…)
+        $repeatNumber = (int) ((($repeatNumber - 1) % $maxDefinedRepeat) + 1);
         
         // Get the rule for this violation type and repeat number
         $rule = LaborLawRule::byViolationType($violationType)
