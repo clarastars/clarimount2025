@@ -58,8 +58,9 @@ class AttendancePenaltyService
             $rule->action_value_basic_days
         );
 
-        // Create or get existing penalty (idempotent)
-        $penalty = AttendancePenalty::firstOrCreate(
+        // Use updateOrCreate so that when re-running month sync (--month), repeat_number and
+        // rule-based fields are recalculated in chronological order (day 2 = first, day 5 = second).
+        $penalty = AttendancePenalty::updateOrCreate(
             [
                 'employee_id' => $employeeId,
                 'attendance_date' => $attendanceDate,
