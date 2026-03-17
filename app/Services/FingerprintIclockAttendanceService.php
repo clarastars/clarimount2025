@@ -90,6 +90,56 @@ class FingerprintIclockAttendanceService
     }
 
     /**
+     * Sync attendance for a specific employee (by employee id) for the current month until today (inclusive).
+     */
+    public function syncCurrentMonthUntilTodayForEmployeeId(int $employeeId): void
+    {
+        $now = Carbon::now('Asia/Riyadh');
+        $startOfMonth = $now->copy()->startOfMonth();
+        $today = $now->copy()->startOfDay();
+
+        $current = $startOfMonth->copy();
+        while ($current->lte($today)) {
+            $this->syncForEmployeeIdAndDate($employeeId, $current);
+            $current->addDay();
+        }
+    }
+
+    /**
+     * Sync attendance for a specific employee (by employee id) for a specific date.
+     */
+    public function syncForEmployeeIdAndDate(int $employeeId, Carbon $date): void
+    {
+        if (empty($this->baseUrl) || empty($this->token)) {
+            Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured');
+            return;
+        }
+
+        $employee = Employee::query()->find($employeeId);
+        if (! $employee) {
+            Log::channel('daily')->warning('[FingerprintIclock] Employee not found', [
+                'employee_id' => $employeeId,
+            ]);
+            return;
+        }
+
+        $empCode = (string) ($employee->fingerprint_device_id ?? '');
+        if ($empCode === '') {
+            Log::channel('daily')->info('[FingerprintIclock] Sync skipped: employee has no fingerprint_device_id', [
+                'employee_id' => $employeeId,
+            ]);
+            return;
+        }
+
+        $device = $this->getOrCreateApiDevice();
+        $startTime = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $endTime = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
+        $attDate = $date->format('Y-m-d');
+
+        $this->syncEmployeeForDate($device, $empCode, $attDate, $startTime, $endTime);
+    }
+
+    /**
      * Fetch transactions from API for one employee and one day, then upsert zk_daily_attendance.
      */
     public function syncEmployeeForDate(
