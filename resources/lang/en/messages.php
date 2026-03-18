@@ -1172,6 +1172,7 @@ return [
         'penalty_deduction_day' => 'Deduct one day\'s wage',
         'penalty_termination' => 'Termination',
         'penalty_approval' => 'Penalty Approval',
+        'late_minutes_deduction' => 'Late minutes deduction',
         'approve' => 'Approve',
         'reject' => 'Reject',
         'approved' => 'Approved',

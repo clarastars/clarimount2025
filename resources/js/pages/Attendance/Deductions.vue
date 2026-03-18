@@ -45,6 +45,7 @@ interface ApprovedPenalty {
   date: string
   action_text: string
   reason_text: string
+  late_minutes_deduction_amount: number | null
   approved_at: string | null
   approver_name: string | null
 }
@@ -231,6 +232,11 @@ function formatDate(dateStr: string) {
   }
 }
 
+function formatCurrency(amount: number) {
+  if (amount == null || Number.isNaN(amount)) return '-'
+  return Number(amount).toFixed(2) + ' SAR'
+}
+
 function isManual(row: DeductionRow): row is ManualDeduction {
   return row.type === 'manual'
 }
@@ -366,7 +372,12 @@ function isManual(row: DeductionRow): row is ManualDeduction {
                         <span class="font-medium">{{ row.amount }}</span>
                       </template>
                       <template v-else>
-                        {{ row.action_text }}
+                        <div class="flex flex-col gap-0.5">
+                          <span>{{ row.action_text }}</span>
+                          <span v-if="row.late_minutes_deduction_amount != null && row.late_minutes_deduction_amount > 0" class="text-xs text-amber-600 dark:text-amber-400">
+                            {{ t('attendance.late_minutes_deduction') }}: {{ formatCurrency(row.late_minutes_deduction_amount) }}
+                          </span>
+                        </div>
                       </template>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" :title="isManual(row) ? row.reason : row.reason_text">

@@ -24,6 +24,7 @@ class AttendancePenalty extends Model
         'action_value_basic_days',
         'action_text',
         'reason_text',
+        'late_minutes_deduction_amount',
         'approval_status',
         'approved_by',
         'approved_at',
@@ -38,6 +39,7 @@ class AttendancePenalty extends Model
         'action_value' => 'integer',
         'action_value_gross_days' => 'integer',
         'action_value_basic_days' => 'integer',
+        'late_minutes_deduction_amount' => 'decimal:2',
         'approved_at' => 'datetime',
     ];
 

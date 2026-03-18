@@ -64,14 +64,18 @@ class SalaryRunService
                 foreach ($approvedPenalties as $penalty) {
                     $basicSalary = $employee->basic_salary ? (float) $employee->basic_salary : null;
                     $penaltyAmount = $this->calculatePenaltyAmount($penalty, $grossSalary, $dailyWage, $basicSalary);
-                    $penaltiesTotal += $penaltyAmount;
+                    $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
+                    $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
+                    $penaltiesTotal += $totalForPenalty;
 
                     $breakdown[] = [
                         'date' => $penalty->attendance_date->format('Y-m-d'),
                         'action_type' => $penalty->action_type,
                         'action_value' => $penalty->action_value,
                         'action_text' => $penalty->action_text,
-                        'amount' => $penaltyAmount,
+                        'amount' => $totalForPenalty,
+                        'penalty_amount' => $penaltyAmount,
+                        'late_minutes_deduction_amount' => $lateMinutesDeduction,
                         'source' => 'penalty',
                     ];
                 }

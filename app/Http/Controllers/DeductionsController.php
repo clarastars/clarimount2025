@@ -79,6 +79,7 @@ class DeductionsController extends Controller
                 'date' => $p->attendance_date->format('Y-m-d'),
                 'action_text' => $p->action_text,
                 'reason_text' => $p->reason_text,
+                'late_minutes_deduction_amount' => $p->late_minutes_deduction_amount !== null ? (float) $p->late_minutes_deduction_amount : null,
                 'approved_at' => $p->approved_at?->toIso8601String(),
                 'approver_name' => $p->approver?->name,
             ]),

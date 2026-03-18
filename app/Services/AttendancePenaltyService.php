@@ -52,11 +52,14 @@ class AttendancePenaltyService
 
         // Generate action text
         $actionText = $this->generateActionText(
-            $rule->action_type, 
+            $rule->action_type,
             $rule->action_value,
             $rule->action_value_gross_days,
             $rule->action_value_basic_days
         );
+
+        // Calculate late minutes deduction amount: late_minutes × minute_rate (from basic salary, work days, shift)
+        $lateMinutesDeductionAmount = $this->calculateLateMinutesDeductionAmount($employeeId, $lateMinutes);
 
         // Use updateOrCreate so that when re-running month sync (--month), repeat_number and
         // rule-based fields are recalculated in chronological order (day 2 = first, day 5 = second).
@@ -75,6 +78,7 @@ class AttendancePenaltyService
                 'action_value_basic_days' => $rule->action_value_basic_days,
                 'action_text' => $actionText,
                 'reason_text' => $rule->reason_text,
+                'late_minutes_deduction_amount' => $lateMinutesDeductionAmount,
             ]
         );
 
@@ -290,6 +294,61 @@ class AttendancePenaltyService
         );
 
         return $penalty;
+    }
+
+    /**
+     * Calculate deduction amount for late minutes: late_minutes × minute_rate.
+     * Minute rate = basic_salary / (work_days_per_month × work_minutes_per_day).
+     * Work minutes per day = shift end_time - start_time. Work days per month from shift workdays.
+     *
+     * @param int $employeeId
+     * @param int $lateMinutes
+     * @return float|null Amount in currency, or null if not calculable
+     */
+    private function calculateLateMinutesDeductionAmount(int $employeeId, int $lateMinutes): ?float
+    {
+        if ($lateMinutes <= 0) {
+            return null;
+        }
+
+        $employee = Employee::with(['shift.workdays'])->find($employeeId);
+        if (! $employee || ! $employee->shift) {
+            return null;
+        }
+
+        $basicSalary = $employee->basic_salary ? (float) $employee->basic_salary : null;
+        if ($basicSalary === null || $basicSalary <= 0) {
+            return null;
+        }
+
+        $shift = $employee->shift;
+        $start = $shift->start_time;
+        $end = $shift->end_time;
+        if (! $start || ! $end) {
+            return null;
+        }
+
+        // Work minutes per day (same-day shift; if end < start assume next day)
+        $startMinutes = $start->hour * 60 + $start->minute;
+        $endMinutes = $end->hour * 60 + $end->minute;
+        $workMinutesPerDay = $endMinutes > $startMinutes
+            ? $endMinutes - $startMinutes
+            : (24 * 60 - $startMinutes) + $endMinutes;
+        if ($workMinutesPerDay <= 0) {
+            return null;
+        }
+
+        // Work days per month: count weekdays where is_workday = true, then scale to month
+        $workDaysPerWeek = $shift->workdays()->where('is_workday', true)->count();
+        if ($workDaysPerWeek <= 0) {
+            return null;
+        }
+        $workDaysPerMonth = $workDaysPerWeek * (30 / 7);
+
+        $minuteRate = $basicSalary / ($workDaysPerMonth * $workMinutesPerDay);
+        $amount = round($lateMinutes * $minuteRate, 2);
+
+        return $amount > 0 ? $amount : null;
     }
 
     /**

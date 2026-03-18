@@ -260,11 +260,16 @@
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-center">
+                        <div class="flex flex-col justify-center items-center gap-1">
                           <Badge v-if="record.penalty?.action_text" :variant="getPenaltyVariant(record.penalty?.action_type)" class="px-3 py-1">
                             {{ record.penalty.action_text }}
                           </Badge>
-                          <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
+                          <span v-if="record.penalty?.late_minutes_deduction_amount != null && Number(record.penalty.late_minutes_deduction_amount) > 0" class="text-xs text-amber-600 dark:text-amber-400">
+                            {{ $t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(record.penalty.late_minutes_deduction_amount)) }}
+                          </span>
+                          <template v-if="!record.penalty?.action_text && !(record.penalty?.late_minutes_deduction_amount != null && Number(record.penalty.late_minutes_deduction_amount) > 0)">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
+                          </template>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
@@ -683,6 +688,11 @@ const getStatusText = (status) => {
 
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString()
+}
+
+const formatCurrency = (amount) => {
+  if (amount == null || Number.isNaN(amount)) return '-'
+  return Number(amount).toFixed(2) + ' SAR'
 }
 
 const formatAttendanceDate = (date) => {

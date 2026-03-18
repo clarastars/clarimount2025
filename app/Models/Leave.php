@@ -88,6 +88,6 @@ class Leave extends Model
             return 0;
         }
 
-        return $overlapStart->diffInDays($overlapEnd) + 1;
+        return (int) ($overlapStart->diffInDays($overlapEnd) + 1);
     }
 }

@@ -274,6 +274,9 @@
                   {{ t('attendance.deduction_type_manual') }}
                 </div>
                 <div class="text-sm text-gray-500 break-words">{{ penalty.action_text }}</div>
+                <div v-if="penalty.source === 'penalty' && penalty.late_minutes_deduction_amount != null && Number(penalty.late_minutes_deduction_amount) > 0" class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  {{ t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(penalty.late_minutes_deduction_amount)) }}
+                </div>
               </div>
               <div class="text-sm font-medium text-orange-600 dark:text-orange-400 shrink-0 ms-2">
                 {{ formatCurrency(penalty.amount) }}
@@ -438,6 +441,8 @@ interface Props {
         action_value: number | null;
         action_text: string;
         amount: number;
+        penalty_amount?: number;
+        late_minutes_deduction_amount?: number;
         source?: 'penalty' | 'manual_deduction';
       }>;
     }>;

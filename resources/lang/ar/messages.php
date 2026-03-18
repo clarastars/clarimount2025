@@ -1184,6 +1184,7 @@ return [
         'penalty_deduction_day' => 'خصم أجر يوم',
         'penalty_termination' => 'إنهاء الخدمة',
         'penalty_approval' => 'اعتماد الجزاء',
+        'late_minutes_deduction' => 'خصم دقائق التأخير',
         'approve' => 'اعتماد',
         'reject' => 'رفض',
         'approved' => 'تم الاعتماد',
