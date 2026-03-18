@@ -178,9 +178,14 @@ class SalaryRunService
                 return 0;
 
             case 'deduction_percentage':
-                // Percentage of daily wage
+                // Percentage of basic daily wage (الخصم من الراتب الأساسي)
                 $percentage = $penalty->action_value ?? 0;
-                return ($percentage / 100) * $dailyWage;
+                if ($basicSalary === null || $basicSalary <= 0) {
+                    return 0;
+                }
+                $basicDailyWage = $basicSalary / 30;
+
+                return ($percentage / 100) * $basicDailyWage;
 
             case 'deduction_days':
                 // Days * daily wage
