@@ -12,7 +12,8 @@ class SyncFingerprintIclockAttendanceEmployee extends Command
 {
     protected $signature = 'attendance:sync-fingerprint-iclock-employee
                             {employeeId : Employee id}
-                            {--month : Sync attendance from start of current month until today for this employee}';
+                            {--month : Sync attendance from start of current month until today for this employee}
+                            {--progress : Print per-day/per-employee progress to the terminal while running}';
 
     protected $description = 'Sync fingerprint iClock attendance (and penalties) for a specific employee. Supports backfilling the current month.';
 
@@ -25,6 +26,8 @@ class SyncFingerprintIclockAttendanceEmployee extends Command
         }
 
         if ($this->option('month')) {
+            // For backfills we usually want to see what day/employee is processing right now.
+            $service->setProgressEnabled(true);
             $this->info("Syncing current month attendance for employee #{$employeeId} (from start of month until today)...");
             $service->syncCurrentMonthUntilTodayForEmployeeId($employeeId);
             $this->info('Done.');

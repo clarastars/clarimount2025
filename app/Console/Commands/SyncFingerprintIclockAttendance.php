@@ -11,7 +11,8 @@ class SyncFingerprintIclockAttendance extends Command
 {
     protected $signature = 'attendance:sync-fingerprint-iclock
                            {--job : Dispatch the job to the queue instead of running synchronously}
-                           {--month : Sync attendance from start of current month until today}';
+                           {--month : Sync attendance from start of current month until today}
+                           {--progress : Print per-day/per-employee progress to the terminal while running}';
 
     protected $description = 'Sync today\'s attendance from fingerprint iClock API (first punch = check-in, last = check-out)';
 
@@ -19,6 +20,9 @@ class SyncFingerprintIclockAttendance extends Command
     {
         // If --month is provided, backfill from start of current month until today.
         if ($this->option('month')) {
+            // For backfills we usually want to see what employee/day is processing right now.
+            $service->setProgressEnabled(true);
+
             $this->info('Syncing current month attendance (from start of month until today) from iClock API...');
             $service->syncCurrentMonthUntilToday();
             $this->info('Done syncing current month.');

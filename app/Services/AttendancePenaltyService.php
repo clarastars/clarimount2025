@@ -91,14 +91,14 @@ class AttendancePenaltyService
      *
      * @param ZkDailyAttendance $attendance
      * @param string $attDate Date in Y-m-d format
-     * @return void
+     * @return int|null Late minutes (when a penalty is created/updated), otherwise null
      */
-    public function calculatePenaltyForDailyAttendance(ZkDailyAttendance $attendance, string $attDate): void
+    public function calculatePenaltyForDailyAttendance(ZkDailyAttendance $attendance, string $attDate): ?int
     {
         $employee = Employee::with('shift.workdays')->where('fingerprint_device_id', $attendance->device_pin)->first();
 
         if (! $employee || ! $employee->shift) {
-            return;
+            return null;
         }
 
         $attDateCarbon = Carbon::parse($attDate, 'Asia/Riyadh');
@@ -106,11 +106,11 @@ class AttendancePenaltyService
 
         $workdays = $employee->shift->workdays()->where('is_workday', true)->pluck('weekday')->toArray();
         if (! in_array($weekday, $workdays)) {
-            return;
+            return null;
         }
 
         if (! $attendance->first_punch) {
-            return;
+            return null;
         }
 
         $expectedStart = Carbon::parse($attDate . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
@@ -121,7 +121,10 @@ class AttendancePenaltyService
 
         if ($lateMinutes > 0) {
             $this->calculatePenalty($employee->id, $attDate, $lateMinutes);
+            return $lateMinutes;
         }
+
+        return null;
     }
 
     /**
