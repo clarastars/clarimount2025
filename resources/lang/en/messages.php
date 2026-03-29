@@ -1514,5 +1514,10 @@ return [
         'approval_by_label' => 'Approved by',
         'already_approved' => 'Already approved.',
         'approval_saved' => 'Approval saved successfully.',
+        'remove_breakdown_line' => 'Remove deduction line',
+        'remove_breakdown_line_confirm' => 'Remove this deduction line from this salary run? It will stay excluded when the run is recalculated.',
+        'breakdown_line_removed' => 'Deduction line removed.',
+        'breakdown_line_not_found' => 'Deduction line could not be found.',
+        'unpaid_leave_label' => 'Unpaid leave',
     ],
 ];

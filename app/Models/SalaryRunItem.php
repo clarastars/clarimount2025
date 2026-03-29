@@ -22,6 +22,7 @@ class SalaryRunItem extends Model
         'unpaid_leave_total',
         'net_salary',
         'breakdown',
+        'breakdown_exclusions',
         'debt_deductions',
     ];
 
@@ -33,6 +34,7 @@ class SalaryRunItem extends Model
         'unpaid_leave_total' => 'decimal:2',
         'net_salary' => 'decimal:2',
         'breakdown' => 'array',
+        'breakdown_exclusions' => 'array',
         'debt_deductions' => 'array',
     ];
 

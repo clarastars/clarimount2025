@@ -303,4 +303,108 @@ class SalaryRunController extends Controller
 
         return back()->with('success', __('messages.debts.debt_deduction_updated_successfully'));
     }
+
+    /**
+     * Remove one breakdown line from a salary run item (draft only) and exclude it from future recalculations.
+     */
+    public function removeBreakdownLine(Request $request, Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+            abort(403, 'You do not have access to this company.');
+        }
+
+        if ($salaryRun->company_id !== $company->id) {
+            abort(403, 'Salary run does not belong to this company.');
+        }
+
+        if ($salaryRun->status === 'finalized') {
+            return back()->with('error', __('messages.salary_runs.cannot_update_finalized'));
+        }
+
+        $validated = $request->validate([
+            'salary_run_item_id' => 'required|exists:salary_run_items,id',
+            'line_type' => 'required|in:attendance_penalty,employee_deduction,unpaid_leave',
+            'line_id' => 'required|integer|min:1',
+        ]);
+
+        $item = SalaryRunItem::query()
+            ->where('id', $validated['salary_run_item_id'])
+            ->where('salary_run_id', $salaryRun->id)
+            ->with('employee')
+            ->firstOrFail();
+
+        if ($item->employee->company_id !== $company->id) {
+            abort(403, 'Employee does not belong to this company.');
+        }
+
+        $breakdown = $item->breakdown ?? [];
+        $found = false;
+        $removedAmount = 0.0;
+        $newBreakdown = [];
+
+        foreach ($breakdown as $row) {
+            $match = match ($validated['line_type']) {
+                'attendance_penalty' => (int) ($row['attendance_penalty_id'] ?? 0) === $validated['line_id'],
+                'employee_deduction' => (int) ($row['employee_deduction_id'] ?? 0) === $validated['line_id'],
+                'unpaid_leave' => (int) ($row['leave_id'] ?? 0) === $validated['line_id'],
+            };
+
+            if ($match) {
+                $found = true;
+                $removedAmount = (float) ($row['amount'] ?? 0);
+
+                continue;
+            }
+
+            $newBreakdown[] = $row;
+        }
+
+        if (! $found) {
+            return back()->with('error', __('messages.salary_runs.breakdown_line_not_found'));
+        }
+
+        $exclusions = $item->breakdown_exclusions ?? [];
+        $exclusions[] = [
+            'type' => $validated['line_type'],
+            'id' => $validated['line_id'],
+        ];
+        $exclusions = collect($exclusions)
+            ->unique(fn (array $e): string => ($e['type'] ?? '') . ':' . (string) ($e['id'] ?? ''))
+            ->values()
+            ->all();
+
+        $penaltiesTotal = (float) $item->penalties_total;
+        $unpaidLeaveTotal = (float) $item->unpaid_leave_total;
+
+        if ($validated['line_type'] === 'unpaid_leave') {
+            $unpaidLeaveTotal = round(max(0, $unpaidLeaveTotal - $removedAmount), 2);
+        } else {
+            $penaltiesTotal = round(max(0, $penaltiesTotal - $removedAmount), 2);
+        }
+
+        $debtDeductions = $item->debt_deductions ?? [];
+        $debtTotal = 0.0;
+        if (is_array($debtDeductions)) {
+            foreach ($debtDeductions as $deduction) {
+                $debtTotal += (float) ($deduction['amount'] ?? 0);
+            }
+        }
+
+        $netSalary = round(
+            (float) $item->gross_salary - $penaltiesTotal - $unpaidLeaveTotal - $debtTotal,
+            2
+        );
+
+        $item->update([
+            'breakdown' => $newBreakdown,
+            'breakdown_exclusions' => $exclusions,
+            'penalties_total' => $penaltiesTotal,
+            'unpaid_leave_total' => $unpaidLeaveTotal,
+            'net_salary' => $netSalary,
+        ]);
+
+        return back()->with('success', __('messages.salary_runs.breakdown_line_removed'));
+    }
 }

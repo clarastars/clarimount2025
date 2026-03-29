@@ -45,6 +45,12 @@ class SalaryRunService
             $endDate = Carbon::create($year, $month, 1)->endOfMonth();
 
             foreach ($employees as $employee) {
+                $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
+                    ->where('employee_id', $employee->id)
+                    ->first();
+
+                $breakdownExclusions = $existingItem?->breakdown_exclusions ?? [];
+
                 $grossSalary = ($employee->basic_salary ?? 0) + ($employee->allowances ?? 0);
                 $dailyWage = $grossSalary / 30; // Simplified: using 30 days
 
@@ -62,6 +68,10 @@ class SalaryRunService
                 $breakdown = [];
 
                 foreach ($approvedPenalties as $penalty) {
+                    if ($this->isBreakdownExcluded($breakdownExclusions, 'attendance_penalty', $penalty->id)) {
+                        continue;
+                    }
+
                     $basicSalary = $employee->basic_salary ? (float) $employee->basic_salary : null;
                     $penaltyAmount = $this->calculatePenaltyAmount($penalty, $grossSalary, $dailyWage, $basicSalary);
                     $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
@@ -76,6 +86,7 @@ class SalaryRunService
                         'amount' => $totalForPenalty,
                         'penalty_amount' => $penaltyAmount,
                         'late_minutes_deduction_amount' => $lateMinutesDeduction,
+                        'attendance_penalty_id' => $penalty->id,
                         'source' => 'penalty',
                     ];
                 }
@@ -90,6 +101,10 @@ class SalaryRunService
                     ->get();
 
                 foreach ($manualDeductions as $deduction) {
+                    if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_deduction', $deduction->id)) {
+                        continue;
+                    }
+
                     $amount = (float) $deduction->amount;
                     $penaltiesTotal += $amount;
                     $breakdown[] = [
@@ -98,14 +113,10 @@ class SalaryRunService
                         'action_value' => null,
                         'action_text' => $deduction->reason,
                         'amount' => $amount,
+                        'employee_deduction_id' => $deduction->id,
                         'source' => 'manual_deduction',
                     ];
                 }
-
-                // Get existing salary run item to preserve debt_deductions if exists
-                $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
-                    ->where('employee_id', $employee->id)
-                    ->first();
 
                 $debtDeductions = $existingItem?->debt_deductions ?? [];
                 $debtDeductionsTotal = 0;
@@ -125,6 +136,10 @@ class SalaryRunService
 
                 $unpaidLeaveTotal = 0;
                 foreach ($unpaidLeaves as $leave) {
+                    if ($this->isBreakdownExcluded($breakdownExclusions, 'unpaid_leave', $leave->id)) {
+                        continue;
+                    }
+
                     $daysInMonth = $leave->daysInMonth($year, $month);
                     $amount = round($daysInMonth * $dailyWage, 2);
                     $unpaidLeaveTotal += $amount;
@@ -134,6 +149,8 @@ class SalaryRunService
                         'action_value' => $daysInMonth,
                         'action_text' => 'Unpaid leave',
                         'amount' => $amount,
+                        'leave_id' => $leave->id,
+                        'source' => 'unpaid_leave',
                     ];
                 }
 
@@ -153,6 +170,7 @@ class SalaryRunService
                         'unpaid_leave_total' => $unpaidLeaveTotal,
                         'net_salary' => $netSalary,
                         'breakdown' => $breakdown,
+                        'breakdown_exclusions' => $breakdownExclusions,
                         'debt_deductions' => $debtDeductions, // Preserve existing debt deductions
                     ]
                 );
@@ -231,6 +249,24 @@ class SalaryRunService
             default:
                 return 0;
         }
+    }
+
+    /**
+     * @param  array<int, array{type?: string, id?: int}>|null  $exclusions
+     */
+    private function isBreakdownExcluded(?array $exclusions, string $type, int $id): bool
+    {
+        if ($exclusions === null || $exclusions === []) {
+            return false;
+        }
+
+        foreach ($exclusions as $row) {
+            if (($row['type'] ?? '') === $type && (int) ($row['id'] ?? 0) === $id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

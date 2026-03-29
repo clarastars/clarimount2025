@@ -1526,5 +1526,10 @@ return [
         'approval_by_label' => 'المعتمد',
         'already_approved' => 'تم الاعتماد مسبقاً.',
         'approval_saved' => 'تم تسجيل الاعتماد بنجاح.',
+        'remove_breakdown_line' => 'إلغاء بند الخصم',
+        'remove_breakdown_line_confirm' => 'إلغاء هذا البند من خصومات الموظف في هذا المسير؟ لن يُعاد احتسابه عند تحديث المسير.',
+        'breakdown_line_removed' => 'تم إلغاء بند الخصم.',
+        'breakdown_line_not_found' => 'تعذر العثور على بند الخصم.',
+        'unpaid_leave_label' => 'إجازة غير مدفوعة',
     ],
 ];

@@ -266,19 +266,34 @@
             <div
               v-for="(penalty, index) in selectedItem.breakdown"
               :key="index"
-              class="flex justify-between items-center p-3 border rounded-lg"
+              class="flex justify-between items-start gap-2 p-3 border rounded-lg"
             >
+              <Button
+                v-if="salaryRun.status === 'draft' && getBreakdownLineMeta(penalty)"
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                :title="t('salary_runs.remove_breakdown_line')"
+                :disabled="removingBreakdownKey === breakdownLineKey(selectedItem.id, penalty)"
+                @click="removeBreakdownLine(penalty)"
+              >
+                <Icon name="X" class="h-4 w-4" />
+              </Button>
               <div class="min-w-0 flex-1">
                 <div class="font-medium">{{ penalty.date }}</div>
                 <div v-if="penalty.source === 'manual_deduction'" class="text-xs text-blue-600 dark:text-blue-400 mb-0.5">
                   {{ t('attendance.deduction_type_manual') }}
+                </div>
+                <div v-if="penalty.source === 'unpaid_leave'" class="text-xs text-purple-600 dark:text-purple-400 mb-0.5">
+                  {{ t('salary_runs.unpaid_leave_label') }}
                 </div>
                 <div class="text-sm text-gray-500 break-words">{{ penalty.action_text }}</div>
                 <div v-if="penalty.source === 'penalty' && penalty.late_minutes_deduction_amount != null && Number(penalty.late_minutes_deduction_amount) > 0" class="text-xs text-amber-600 dark:text-amber-400 mt-1">
                   {{ t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(penalty.late_minutes_deduction_amount)) }}
                 </div>
               </div>
-              <div class="text-sm font-medium text-orange-600 dark:text-orange-400 shrink-0 ms-2">
+              <div class="text-sm font-medium text-orange-600 dark:text-orange-400 shrink-0">
                 {{ formatCurrency(penalty.amount) }}
               </div>
             </div>
@@ -443,7 +458,10 @@ interface Props {
         amount: number;
         penalty_amount?: number;
         late_minutes_deduction_amount?: number;
-        source?: 'penalty' | 'manual_deduction';
+        attendance_penalty_id?: number;
+        employee_deduction_id?: number;
+        leave_id?: number;
+        source?: 'penalty' | 'manual_deduction' | 'unpaid_leave';
       }>;
     }>;
   };
@@ -552,6 +570,67 @@ const totalNet = computed(() => {
 
 const breakdownModalOpen = ref(false);
 const selectedItem = ref<any>(null);
+const removingBreakdownKey = ref<string | null>(null);
+
+function getBreakdownLineMeta(line: Record<string, unknown>): { line_type: string; line_id: number } | null {
+  const ap = line.attendance_penalty_id;
+  if (ap != null && Number(ap) > 0) {
+    return { line_type: 'attendance_penalty', line_id: Number(ap) };
+  }
+  const ed = line.employee_deduction_id;
+  if (ed != null && Number(ed) > 0) {
+    return { line_type: 'employee_deduction', line_id: Number(ed) };
+  }
+  const lv = line.leave_id;
+  if (lv != null && Number(lv) > 0) {
+    return { line_type: 'unpaid_leave', line_id: Number(lv) };
+  }
+  return null;
+}
+
+function breakdownLineKey(itemId: number, line: Record<string, unknown>): string {
+  const m = getBreakdownLineMeta(line);
+  return m ? `${itemId}-${m.line_type}-${m.line_id}` : `${itemId}-legacy`;
+}
+
+function removeBreakdownLine(line: Record<string, unknown>) {
+  if (props.salaryRun.status !== 'draft') {
+    return;
+  }
+  const meta = getBreakdownLineMeta(line);
+  if (!meta || !selectedItem.value) {
+    return;
+  }
+  if (!confirm(t('salary_runs.remove_breakdown_line_confirm'))) {
+    return;
+  }
+  removingBreakdownKey.value = breakdownLineKey(selectedItem.value.id, line);
+  router.post(
+    route('salary-runs.remove-breakdown-line', [props.company.id, props.salaryRun.id]),
+    {
+      salary_run_item_id: selectedItem.value.id,
+      line_type: meta.line_type,
+      line_id: meta.line_id,
+    },
+    {
+      preserveScroll: true,
+      onFinish: () => {
+        removingBreakdownKey.value = null;
+      },
+      onSuccess: (page) => {
+        const id = selectedItem.value?.id;
+        const items = (page.props as { salaryRun?: { items?: Array<{ id: number; breakdown?: unknown[] }> } }).salaryRun?.items;
+        const fresh = items?.find((i) => i.id === id);
+        if (fresh) {
+          selectedItem.value = { ...fresh };
+        }
+        if (!fresh?.breakdown?.length) {
+          closeBreakdownModal();
+        }
+      },
+    },
+  );
+}
 const debtDeductionsModalOpen = ref(false);
 const selectedItemForDebts = ref<any>(null);
 const debtDeductions = ref<Record<number, number>>({});

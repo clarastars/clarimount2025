@@ -243,6 +243,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-accountant', [SalaryRunController::class, 'approveAccountant'])->name('salary-runs.approve-accountant');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-ceo', [SalaryRunController::class, 'approveCeo'])->name('salary-runs.approve-ceo');
     Route::post('companies/{company}/salary-runs/{salaryRun}/update-debt-deductions', [SalaryRunController::class, 'updateDebtDeductions'])->name('salary-runs.update-debt-deductions');
+    Route::post('companies/{company}/salary-runs/{salaryRun}/remove-breakdown-line', [SalaryRunController::class, 'removeBreakdownLine'])->name('salary-runs.remove-breakdown-line');
     
     // Bayzat Configuration routes
     Route::get('bayzat-configs', [BayzatConfigController::class, 'index'])->name('bayzat-configs.index');
