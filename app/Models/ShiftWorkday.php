@@ -18,11 +18,15 @@ class ShiftWorkday extends Model
         'shift_id',
         'weekday',
         'is_workday',
+        'start_time',
+        'end_time',
     ];
 
     protected $casts = [
         'weekday' => 'integer',
         'is_workday' => 'boolean',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
     ];
 
     /**

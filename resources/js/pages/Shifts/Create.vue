@@ -34,16 +34,35 @@ const form = useForm({
     start_time: '08:00',
     end_time: '17:00',
     grace_minutes: 0,
-    workdays: weekdays.map((w) => ({ weekday: w.weekday, is_workday: true })),
+    workdays: weekdays.map((w) => ({
+        weekday: w.weekday,
+        is_workday: true,
+        start_time: '',
+        end_time: '',
+    })),
 })
+
+const workdayErrors = computed(() =>
+    Object.entries(form.errors).filter(([k]) => k.startsWith('workdays.')),
+)
 
 function setWorkday(weekday: number, is_workday: boolean) {
     const idx = form.workdays.findIndex((w: { weekday: number }) => w.weekday === weekday)
-    if (idx !== -1) form.workdays[idx].is_workday = is_workday
+    if (idx !== -1) {
+        form.workdays[idx].is_workday = is_workday
+        if (!is_workday) {
+            form.workdays[idx].start_time = ''
+            form.workdays[idx].end_time = ''
+        }
+    }
 }
 
 function getWorkday(weekday: number) {
     return form.workdays.find((w: { weekday: number }) => w.weekday === weekday)?.is_workday ?? true
+}
+
+function workdayRow(weekday: number) {
+    return form.workdays.find((w: { weekday: number }) => w.weekday === weekday)!
 }
 
 const submit = () => {
@@ -78,6 +97,7 @@ const submit = () => {
                                     <p v-if="form.errors.end_time" class="text-red-500 text-sm mt-1">{{ form.errors.end_time }}</p>
                                 </div>
                             </div>
+                            <p class="text-xs text-muted-foreground -mt-2">{{ t('shifts.default_times_hint') }}</p>
                             <div>
                                 <Label for="grace_minutes">{{ t('shifts.grace_minutes') }}</Label>
                                 <Input id="grace_minutes" v-model.number="form.grace_minutes" type="number" min="0" max="120" class="mt-1 w-full" />
@@ -86,17 +106,49 @@ const submit = () => {
                             </div>
                             <div>
                                 <Label class="mb-2 block">{{ t('shifts.workdays') }}</Label>
-                                <div class="flex flex-wrap gap-4">
-                                    <label v-for="w in weekdays" :key="w.weekday" class="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            :checked="getWorkday(w.weekday)"
-                                            @change="setWorkday(w.weekday, ($event.target as HTMLInputElement).checked)"
-                                        />
-                                        <span class="text-sm">{{ t(w.labelKey) }}</span>
-                                    </label>
+                                <p class="text-xs text-muted-foreground mb-3">{{ t('shifts.custom_times_per_day') }} — {{ t('shifts.custom_times_hint') }}</p>
+                                <div class="space-y-3">
+                                    <div
+                                        v-for="w in weekdays"
+                                        :key="w.weekday"
+                                        class="rounded-md border border-border p-3 space-y-2"
+                                    >
+                                        <label class="flex items-center gap-2 cursor-pointer font-medium">
+                                            <input
+                                                type="checkbox"
+                                                :checked="getWorkday(w.weekday)"
+                                                @change="setWorkday(w.weekday, ($event.target as HTMLInputElement).checked)"
+                                            />
+                                            <span class="text-sm">{{ t(w.labelKey) }}</span>
+                                        </label>
+                                        <div v-if="getWorkday(w.weekday)" class="grid grid-cols-2 gap-3 pl-6 pt-1">
+                                            <div>
+                                                <Label class="text-xs text-muted-foreground">{{ t('shifts.custom_start') }}</Label>
+                                                <Input
+                                                    v-model="workdayRow(w.weekday).start_time"
+                                                    type="time"
+                                                    class="mt-1 w-full"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label class="text-xs text-muted-foreground">{{ t('shifts.custom_end') }}</Label>
+                                                <Input
+                                                    v-model="workdayRow(w.weekday).end_time"
+                                                    type="time"
+                                                    class="mt-1 w-full"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <p v-if="form.errors.workdays" class="text-red-500 text-sm mt-1">{{ form.errors.workdays }}</p>
+                                <p
+                                    v-for="[key, message] in workdayErrors"
+                                    :key="key"
+                                    class="text-red-500 text-sm mt-1"
+                                >
+                                    {{ Array.isArray(message) ? message[0] : message }}
+                                </p>
                             </div>
                             <div class="flex justify-end gap-4 pt-4">
                                 <Button type="button" variant="outline" @click="router.visit(route('shifts.index'))">

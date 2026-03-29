@@ -8,9 +8,10 @@ use App\Models\Shift;
 use App\Models\ShiftWorkday;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\DB;
 
 class ShiftController extends Controller
 {
@@ -55,9 +56,13 @@ class ShiftController extends Controller
             'workdays' => 'required|array',
             'workdays.*.weekday' => 'required|integer|min:0|max:6',
             'workdays.*.is_workday' => 'required|boolean',
+            'workdays.*.start_time' => 'nullable|string|regex:/^\d{2}:\d{2}(:\d{2})?$/',
+            'workdays.*.end_time' => 'nullable|string|regex:/^\d{2}:\d{2}(:\d{2})?$/',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $workdays = $this->normalizeAndValidateWorkdayTimes($validated['workdays']);
+
+        DB::transaction(function () use ($validated, $workdays) {
             $shift = Shift::create([
                 'name' => $validated['name'],
                 'start_time' => $validated['start_time'],
@@ -65,11 +70,13 @@ class ShiftController extends Controller
                 'grace_minutes' => $validated['grace_minutes'] ?? 0,
             ]);
 
-            foreach ($validated['workdays'] as $wd) {
+            foreach ($workdays as $wd) {
                 ShiftWorkday::create([
                     'shift_id' => $shift->id,
                     'weekday' => $wd['weekday'],
                     'is_workday' => $wd['is_workday'],
+                    'start_time' => $wd['start_time'],
+                    'end_time' => $wd['end_time'],
                 ]);
             }
         });
@@ -110,9 +117,13 @@ class ShiftController extends Controller
             'workdays' => 'required|array',
             'workdays.*.weekday' => 'required|integer|min:0|max:6',
             'workdays.*.is_workday' => 'required|boolean',
+            'workdays.*.start_time' => 'nullable|string|regex:/^\d{2}:\d{2}(:\d{2})?$/',
+            'workdays.*.end_time' => 'nullable|string|regex:/^\d{2}:\d{2}(:\d{2})?$/',
         ]);
 
-        DB::transaction(function () use ($validated, $shift) {
+        $workdays = $this->normalizeAndValidateWorkdayTimes($validated['workdays']);
+
+        DB::transaction(function () use ($validated, $workdays, $shift) {
             $shift->update([
                 'name' => $validated['name'],
                 'start_time' => $validated['start_time'],
@@ -121,11 +132,13 @@ class ShiftController extends Controller
             ]);
 
             $shift->workdays()->delete();
-            foreach ($validated['workdays'] as $wd) {
+            foreach ($workdays as $wd) {
                 ShiftWorkday::create([
                     'shift_id' => $shift->id,
                     'weekday' => $wd['weekday'],
                     'is_workday' => $wd['is_workday'],
+                    'start_time' => $wd['start_time'],
+                    'end_time' => $wd['end_time'],
                 ]);
             }
         });
@@ -149,5 +162,47 @@ class ShiftController extends Controller
         $shift->delete();
         return redirect()->route('shifts.index')
             ->with('success', __('shifts.deleted_successfully'));
+    }
+
+    /**
+     * @param  array<int, array{weekday: int, is_workday: bool, start_time?: ?string, end_time?: ?string}>  $workdays
+     * @return array<int, array{weekday: int, is_workday: bool, start_time: ?string, end_time: ?string}>
+     */
+    private function normalizeAndValidateWorkdayTimes(array $workdays): array
+    {
+        $out = [];
+        foreach ($workdays as $i => $wd) {
+            $isWorkday = (bool) ($wd['is_workday'] ?? false);
+            $start = isset($wd['start_time']) ? trim((string) $wd['start_time']) : '';
+            $end = isset($wd['end_time']) ? trim((string) $wd['end_time']) : '';
+            $start = $start === '' ? null : $start;
+            $end = $end === '' ? null : $end;
+
+            if (! $isWorkday) {
+                $out[] = [
+                    'weekday' => (int) $wd['weekday'],
+                    'is_workday' => false,
+                    'start_time' => null,
+                    'end_time' => null,
+                ];
+
+                continue;
+            }
+
+            if (($start !== null && $end === null) || ($start === null && $end !== null)) {
+                throw ValidationException::withMessages([
+                    "workdays.{$i}.start_time" => [__('shifts.custom_times_both_required')],
+                ]);
+            }
+
+            $out[] = [
+                'weekday' => (int) $wd['weekday'],
+                'is_workday' => true,
+                'start_time' => $start,
+                'end_time' => $end,
+            ];
+        }
+
+        return $out;
     }
 }

@@ -200,7 +200,9 @@ class ZkAttlogIngestService
     private function calculateAttendancePenalty(ZkDailyAttendance $attendance, string $attDate): void
     {
         // Get employee from device_pin
-        $employee = Employee::where('fingerprint_device_id', $attendance->device_pin)->first();
+        $employee = Employee::with('shift.workdays')
+            ->where('fingerprint_device_id', $attendance->device_pin)
+            ->first();
 
         if (!$employee || !$employee->shift) {
             // No employee or no shift assigned, skip penalty calculation
@@ -227,8 +229,11 @@ class ZkAttlogIngestService
             return;
         }
 
-        // Calculate late minutes (same logic as AttendanceController)
-        $expectedStart = Carbon::parse($attDate . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
+        // Calculate late minutes (same logic as AttendanceController; per-weekday start when set)
+        $expectedStart = Carbon::parse(
+            $attDate . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
+            'Asia/Riyadh'
+        );
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
         
         // Calculate signed difference in minutes
