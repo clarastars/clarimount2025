@@ -180,7 +180,7 @@
                 <tr v-for="item in salaryRun.items" :key="item.id" class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {{ item.employee?.first_name }} {{ item.employee?.last_name }}
+                      {{ getEmployeeFullName(item.employee) }}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ item.employee?.employee_id }}
@@ -259,7 +259,7 @@
           <DialogHeader>
             <DialogTitle>{{ t('salary_runs.breakdown') }}</DialogTitle>
             <DialogDescription>
-              {{ selectedItem?.employee?.first_name }} {{ selectedItem?.employee?.last_name }}
+              {{ getEmployeeFullName(selectedItem?.employee) }}
             </DialogDescription>
           </DialogHeader>
           <div v-if="selectedItem && selectedItem.breakdown" class="space-y-2">
@@ -315,7 +315,7 @@
           <DialogHeader>
             <DialogTitle>{{ t('debts.update_debt_deductions') }}</DialogTitle>
             <DialogDescription>
-              {{ selectedItemForDebts?.employee?.first_name }} {{ selectedItemForDebts?.employee?.last_name }}
+              {{ getEmployeeFullName(selectedItemForDebts?.employee) }}
             </DialogDescription>
           </DialogHeader>
           <form @submit.prevent="submitDebtDeductions" class="space-y-4">
@@ -431,6 +431,7 @@ interface Props {
       employee: {
         id: number;
         first_name: string;
+        father_name?: string | null;
         last_name: string;
         employee_id: string;
         debts?: Array<{
@@ -474,6 +475,14 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+function getEmployeeFullName(employee?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
+  if (!employee) return '';
+  return [employee.first_name, employee.father_name, employee.last_name]
+    .map((part) => (part ?? '').trim())
+    .filter((part) => part.length > 0)
+    .join(' ');
+}
 
 const defaultApproval = { approved_at: null, approver_name: null, can_approve: false };
 const approvalList = computed(() => {
