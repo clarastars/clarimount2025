@@ -56,6 +56,15 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
     public function map($item): array
     {
         $employee = $item->employee;
+        $employeeName = '';
+        if ($employee) {
+            $parts = [
+                trim((string) ($employee->first_name ?? '')),
+                trim((string) ($employee->father_name ?? '')),
+                trim((string) ($employee->last_name ?? '')),
+            ];
+            $employeeName = implode(' ', array_filter($parts, static fn (string $p): bool => $p !== ''));
+        }
         $debtTotal = 0;
         if (is_array($item->debt_deductions)) {
             foreach ($item->debt_deductions as $d) {
@@ -73,7 +82,7 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : '';
 
         return [
-            $employee ? $employee->full_name : '',
+            $employeeName,
             $item->basic_salary !== null ? (float) $item->basic_salary : '',
             $housing ?: '',
             $transport ?: '',
@@ -117,6 +126,32 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
             $sheet->getStyle($range)->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_CENTER)
                 ->setVertical(Alignment::VERTICAL_CENTER);
+        }
+
+        // Add totals row for all amount columns.
+        if ($highestRow >= 2) {
+            $totalRow = $highestRow + 1;
+            $sheet->setCellValue('A' . $totalRow, 'الإجمالي');
+
+            foreach (range('B', 'Q') as $column) {
+                $sheet->setCellValue(
+                    $column . $totalRow,
+                    sprintf('=SUM(%s2:%s%d)', $column, $column, $highestRow)
+                );
+            }
+
+            $totalRange = 'A' . $totalRow . ':Q' . $totalRow;
+            $sheet->getStyle($totalRange)->applyFromArray([
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFF2CC'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+            ]);
         }
     }
 }
