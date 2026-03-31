@@ -57,6 +57,14 @@ interface Props {
 
 const props = defineProps<Props>();
 
+function getFullName(person?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
+    if (!person) return '';
+    return [person.first_name, person.father_name, person.last_name]
+        .map((part) => (part ?? '').trim())
+        .filter((part) => part.length > 0)
+        .join(' ');
+}
+
 const search = ref(props.filters?.search || '');
 const statusFilter = ref(props.filters?.status || '');
 const departmentFilter = ref(props.filters?.department || '');
@@ -601,13 +609,13 @@ async function unlinkFingerprint() {
                                         <div class="flex-shrink-0 h-12 w-12">
                                             <div class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
                                                 <span class="text-sm font-semibold text-white">
-                                                    {{ (employee.first_name?.[0] || '') + (employee.last_name?.[0] || '') }}
+                                                    {{ (employee.first_name?.[0] || '') + (employee.father_name?.[0] || employee.last_name?.[0] || '') }}
                                                 </span>
                                             </div>
                                         </div>
                                         <div class="ml-4 rtl:ml-0 rtl:mr-4 text-left rtl:text-right">
                                             <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {{ employee.first_name }} {{ employee.last_name }}
+                                                {{ getFullName(employee) }}
                                             </div>
                                             <div class="text-sm text-gray-500 dark:text-gray-400 font-mono">
                                                 {{ employee.employee_id }}
@@ -785,7 +793,7 @@ async function unlinkFingerprint() {
                     <DialogHeader>
                         <DialogTitle>{{ t('employees.fingerprint_link_dialog_title') }}</DialogTitle>
                         <DialogDescription>
-                            {{ linkingEmployee ? `${linkingEmployee.first_name} ${linkingEmployee.last_name}` : '' }}
+                            {{ getFullName(linkingEmployee) }}
                             — {{ t('employees.fingerprint_link_dialog_description') }}
                         </DialogDescription>
                     </DialogHeader>
