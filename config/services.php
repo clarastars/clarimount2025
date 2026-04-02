@@ -37,6 +37,14 @@ return [
 
     'bayzat' => [
         'default_api_url' => env('BAYZAT_DEFAULT_API_URL', 'https://integration.bayzat.com/attendance'),
+        /** API key for integration.bayzat.com (x-api-key), e.g. fingerprint → Bayzat push */
+        'api_key' => env('BAYZAT_API_KEY'),
+        /** Optional override; defaults to default_api_url */
+        'iclock_push_url' => env('BAYZAT_ICLOCK_PUSH_URL'),
+        'iclock_push_timeout' => env('BAYZAT_ICLOCK_PUSH_TIMEOUT', 30),
+        'iclock_push_max_records_per_request' => env('BAYZAT_ICLOCK_PUSH_MAX_RECORDS', 50),
+        /** Seconds between HTTP chunks (0 = no delay) */
+        'iclock_push_chunk_delay_seconds' => env('BAYZAT_ICLOCK_PUSH_CHUNK_DELAY', 0),
         'rate_limit_delay' => env('BAYZAT_RATE_LIMIT_DELAY', 1), // seconds between requests
         'max_records_per_request' => env('BAYZAT_MAX_RECORDS_PER_REQUEST', 20),
         'max_retry_attempts' => env('BAYZAT_MAX_RETRY_ATTEMPTS', 5),
