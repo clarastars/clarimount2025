@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Pushes first and last punch times per employee per day to Bayzat (Asia/Riyadh), without a type field.
+ * If first and last punch are the same instant, only one record is sent (Bayzat rejects duplicate empId+time).
  * Uses the same source as the attendance screen: for each employee+day, if multiple devices exist,
  * the iClock API row (FINGERPRINT_ICLOCK_API) wins over physical ZK devices.
  *
@@ -134,10 +135,12 @@ class BayzatFingerprintAttendancePushService
                     'empId' => $p['empId'],
                     'time' => $p['checkIn'],
                 ];
-                $records[] = [
-                    'empId' => $p['empId'],
-                    'time' => $p['checkOut'],
-                ];
+                if ($p['checkOut'] !== $p['checkIn']) {
+                    $records[] = [
+                        'empId' => $p['empId'],
+                        'time' => $p['checkOut'],
+                    ];
+                }
             }
 
             try {
