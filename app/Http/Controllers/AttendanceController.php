@@ -331,8 +331,11 @@ class AttendanceController extends Controller
                     return $record;
                 }
 
-                // Calculate late minutes
-                $expectedStart = Carbon::parse($date . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
+                // Calculate late minutes (respect day-specific shift_workdays override when set)
+                $expectedStart = Carbon::parse(
+                    $date . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
+                    'Asia/Riyadh'
+                );
                 $firstPunch = Carbon::parse($record->first_punch)->setTimezone('Asia/Riyadh');
                 $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
                 $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);

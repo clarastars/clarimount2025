@@ -113,7 +113,8 @@ class AttendancePenaltyService
             return null;
         }
 
-        $expectedStart = Carbon::parse($attDate . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
+        $expectedStartTime = $employee->shift->effectiveStartTimeStringForWeekday($weekday);
+        $expectedStart = Carbon::parse($attDate . ' ' . $expectedStartTime, 'Asia/Riyadh');
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
         $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
         $graceMinutes = (int) ($employee->shift->grace_minutes ?? 0);
@@ -176,10 +177,12 @@ class AttendancePenaltyService
         $year = (int) $date->year;
         $month = (int) $date->month;
 
-        // Count existing penalties for the same violation type in the same calendar month
+        // Count only previous penalties (strictly before this date) in the same calendar month.
+        // This keeps month start reset behavior stable even when rebuilds are re-run.
         $count = AttendancePenalty::forEmployee($employeeId)
             ->byViolationType($violationType)
             ->forMonthYear($year, $month)
+            ->whereDate('attendance_date', '<', $attendanceDate)
             ->count();
 
         // Actual repeat number for this occurrence

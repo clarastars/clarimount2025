@@ -298,7 +298,8 @@ class AttendancePresentationRebuildService
         }
 
         $dateStr = $row['att_date'];
-        $expectedStart = Carbon::parse($dateStr . ' ' . $employee->shift->start_time->format('H:i:s'), self::TZ);
+        $expectedStartTime = $employee->shift->effectiveStartTimeStringForWeekday($weekday);
+        $expectedStart = Carbon::parse($dateStr . ' ' . $expectedStartTime, self::TZ);
         $firstPunch = Carbon::parse($row['first_punch'])->setTimezone(self::TZ);
         $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
         $grace = (int) ($employee->shift->grace_minutes ?? 0);
