@@ -92,7 +92,7 @@ class AttendanceController extends Controller
         $endYmd = $endDate->format('Y-m-d');
 
         $presentationQuery = AttendanceDailyPresentation::query()
-            ->where('company_id', $company->id)
+            ->where('attendance_daily_presentations.company_id', $company->id)
             ->whereBetween('att_date', [$startYmd, $endYmd])
             ->with(['employee' => static function ($q) {
                 $q->select('id', 'first_name', 'last_name', 'employee_id', 'company_id');
