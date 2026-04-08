@@ -113,10 +113,7 @@ class AttendancePenaltyService
             return null;
         }
 
-        $expectedStart = Carbon::parse(
-            $attDate . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
-            'Asia/Riyadh'
-        );
+        $expectedStart = Carbon::parse($attDate . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
         $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
         $graceMinutes = (int) ($employee->shift->grace_minutes ?? 0);
@@ -305,7 +302,7 @@ class AttendancePenaltyService
     /**
      * Calculate deduction amount for late minutes: late_minutes × minute_rate.
      * Minute rate = basic_salary / (work_days_per_month × work_minutes_per_day).
-     * Work minutes per day = average over workdays (default shift times or per-day overrides). Work days per month from shift workdays.
+     * Work minutes per day = shift end_time - start_time. Work days per month from shift workdays.
      *
      * @param int $employeeId
      * @param int $lateMinutes
@@ -328,13 +325,21 @@ class AttendancePenaltyService
         }
 
         $shift = $employee->shift;
-        $shift->loadMissing('workdays');
-        $workMinutesPerDayFloat = $shift->averageWorkMinutesPerWorkday();
-        if ($workMinutesPerDayFloat === null || $workMinutesPerDayFloat <= 0) {
+        $start = $shift->start_time;
+        $end = $shift->end_time;
+        if (! $start || ! $end) {
             return null;
         }
 
-        $workMinutesPerDay = (int) round($workMinutesPerDayFloat);
+        // Work minutes per day (same-day shift; if end < start assume next day)
+        $startMinutes = $start->hour * 60 + $start->minute;
+        $endMinutes = $end->hour * 60 + $end->minute;
+        $workMinutesPerDay = $endMinutes > $startMinutes
+            ? $endMinutes - $startMinutes
+            : (24 * 60 - $startMinutes) + $endMinutes;
+        if ($workMinutesPerDay <= 0) {
+            return null;
+        }
 
         // Work days per month: count weekdays where is_workday = true, then scale to month
         $workDaysPerWeek = $shift->workdays()->where('is_workday', true)->count();

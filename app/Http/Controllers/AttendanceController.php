@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\AttendanceImportRequest;
+use App\Models\AttendanceDailyPresentation;
 use App\Models\AttendanceImport;
 use App\Models\AttendancePenalty;
 use App\Models\BayzatSyncBatch;
@@ -12,11 +13,9 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ZkDailyAttendance;
 use App\Services\AttendanceImportService;
-use App\Services\AttendancePenaltyService;
 use App\Jobs\ProcessBayzatSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Carbon\Carbon;
@@ -25,7 +24,6 @@ class AttendanceController extends Controller
 {
     public function __construct(
         private AttendanceImportService $importService,
-        private AttendancePenaltyService $penaltyService
     ) {}
 
     public function index(Request $request, Company $company): Response
@@ -89,374 +87,72 @@ class AttendanceController extends Controller
                 $endDate = $now->copy()->endOfDay();
         }
 
-        // Get all employees in the company with their shifts
-        $allEmployees = Employee::with(['shift.workdays'])
+        // Fingerprint grid: read precomputed rows (rebuilt by jobs / attendance:rebuild-presentations)
+        $startYmd = $startDate->format('Y-m-d');
+        $endYmd = $endDate->format('Y-m-d');
+
+        $presentationQuery = AttendanceDailyPresentation::query()
             ->where('company_id', $company->id)
-            ->get();
+            ->whereBetween('att_date', [$startYmd, $endYmd])
+            ->with(['employee' => static function ($q) {
+                $q->select('id', 'first_name', 'last_name', 'employee_id', 'company_id');
+            }]);
 
-        // Get existing attendance records. Prefer iClock API source when multiple exist per employee/date.
-        $existingAttendance = ZkDailyAttendance::query()
-            ->select([
-                'zk_daily_attendance.*',
-                'employees.id as employee_id',
-                'employees.first_name',
-                'employees.last_name',
-                'employees.employee_id as emp_code',
-                'employees.company_id',
-                'zk_devices.name as device_name',
-                'zk_devices.serial_number',
-            ])
-            ->leftJoin('employees', function ($join) {
-                $join->on('employees.fingerprint_device_id', '=', 'zk_daily_attendance.device_pin');
-            })
-            ->leftJoin('zk_devices', 'zk_devices.id', '=', 'zk_daily_attendance.device_id')
-            ->whereBetween('zk_daily_attendance.att_date', [
-                $startDate->format('Y-m-d'),
-                $endDate->format('Y-m-d')
-            ])
-            ->where('employees.company_id', $company->id)
-            ->orderByRaw("(zk_devices.serial_number = 'FINGERPRINT_ICLOCK_API') ASC") // API record overwrites when keyBy
-            ->get()
-            ->keyBy(function ($record) {
-                $dateStr = is_string($record->att_date) 
-                    ? $record->att_date 
-                    : ($record->att_date instanceof \Carbon\Carbon 
-                        ? $record->att_date->format('Y-m-d') 
-                        : $record->att_date);
-                return ($record->employee_id ?? 'no_emp') . '_' . $dateStr;
-            });
-
-        // Build workday maps for quick lookup
-        $shiftWorkdayMaps = [];
-        foreach ($allEmployees as $employee) {
-            if ($employee->shift) {
-                $shiftWorkdayMaps[$employee->id] = $employee->shift->workdays
-                    ->where('is_workday', true)
-                    ->pluck('weekday')
-                    ->toArray();
-            }
-        }
-
-        // Generate all possible attendance records (including absences)
-        // Only include past dates and today (not future dates)
-        $today = Carbon::today('Asia/Riyadh');
-        $allRecords = collect();
-        $currentDate = $startDate->copy();
-
-        while ($currentDate->lte($endDate)) {
-            // Skip future dates - only process past dates and today
-            if ($currentDate->isFuture()) {
-                $currentDate->addDay();
-                continue;
-            }
-
-            $dateStr = $currentDate->format('Y-m-d');
-            $weekday = $currentDate->dayOfWeek; // 0=Sunday, 6=Saturday
-
-            foreach ($allEmployees as $employee) {
-                $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
-                $isWorkday = in_array($weekday, $workdays);
-
-                // Check if there's an existing attendance record
-                $key = $employee->id . '_' . $dateStr;
-                $existingRecord = $existingAttendance->get($key);
-
-                if ($existingRecord) {
-                    // Use existing record (only if not future date)
-                    $allRecords->push($existingRecord);
-                } elseif ($isWorkday) {
-                    // Create virtual record for absence (only for past/today dates)
-                    $virtualRecord = (object) [
-                        'id' => null,
-                        'employee_id' => $employee->id,
-                        'first_name' => $employee->first_name,
-                        'last_name' => $employee->last_name,
-                        'emp_code' => $employee->employee_id,
-                        'company_id' => $employee->company_id,
-                        'att_date' => $dateStr,
-                        'device_pin' => $employee->fingerprint_device_id ?? null,
-                        'first_punch' => null,
-                        'last_punch' => null,
-                        'punch_count' => 0,
-                        'device_name' => null,
-                        'serial_number' => null,
-                        'is_virtual' => true, // Flag to identify virtual records
-                    ];
-                    $allRecords->push($virtualRecord);
-                }
-                // If not a workday, skip (no record needed)
-            }
-
-            $currentDate->addDay();
-        }
-
-        // Also filter out any existing records that are in the future
-        $allRecords = $allRecords->filter(function ($record) use ($today) {
-            $recordDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
-            return !$recordDate->isFuture();
-        })->values();
-
-        // Apply search filter if provided
-        if (!empty($search)) {
-            $allRecords = $allRecords->filter(function ($record) use ($search) {
-                $fullName = ($record->first_name ?? '') . ' ' . ($record->last_name ?? '');
-                return stripos($record->first_name ?? '', $search) !== false
-                    || stripos($record->last_name ?? '', $search) !== false
-                    || stripos($fullName, $search) !== false
-                    || stripos($record->emp_code ?? '', $search) !== false
-                    || stripos($record->device_pin ?? '', $search) !== false;
+        if ($search !== '' && $search !== null) {
+            $presentationQuery->where(function ($q) use ($search) {
+                $q->whereHas('employee', function ($eq) use ($search) {
+                    $eq->where('first_name', 'like', '%'.$search.'%')
+                        ->orWhere('last_name', 'like', '%'.$search.'%')
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%'.$search.'%'])
+                        ->orWhere('employee_id', 'like', '%'.$search.'%');
+                })->orWhere('attendance_daily_presentations.device_pin', 'like', '%'.$search.'%');
             });
         }
 
-        // Sort records
-        $allRecords = $allRecords->sortBy([
-            ['att_date', 'desc'],
-            ['first_name', 'asc'],
-            ['last_name', 'asc'],
-        ])->values();
-
-        // Paginate manually
-        $perPage = 15;
-        $currentPage = $request->query('page', 1);
-        $items = $allRecords->slice(($currentPage - 1) * $perPage, $perPage)->values();
-        
-        $fingerprintAttendance = new \Illuminate\Pagination\LengthAwarePaginator(
-            $items,
-            $allRecords->count(),
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        // Calculate attendance status and late minutes based on shifts
-        // All timezone calculations use Asia/Riyadh timezone
-        $employeeIds = $fingerprintAttendance->getCollection()
-            ->pluck('employee_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($employeeIds->isNotEmpty()) {
-            // Eager load employees with shifts and workdays (already loaded above)
-            $employees = $allEmployees->keyBy('id');
-
-            // Workday maps already built above
-
-            // First: Collect all absent records and process them from oldest to newest
-            // This ensures that repeat_number increases correctly (oldest = 1, newest = highest)
-            // Only process past dates and today (not future dates)
-            $today = Carbon::today('Asia/Riyadh');
-            
-            $allAbsentRecords = $fingerprintAttendance->getCollection()
-                ->filter(function ($record) use ($employees, $shiftWorkdayMaps, $today) {
-                    $employee = $employees->get($record->employee_id);
-                    if (!$employee || !$employee->shift) {
-                        return false;
-                    }
-
-                    // If employee is not linked to a fingerprint device, skip absence penalties
-                    if (!$employee->fingerprint_device_id) {
-                        return false;
-                    }
-
-                    $attDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
-                    
-                    // Only process past dates and today (not future dates)
-                    if ($attDate->isFuture()) {
-                        return false;
-                    }
-                    
-                    $weekday = $attDate->dayOfWeek;
-                    $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
-
-                    // Check if it's a workday
-                    if (!in_array($weekday, $workdays)) {
-                        return false;
-                    }
-
-                    // Check if absent (no first punch or virtual record)
-                    return !$record->first_punch || ($record->is_virtual ?? false);
-                })
-                ->sortBy('att_date') // Sort from oldest to newest
-                ->values();
-
-            // Group absent records by employee to process them correctly
-            $absentRecordsByEmployee = $allAbsentRecords->groupBy('employee_id');
-
-            // Process absent records from oldest to newest for each employee
-            foreach ($absentRecordsByEmployee as $employeeId => $employeeAbsentRecords) {
-                $repeatNumber = 0;
-                foreach ($employeeAbsentRecords as $record) {
-                    $repeatNumber++;
-                    if ($record->employee_id) {
-                        $dateStr = is_string($record->att_date) 
-                            ? $record->att_date 
-                            : ($record->att_date instanceof \Carbon\Carbon 
-                                ? $record->att_date->format('Y-m-d') 
-                                : $record->att_date);
-                        // Pass the calculated repeat_number directly
-                        $this->penaltyService->calculateAbsenceWithoutExcusePenaltyWithRepeatNumber(
-                            $record->employee_id, 
-                            $dateStr, 
-                            min($repeatNumber, 4)
-                        );
-                    }
-                }
-            }
-
-            // Delete absence penalties for records that have punches (employee came to work)
-            $recordsWithPunch = $fingerprintAttendance->getCollection()
-                ->filter(function ($record) {
-                    return $record->first_punch && !($record->is_virtual ?? false);
-                });
-
-            foreach ($recordsWithPunch as $record) {
-                if ($record->employee_id) {
-                    $dateStr = is_string($record->att_date) 
-                        ? $record->att_date 
-                        : ($record->att_date instanceof \Carbon\Carbon 
-                            ? $record->att_date->format('Y-m-d') 
-                            : $record->att_date);
-                    
-                    // Delete absence penalty if exists (employee has punch, so not absent)
-                    AttendancePenalty::where('employee_id', $record->employee_id)
-                        ->where('attendance_date', $dateStr)
-                        ->where('violation_type', 'absent_without_excuse')
-                        ->delete();
-                }
-            }
-
-            // Now process all records for display (status, late minutes, etc.)
-            $fingerprintAttendance->getCollection()->transform(function ($record) use ($employees, $shiftWorkdayMaps) {
-                $employee = $employees->get($record->employee_id);
-
-                // No employee or no shift assigned
-                if (!$employee || !$employee->shift) {
-                    $record->status_ar = 'غير محدد';
-                    $record->late_minutes = null;
-                    return $record;
-                }
-
-                // If employee is not linked to a fingerprint device, do not apply any attendance status or penalties
-                if (!$employee->fingerprint_device_id) {
-                    $record->status_ar = 'غير مربوط ببصمة';
-                    $record->late_minutes = null;
-                    return $record;
-                }
-
-                // Get weekday of attendance date (0=Sunday, 6=Saturday)
-                $attDate = Carbon::parse($record->att_date, 'Asia/Riyadh');
-                $weekday = $attDate->dayOfWeek; // Carbon: 0=Sunday, 1=Monday, ..., 6=Saturday
-                $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
-
-                // Check if it's a workday
-                if (!in_array($weekday, $workdays)) {
-                    $record->status_ar = 'إجازة';
-                    $record->late_minutes = 0;
-                    return $record;
-                }
-
-                // No first punch (absent) or virtual record
-                if (!$record->first_punch || ($record->is_virtual ?? false)) {
-                    $record->status_ar = 'غائب';
-                    $record->late_minutes = null;
-                    // Penalty already created above, no need to create again
-                    return $record;
-                }
-
-                // Calculate late minutes (per-weekday start when configured on shift workdays)
-                $dateStr = $attDate->format('Y-m-d');
-                $expectedStart = Carbon::parse(
-                    $dateStr . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
-                    'Asia/Riyadh'
-                );
-                
-                // First punch time (convert from UTC to Asia/Riyadh)
-                $firstPunch = Carbon::parse($record->first_punch)->setTimezone('Asia/Riyadh');
-                
-                // Calculate signed difference in minutes
-                // Use timestamp difference to get signed value
-                // Positive = late, Negative = early
-                $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
-                
-                // Apply grace period
-                // If actualLateMinutes is negative (early), lateMinutes should be 0
-                $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);
-
-                // Set status based on late minutes
-                $record->status_ar = $lateMinutes > 0 ? 'متأخر' : 'في الموعد';
-                $record->late_minutes = $lateMinutes;
-
-                return $record;
-            });
-            
-            // Load penalties for all records
-            $attendanceDates = $fingerprintAttendance->getCollection()
-                ->pluck('att_date')
-                ->map(function ($date) {
-                    if (is_string($date)) {
-                        return $date;
-                    }
-                    return $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : $date;
-                })
-                ->unique()
-                ->values()
-                ->toArray();
-
-            $penalties = AttendancePenalty::whereIn('employee_id', $employeeIds->toArray())
-                ->whereIn('attendance_date', $attendanceDates)
-                ->get()
-                ->keyBy(function ($penalty) {
-                    return $penalty->employee_id . '_' . $penalty->attendance_date->format('Y-m-d');
-                });
-
-            // Attach penalty to each record
-            $fingerprintAttendance->getCollection()->transform(function ($record) use ($penalties) {
-                $dateStr = is_string($record->att_date) 
-                    ? $record->att_date 
-                    : ($record->att_date instanceof \Carbon\Carbon 
-                        ? $record->att_date->format('Y-m-d') 
-                        : $record->att_date);
-                $key = $record->employee_id . '_' . $dateStr;
-                $record->penalty = $penalties->get($key);
-                return $record;
-            });
-            
-            // Apply status filter if provided
-            if (!empty($statusFilter)) {
-                $fingerprintAttendance->setCollection(
-                    $fingerprintAttendance->getCollection()->filter(function ($record) use ($statusFilter) {
-                        if ($statusFilter === 'late') {
-                            return $record->status_ar === 'متأخر';
-                        } elseif ($statusFilter === 'on_time') {
-                            return $record->status_ar === 'في الموعد';
-                        }
-                        return true;
-                    })->values()
-                );
-            }
-        } else {
-            // No employees found, set default status
-            $fingerprintAttendance->getCollection()->transform(function ($record) {
-                $record->status_ar = 'غير محدد';
-                $record->late_minutes = null;
-                return $record;
-            });
-            
-            // Apply status filter if provided
-            if (!empty($statusFilter)) {
-                $fingerprintAttendance->setCollection(
-                    $fingerprintAttendance->getCollection()->filter(function ($record) use ($statusFilter) {
-                        if ($statusFilter === 'late') {
-                            return $record->status_ar === 'متأخر';
-                        } elseif ($statusFilter === 'on_time') {
-                            return $record->status_ar === 'في الموعد';
-                        }
-                        return true;
-                    })->values()
-                );
-            }
+        if ($statusFilter === 'late') {
+            $presentationQuery->where('status_ar', 'متأخر');
+        } elseif ($statusFilter === 'on_time') {
+            $presentationQuery->where('status_ar', 'في الموعد');
         }
+
+        $presentationQuery
+            ->join('employees', 'employees.id', '=', 'attendance_daily_presentations.employee_id')
+            ->orderByDesc('attendance_daily_presentations.att_date')
+            ->orderBy('employees.first_name')
+            ->orderBy('employees.last_name')
+            ->select('attendance_daily_presentations.*');
+
+        $paginator = $presentationQuery->paginate(15)->withQueryString();
+
+        $penaltyMap = $this->penaltyMapForPresentationPage($paginator->getCollection());
+
+        $fingerprintAttendance = $paginator->through(function (AttendanceDailyPresentation $p) use ($penaltyMap) {
+            $e = $p->employee;
+            $dateStr = $p->att_date instanceof Carbon ? $p->att_date->format('Y-m-d') : (string) $p->att_date;
+            $key = $p->employee_id.'_'.$dateStr;
+
+            return [
+                'id' => $p->id,
+                'employee_id' => $p->employee_id,
+                'first_name' => $e->first_name ?? '',
+                'last_name' => $e->last_name ?? '',
+                'emp_code' => $e->employee_id ?? null,
+                'company_id' => (int) $p->company_id,
+                'att_date' => $p->att_date,
+                'device_pin' => $p->device_pin,
+                'first_punch' => $p->first_punch,
+                'last_punch' => $p->last_punch,
+                'punch_count' => $p->punch_count,
+                'first_verify_mode' => $p->first_verify_mode,
+                'last_verify_mode' => $p->last_verify_mode,
+                'device_name' => $p->device_name,
+                'serial_number' => $p->serial_number,
+                'status_ar' => $p->status_ar,
+                'late_minutes' => $p->late_minutes,
+                'is_virtual' => $p->is_virtual_absence,
+                'penalty' => $penaltyMap->get($key),
+            ];
+        });
 
         // Get statistics for selected date range (filtered by company)
         $statsQuery = ZkDailyAttendance::query()
@@ -635,11 +331,8 @@ class AttendanceController extends Controller
                     return $record;
                 }
 
-                // Calculate late minutes (per-weekday start when configured)
-                $expectedStart = Carbon::parse(
-                    $date . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
-                    'Asia/Riyadh'
-                );
+                // Calculate late minutes
+                $expectedStart = Carbon::parse($date . ' ' . $employee->shift->start_time->format('H:i:s'), 'Asia/Riyadh');
                 $firstPunch = Carbon::parse($record->first_punch)->setTimezone('Asia/Riyadh');
                 $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
                 $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);
@@ -675,7 +368,7 @@ class AttendanceController extends Controller
         $lateRecords = $allRecords;
 
         // Paginate the filtered results
-        $currentPage = $request->query('page', 1);
+        $currentPage = (int) $request->query('page', '1');
         $perPage = 15;
         $items = $lateRecords->slice(($currentPage - 1) * $perPage, $perPage)->values();
         $lateAttendance = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -883,6 +576,35 @@ class AttendanceController extends Controller
 
         fclose($handle);
         exit;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, AttendanceDailyPresentation>  $items
+     * @return \Illuminate\Support\Collection<string, AttendancePenalty>
+     */
+    private function penaltyMapForPresentationPage(\Illuminate\Support\Collection $items): \Illuminate\Support\Collection
+    {
+        if ($items->isEmpty()) {
+            return collect();
+        }
+
+        $employeeIds = $items->pluck('employee_id')->unique()->values()->all();
+        $dates = $items->map(function (AttendanceDailyPresentation $p) {
+            $d = $p->att_date;
+
+            return $d instanceof Carbon ? $d->format('Y-m-d') : (string) $d;
+        })->unique()->values()->all();
+
+        return AttendancePenalty::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('attendance_date', $dates)
+            ->get()
+            ->keyBy(static function (AttendancePenalty $penalty) {
+                $d = $penalty->attendance_date;
+                $dateStr = $d instanceof Carbon ? $d->format('Y-m-d') : (string) $d;
+
+                return $penalty->employee_id.'_'.$dateStr;
+            });
     }
 
     private function categorizeValidationErrors(array $errors): array

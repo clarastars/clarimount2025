@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\AttendancePresentationRebuildService;
 use App\Services\FingerprintIclockAttendanceService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -18,7 +19,7 @@ class SyncFingerprintIclockAttendance extends Command
 
     protected $description = 'Sync today\'s attendance from fingerprint iClock API (first punch = check-in, last = check-out)';
 
-    public function handle(FingerprintIclockAttendanceService $service): int
+    public function handle(FingerprintIclockAttendanceService $service, AttendancePresentationRebuildService $presentationRebuild): int
     {
         if ($this->option('month') && $this->option('date')) {
             $this->error('Use either --month or --date, not both.');
@@ -39,6 +40,8 @@ class SyncFingerprintIclockAttendance extends Command
             $service->setProgressEnabled(true);
             $this->info('Syncing iClock attendance for '.$date->format('Y-m-d').' (Asia/Riyadh)...');
             $service->syncForDate($date);
+            $this->info('Rebuilding attendance presentations for '.$date->format('Y-m-d').'...');
+            $presentationRebuild->rebuildDateForAllCompanies($date->format('Y-m-d'));
             $this->info('Done.');
 
             return 0;
@@ -51,6 +54,8 @@ class SyncFingerprintIclockAttendance extends Command
 
             $this->info('Syncing current month attendance (from start of month until today) from iClock API...');
             $service->syncCurrentMonthUntilToday();
+            $this->info('Rebuilding attendance presentations for current month...');
+            $presentationRebuild->rebuildCurrentMonthForAllCompanies();
             $this->info('Done syncing current month.');
             return 0;
         }
@@ -63,6 +68,8 @@ class SyncFingerprintIclockAttendance extends Command
 
         $this->info('Syncing today\'s attendance from iClock API...');
         $service->syncToday();
+        $this->info('Rebuilding attendance presentations for today...');
+        $presentationRebuild->rebuildDateForAllCompanies(Carbon::today('Asia/Riyadh')->format('Y-m-d'));
         $this->info('Done.');
         return 0;
     }

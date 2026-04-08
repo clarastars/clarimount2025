@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Services\BayzatFingerprintAttendancePushService;
 use App\Services\FingerprintIclockAttendanceService;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,20 +26,14 @@ class SyncFingerprintIclockAttendanceJob implements ShouldQueue
         $this->onQueue('default');
     }
 
-    public function handle(
-        FingerprintIclockAttendanceService $service,
-        BayzatFingerprintAttendancePushService $bayzatFingerprintPush
-    ): void {
+    public function handle(FingerprintIclockAttendanceService $service): void
+    {
         Log::channel('daily')->info('[FingerprintIclock] Starting scheduled sync for today');
         $service->syncToday();
         Log::channel('daily')->info('[FingerprintIclock] Scheduled sync completed');
 
-        try {
-            $bayzatFingerprintPush->pushToday();
-        } catch (\Throwable $e) {
-            Log::channel('daily')->error('[BayzatFingerprintPush] Failed after iClock sync', [
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $today = Carbon::today('Asia/Riyadh')->format('Y-m-d');
+        RebuildAttendancePresentationJob::dispatch($today, false);
+        Log::channel('daily')->info('[FingerprintIclock] Queued attendance presentation rebuild for '.$today);
     }
 }

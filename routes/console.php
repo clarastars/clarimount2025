@@ -14,3 +14,8 @@ Schedule::command('attendance:cleanup-imports --days=30')->monthly()->descriptio
 
 // Fingerprint iClock API: sync today's attendance (first punch = check-in, last punch = check-out) every 10 minutes
 Schedule::job(new \App\Jobs\SyncFingerprintIclockAttendanceJob())->everyTenMinutes()->description('Sync fingerprint iClock attendance for today');
+
+// Rebuild attendance index cache (presentations + absence penalties) for the current month nightly
+Schedule::job(new \App\Jobs\RebuildAttendancePresentationJob(null, true))
+    ->dailyAt('01:15')
+    ->description('Rebuild attendance_daily_presentations for current month (all companies)');
