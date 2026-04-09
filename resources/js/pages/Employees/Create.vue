@@ -53,17 +53,15 @@ const form = useForm({
     nationality_id: null as number | null,
     residence_country_id: props.defaultResidenceCountryId || null,
     birth_date: '',
-    email: '',
     personal_email: '',
     work_email: '',
+    phone: '',
+    mobile: '',
     
     // Work Details
     company_id: props.defaultCompanyId || null,
     employment_date: '',
     probation_end_date: '',
-    phone: '',
-    work_phone: '',
-    mobile: '',
     fingerprint_device_id: '',
     shift_id: null as number | null,
     work_address: '',
@@ -103,12 +101,6 @@ const form = useForm({
     additional_approver_2: '',
     additional_approver_3: '',
     
-    // Emergency Contact
-    emergency_contact_name: '',
-    emergency_contact_phone: '',
-    emergency_contact_email: '',
-    emergency_contact_address: '',
-    
     // Additional Information
     notes: '',
 })
@@ -131,7 +123,6 @@ const sectionLegal = ref(false)
 const sectionInsurance = ref(false)
 const sectionEmployment = ref(false)
 const sectionManagers = ref(false)
-const sectionEmergency = ref(false)
 const sectionAdditional = ref(false)
 const sectionDebts = ref(false)
 
@@ -174,7 +165,6 @@ const completedSections = computed(() => {
         insurance: form.insurance_policy,
         employment: form.hire_date || form.employment_status,
         managers: form.manager || form.direct_manager,
-        emergency: form.emergency_contact_name,
         additional: form.notes
     }
     
@@ -647,7 +637,6 @@ const formatCurrency = (amount: number) => {
                     <Badge v-if="completedSections.insurance" variant="default">Insurance ✓</Badge>
                     <Badge v-if="completedSections.employment" variant="default">Employment ✓</Badge>
                     <Badge v-if="completedSections.managers" variant="default">Managers ✓</Badge>
-                    <Badge v-if="completedSections.emergency" variant="default">Emergency ✓</Badge>
                     <Badge v-if="completedSections.additional" variant="default">Additional ✓</Badge>
                 </div>
             </div>
@@ -674,7 +663,7 @@ const formatCurrency = (amount: number) => {
                                 <Icon name="User" class="h-5 w-5 text-blue-600" />
                                 <CardTitle class="text-xl">{{ t('employees.general_information') }}</CardTitle>
                                 <Badge v-if="completedSections.general" variant="default">✓</Badge>
-                                <Badge v-if="hasErrorsInSection(['employee_id', 'first_name', 'father_name', 'last_name', 'nationality_id', 'residence_country_id', 'birth_date', 'email', 'personal_email', 'work_email'])" variant="destructive">!</Badge>
+                                <Badge v-if="hasErrorsInSection(['employee_id', 'first_name', 'father_name', 'last_name', 'nationality_id', 'residence_country_id', 'birth_date', 'personal_email', 'work_email', 'phone', 'mobile'])" variant="destructive">!</Badge>
                             </div>
                             <Icon :name="!sectionGeneral ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
                         </div>
@@ -723,13 +712,14 @@ const formatCurrency = (amount: number) => {
                             <!-- Father Name -->
                             <div>
                                 <Label for="father_name" class="mb-2">
-                                    {{ t('employees.father_name') }}
+                                    {{ t('employees.father_name') }} *
                                     <span v-if="form.errors.father_name" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <Input 
                                     id="father_name"
                                     v-model="form.father_name" 
                                     type="text" 
+                                    required
                                     :placeholder="t('employees.father_name_placeholder')"
                                     :class="form.errors.father_name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
@@ -762,12 +752,13 @@ const formatCurrency = (amount: number) => {
                             <!-- Nationality -->
                             <div>
                                 <Label for="nationality_id" class="mb-2">
-                                    {{ t('employees.nationality') }}
+                                    {{ t('employees.nationality') }} *
                                     <span v-if="form.errors.nationality_id" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <select 
                                     id="nationality_id"
                                     v-model="form.nationality_id"
+                                    required
                                     :class="[
                                         'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
                                         form.errors.nationality_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
@@ -787,12 +778,13 @@ const formatCurrency = (amount: number) => {
                             <!-- Residence Country -->
                             <div>
                                 <Label for="residence_country_id" class="mb-2">
-                                    {{ t('employees.residence_country') }}
+                                    {{ t('employees.residence_country') }} *
                                     <span v-if="form.errors.residence_country_id" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <select 
                                     id="residence_country_id"
                                     v-model="form.residence_country_id"
+                                    required
                                     :class="[
                                         'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
                                         form.errors.residence_country_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
@@ -848,25 +840,6 @@ const formatCurrency = (amount: number) => {
 
                             <!-- Personal Email -->
                             <div>
-                                <Label for="email" class="mb-2">
-                                    {{ t('employees.email') }}
-                                    <span v-if="form.errors.email" class="text-red-500 ml-1">*</span>
-                                </Label>
-                                <Input 
-                                    id="email"
-                                    v-model="form.email" 
-                                    type="email"
-                                    :placeholder="t('employees.email_placeholder')"
-                                    :class="form.errors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                />
-                                <div v-if="form.errors.email" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                    <Icon name="AlertCircle" class="h-4 w-4" />
-                                    {{ translateValidationError(form.errors.email || "") }}
-                                </div>
-                            </div>
-
-                            <!-- Personal Email -->
-                            <div>
                                 <Label for="personal_email" class="mb-2">
                                     {{ t('employees.personal_email') }}
                                     <span v-if="form.errors.personal_email" class="text-red-500 ml-1">*</span>
@@ -883,6 +856,42 @@ const formatCurrency = (amount: number) => {
                                     {{ translateValidationError(form.errors.personal_email || "") }}
                                 </div>
                             </div>
+
+                            <div>
+                                <Label for="phone" class="mb-2">
+                                    رقم الجوال الشخصي
+                                    <span v-if="form.errors.phone" class="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Input
+                                    id="phone"
+                                    v-model="form.phone"
+                                    type="text"
+                                    :placeholder="t('employees.phone_placeholder')"
+                                    :class="form.errors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                />
+                                <div v-if="form.errors.phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                    <Icon name="AlertCircle" class="h-4 w-4" />
+                                    {{ translateValidationError(form.errors.phone || "") }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label for="mobile" class="mb-2">
+                                    رقم جوال العمل
+                                    <span v-if="form.errors.mobile" class="text-red-500 ml-1">*</span>
+                                </Label>
+                                <Input
+                                    id="mobile"
+                                    v-model="form.mobile"
+                                    type="text"
+                                    :placeholder="t('employees.mobile_placeholder')"
+                                    :class="form.errors.mobile ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                />
+                                <div v-if="form.errors.mobile" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                    <Icon name="AlertCircle" class="h-4 w-4" />
+                                    {{ translateValidationError(form.errors.mobile || "") }}
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -897,7 +906,7 @@ const formatCurrency = (amount: number) => {
                                         <Icon name="Briefcase" class="h-5 w-5 text-green-600" />
                                         <CardTitle class="text-xl">{{ t('employees.work_details') }}</CardTitle>
                                         <Badge v-if="completedSections.work" variant="default">✓</Badge>
-                                        <Badge v-if="hasErrorsInSection(['employment_date', 'probation_end_date', 'job_title', 'work_phone', 'phone', 'mobile', 'fingerprint_device_id', 'work_address', 'company_id', 'department_id'])" variant="destructive">!</Badge>
+                                        <Badge v-if="hasErrorsInSection(['employment_date', 'probation_end_date', 'job_title', 'fingerprint_device_id', 'work_address', 'company_id', 'department_id'])" variant="destructive">!</Badge>
                                     </div>
                                     <Icon :name="!sectionWork ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
                                 </div>
@@ -1049,63 +1058,6 @@ const formatCurrency = (amount: number) => {
                                                 <Label for="allowance_personal_car" class="mb-1 text-sm">{{ t('employees.allowance_personal_car') }}</Label>
                                                 <Input id="allowance_personal_car" v-model="form.allowance_personal_car" type="number" step="0.01" min="0" class="h-9" />
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Work Phone -->
-                                    <div>
-                                        <Label for="work_phone" class="mb-2">
-                                            {{ t('employees.work_phone') }}
-                                            <span v-if="form.errors.work_phone" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="work_phone"
-                                            v-model="form.work_phone" 
-                                            type="text" 
-                                            placeholder="+966 11 234 5678"
-                                            :class="form.errors.work_phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.work_phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.work_phone || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Phone -->
-                                    <div>
-                                        <Label for="phone" class="mb-2">
-                                            {{ t('employees.phone') }}
-                                            <span v-if="form.errors.phone" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="phone"
-                                            v-model="form.phone" 
-                                            type="text" 
-                                            :placeholder="t('employees.phone_placeholder')"
-                                            :class="form.errors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.phone || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Mobile -->
-                                    <div>
-                                        <Label for="mobile" class="mb-2">
-                                            {{ t('employees.mobile') }}
-                                            <span v-if="form.errors.mobile" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="mobile"
-                                            v-model="form.mobile" 
-                                            type="text" 
-                                            :placeholder="t('employees.mobile_placeholder')"
-                                            :class="form.errors.mobile ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.mobile" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.mobile || "") }}
                                         </div>
                                     </div>
 
@@ -1675,107 +1627,6 @@ const formatCurrency = (amount: number) => {
                                         <div v-if="form.errors.additional_approver_3" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />
                                             {{ form.errors.additional_approver_3 }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Collapsible>
-                </Card>
-
-                <!-- Emergency Contact Section -->
-                <Card>
-                    <Collapsible v-model:open="sectionEmergency">
-                        <CollapsibleTrigger asChild>
-                            <CardHeader class="cursor-pointer hover:bg-gray-50">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <Icon name="Phone" class="h-5 w-5 text-red-600" />
-                                        <CardTitle class="text-xl">{{ t('employees.emergency_contact') }}</CardTitle>
-                                        <Badge v-if="completedSections.emergency" variant="default">✓</Badge>
-                                        <Badge v-if="hasErrorsInSection(['emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_email', 'emergency_contact_address'])" variant="destructive">!</Badge>
-                                    </div>
-                                    <Icon :name="!sectionEmergency ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <!-- Emergency Contact Name -->
-                                    <div>
-                                        <Label for="emergency_contact_name" class="mb-2">
-                                            {{ t('employees.emergency_contact_name') }}
-                                            <span v-if="form.errors.emergency_contact_name" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="emergency_contact_name"
-                                            v-model="form.emergency_contact_name" 
-                                            type="text" 
-                                            placeholder="Emergency contact name"
-                                            :class="form.errors.emergency_contact_name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_name" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.emergency_contact_name || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Emergency Contact Phone -->
-                                    <div>
-                                        <Label for="emergency_contact_phone" class="mb-2">
-                                            {{ t('employees.emergency_contact_phone') }}
-                                            <span v-if="form.errors.emergency_contact_phone" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="emergency_contact_phone"
-                                            v-model="form.emergency_contact_phone" 
-                                            type="text" 
-                                            placeholder="Emergency contact phone"
-                                            :class="form.errors.emergency_contact_phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.emergency_contact_phone || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Emergency Contact Email -->
-                                    <div>
-                                        <Label for="emergency_contact_email" class="mb-2">
-                                            {{ t('employees.emergency_contact_email') }}
-                                            <span v-if="form.errors.emergency_contact_email" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="emergency_contact_email"
-                                            v-model="form.emergency_contact_email" 
-                                            type="email" 
-                                            placeholder="emergency@contact.com"
-                                            :class="form.errors.emergency_contact_email ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_email" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.emergency_contact_email || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Emergency Contact Address -->
-                                    <div>
-                                        <Label for="emergency_contact_address" class="mb-2">
-                                            {{ t('employees.emergency_contact_address') }}
-                                            <span v-if="form.errors.emergency_contact_address" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <textarea 
-                                            id="emergency_contact_address"
-                                            v-model="form.emergency_contact_address" 
-                                            rows="3"
-                                            placeholder="Emergency contact address"
-                                            class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                            :class="form.errors.emergency_contact_address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        ></textarea>
-                                        <div v-if="form.errors.emergency_contact_address" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.emergency_contact_address || "") }}
                                         </div>
                                     </div>
                                 </div>

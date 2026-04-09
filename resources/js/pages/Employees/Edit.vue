@@ -14,7 +14,6 @@
                     <Badge v-if="completedSections.insurance" variant="default">Insurance ✓</Badge>
                     <Badge v-if="completedSections.employment" variant="default">Employment ✓</Badge>
                     <Badge v-if="completedSections.managers" variant="default">Managers ✓</Badge>
-                    <Badge v-if="completedSections.emergency" variant="default">Emergency ✓</Badge>
                     <Badge v-if="completedSections.additional" variant="default">Additional ✓</Badge>
                 </div>
             </div>
@@ -61,11 +60,12 @@
 
                                     <!-- Father Name -->
                                     <div>
-                                        <Label for="father_name" class="mb-2">{{ t('employees.father_name') }}</Label>
+                                        <Label for="father_name" class="mb-2">{{ t('employees.father_name') }} *</Label>
                                         <Input 
                                             id="father_name"
                                             v-model="form.father_name" 
                                             type="text" 
+                                            required
                                             :placeholder="t('employees.father_name_placeholder')"
                                         />
                                         <div v-if="form.errors.father_name" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.father_name || "") }}</div>
@@ -86,10 +86,11 @@
 
                                     <!-- Nationality -->
                                     <div>
-                                        <Label for="nationality_id" class="mb-2">{{ t('employees.nationality') }}</Label>
+                                        <Label for="nationality_id" class="mb-2">{{ t('employees.nationality') }} *</Label>
                                         <select 
                                             id="nationality_id"
                                             v-model="form.nationality_id"
+                                            required
                                             class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <option :value="null">{{ t('employees.select_nationality') }}</option>
@@ -102,10 +103,11 @@
 
                                     <!-- Residence Country -->
                                     <div>
-                                        <Label for="residence_country_id" class="mb-2">{{ t('employees.residence_country') }}</Label>
+                                        <Label for="residence_country_id" class="mb-2">{{ t('employees.residence_country') }} *</Label>
                                         <select 
                                             id="residence_country_id"
                                             v-model="form.residence_country_id"
+                                            required
                                             class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <option :value="null">{{ t('employees.select_residence_country') }}</option>
@@ -125,18 +127,6 @@
                                             type="date" 
                                         />
                                         <div v-if="form.errors.birth_date" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.birth_date || "") }}</div>
-                                    </div>
-
-                                    <!-- Email -->
-                                    <div>
-                                        <Label for="email" class="mb-2">{{ t('employees.email') }}</Label>
-                                        <Input 
-                                            id="email"
-                                            v-model="form.email" 
-                                            type="email" 
-                                            :placeholder="t('employees.email_placeholder')"
-                                        />
-                                        <div v-if="form.errors.email" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.email || "") }}</div>
                                     </div>
 
                                     <!-- Personal Email -->
@@ -165,7 +155,7 @@
 
                                     <!-- Phone -->
                                     <div>
-                                        <Label for="phone" class="mb-2">{{ t('employees.phone') }}</Label>
+                                        <Label for="phone" class="mb-2">رقم الجوال الشخصي</Label>
                                         <Input 
                                             id="phone"
                                             v-model="form.phone" 
@@ -173,6 +163,17 @@
                                             :placeholder="t('employees.phone_placeholder')"
                                         />
                                         <div v-if="form.errors.phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.phone || "") }}</div>
+                                    </div>
+
+                                    <div>
+                                        <Label for="mobile" class="mb-2">رقم جوال العمل</Label>
+                                        <Input
+                                            id="mobile"
+                                            v-model="form.mobile"
+                                            type="text"
+                                            :placeholder="t('employees.mobile_placeholder')"
+                                        />
+                                        <div v-if="form.errors.mobile" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.mobile || "") }}</div>
                                     </div>
 
                                     <!-- Location -->
@@ -249,30 +250,6 @@
                                             type="date" 
                                         />
                                         <div v-if="form.errors.probation_end_date" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.probation_end_date || "") }}</div>
-                                    </div>
-
-                                    <!-- Work Phone -->
-                                    <div>
-                                        <Label for="work_phone" class="mb-2">{{ t('employees.work_phone') }}</Label>
-                                        <Input 
-                                            id="work_phone"
-                                            v-model="form.work_phone" 
-                                            type="text" 
-                                            placeholder="Work phone number"
-                                        />
-                                        <div v-if="form.errors.work_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.work_phone || "") }}</div>
-                                    </div>
-
-                                    <!-- Mobile -->
-                                    <div>
-                                        <Label for="mobile" class="mb-2">{{ t('employees.mobile') }}</Label>
-                                        <Input 
-                                            id="mobile"
-                                            v-model="form.mobile" 
-                                            type="text" 
-                                            :placeholder="t('employees.mobile_placeholder')"
-                                        />
-                                        <div v-if="form.errors.mobile" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.mobile || "") }}</div>
                                     </div>
 
                                     <!-- Fingerprint Device ID -->
@@ -771,78 +748,6 @@
                     </Collapsible>
                 </Card>
 
-                <!-- Emergency Contact Section -->
-                <Card>
-                    <Collapsible v-model:open="sectionEmergency">
-                        <CollapsibleTrigger asChild>
-                            <CardHeader class="cursor-pointer hover:bg-gray-50">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <Icon name="Phone" class="h-5 w-5 text-red-600" />
-                                        <CardTitle class="text-xl">{{ t('employees.emergency_contact') }}</CardTitle>
-                                        <Badge v-if="completedSections.emergency" variant="default">✓</Badge>
-                                    </div>
-                                    <Icon :name="!sectionEmergency ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <!-- Emergency Contact Name -->
-                                    <div>
-                                        <Label for="emergency_contact_name" class="mb-2">{{ t('employees.emergency_contact_name') }}</Label>
-                                        <Input 
-                                            id="emergency_contact_name"
-                                            v-model="form.emergency_contact_name" 
-                                            type="text" 
-                                            placeholder="Emergency contact name"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_name" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_name || "") }}</div>
-                                    </div>
-
-                                    <!-- Emergency Contact Phone -->
-                                    <div>
-                                        <Label for="emergency_contact_phone" class="mb-2">{{ t('employees.emergency_contact_phone') }}</Label>
-                                        <Input 
-                                            id="emergency_contact_phone"
-                                            v-model="form.emergency_contact_phone" 
-                                            type="text" 
-                                            placeholder="Emergency contact phone"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_phone || "") }}</div>
-                                    </div>
-
-                                    <!-- Emergency Contact Email -->
-                                    <div>
-                                        <Label for="emergency_contact_email" class="mb-2">{{ t('employees.emergency_contact_email') }}</Label>
-                                        <Input 
-                                            id="emergency_contact_email"
-                                            v-model="form.emergency_contact_email" 
-                                            type="email" 
-                                            placeholder="emergency@contact.com"
-                                        />
-                                        <div v-if="form.errors.emergency_contact_email" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_email || "") }}</div>
-                                    </div>
-
-                                    <!-- Emergency Contact Address -->
-                                    <div>
-                                        <Label for="emergency_contact_address" class="mb-2">{{ t('employees.emergency_contact_address') }}</Label>
-                                        <textarea 
-                                            id="emergency_contact_address"
-                                            v-model="form.emergency_contact_address" 
-                                            rows="3"
-                                            placeholder="Emergency contact address"
-                                            class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        ></textarea>
-                                        <div v-if="form.errors.emergency_contact_address" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_address || "") }}</div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Collapsible>
-                </Card>
-
                 <!-- Additional Information Section -->
                 <Card>
                     <Collapsible v-model:open="sectionAdditional">
@@ -1076,7 +981,6 @@ const form = useForm({
     nationality_id: props.employee.nationality_id || null as number | null,
     residence_country_id: props.employee.residence_country_id || props.defaultResidenceCountryId || null,
     birth_date: props.employee.birth_date || '',
-    email: props.employee.email || '',
     personal_email: props.employee.personal_email || '',
     work_email: props.employee.work_email || '',
     phone: props.employee.phone || '',
@@ -1086,7 +990,6 @@ const form = useForm({
     company_id: props.employee.company_id || props.defaultCompanyId || null,
     employment_date: props.employee.employment_date || '',
     probation_end_date: props.employee.probation_end_date || '',
-    work_phone: props.employee.work_phone || '',
     mobile: props.employee.mobile || '',
     fingerprint_device_id: props.employee.fingerprint_device_id || '',
     shift_id: props.employee.shift_id || null as number | null,
@@ -1128,12 +1031,6 @@ const form = useForm({
     additional_approver_2: props.employee.additional_approver_2 || '',
     additional_approver_3: props.employee.additional_approver_3 || '',
     
-    // Emergency Contact
-    emergency_contact_name: props.employee.emergency_contact_name || '',
-    emergency_contact_phone: props.employee.emergency_contact_phone || '',
-    emergency_contact_email: props.employee.emergency_contact_email || '',
-    emergency_contact_address: props.employee.emergency_contact_address || '',
-    
     // Additional Information
     notes: props.employee.notes || '',
 })
@@ -1159,7 +1056,6 @@ const sectionLegal = ref(false)
 const sectionInsurance = ref(false)
 const sectionEmployment = ref(false)
 const sectionManagers = ref(false)
-const sectionEmergency = ref(false)
 const sectionAdditional = ref(false)
 const sectionDebts = ref(false)
 
@@ -1269,7 +1165,6 @@ const completedSections = computed(() => {
         insurance: form.insurance_policy,
         employment: form.hire_date || form.employment_status,
         managers: form.manager || form.direct_manager,
-        emergency: form.emergency_contact_name,
         additional: form.notes
     }
     
