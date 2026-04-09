@@ -1258,6 +1258,10 @@ return [
         'deduction_updated' => 'Deduction updated successfully.',
         'deduction_deleted' => 'Deduction deleted successfully.',
         'delete_deduction_confirm' => 'Are you sure you want to delete this deduction?',
+        'penalty_email_subject' => 'Attendance Delay Penalty Notification',
+        'penalty_email_greeting' => 'Dear :name,',
+        'penalty_email_intro' => 'A delay penalty has been approved for your attendance record. Please review the details below.',
+        'penalty_email_footer' => 'Please contact HR if you need any clarification.',
     ],
 
     // Labor Law Rules

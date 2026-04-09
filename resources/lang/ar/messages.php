@@ -1270,6 +1270,10 @@ return [
         'deduction_updated' => 'تم تحديث الخصم بنجاح.',
         'deduction_deleted' => 'تم حذف الخصم بنجاح.',
         'delete_deduction_confirm' => 'هل أنت متأكد من حذف هذا الخصم؟',
+        'penalty_email_subject' => 'إشعار جزاء تأخير الحضور',
+        'penalty_email_greeting' => 'عزيزي/عزيزتي :name،',
+        'penalty_email_intro' => 'تم اعتماد جزاء مرتبط بالتأخير في سجل حضورك. يرجى مراجعة التفاصيل التالية.',
+        'penalty_email_footer' => 'يرجى التواصل مع إدارة الموارد البشرية في حال الحاجة إلى أي توضيح.',
     ],
 
     // قوانين مكتب العمل
