@@ -22,6 +22,10 @@ const sidebarNavItems = computed((): NavItem[] => [
         title: t('settings.appearance'),
         href: '/settings/appearance',
     },
+    {
+        title: t('settings.email_test'),
+        href: '/settings/email-test',
+    },
 ]);
 
 const page = usePage();

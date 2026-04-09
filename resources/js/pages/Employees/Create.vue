@@ -40,6 +40,7 @@ interface Props {
     nationalities: Nationality[]
     defaultResidenceCountryId?: number
     shifts?: any[]
+    canManagePortalAccount?: boolean
 }
 
 const props = defineProps<Props>()
@@ -103,6 +104,11 @@ const form = useForm({
     
     // Additional Information
     notes: '',
+
+    // Employee Account (super-admin only)
+    portal_password: '',
+    portal_password_confirmation: '',
+    portal_password_reset: false,
 })
 
 // Auto-calculate total allowances from allowance details
@@ -125,6 +131,8 @@ const sectionEmployment = ref(false)
 const sectionManagers = ref(false)
 const sectionAdditional = ref(false)
 const sectionDebts = ref(false)
+const showPortalPassword = ref(false)
+const showPortalPasswordConfirmation = ref(false)
 
 // Debts management
 interface Debt {
@@ -890,6 +898,74 @@ const formatCurrency = (amount: number) => {
                                 <div v-if="form.errors.mobile" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                     <Icon name="AlertCircle" class="h-4 w-4" />
                                     {{ translateValidationError(form.errors.mobile || "") }}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card v-if="props.canManagePortalAccount">
+                    <CardHeader class="cursor-pointer hover:bg-gray-50">
+                        <div class="flex items-center gap-3">
+                            <Icon name="KeyRound" class="h-5 w-5 text-violet-600" />
+                            <CardTitle class="text-xl">{{ t('employees.employee_account') }}</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent class="space-y-6">
+                        <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                            {{ t('employees.employee_account_email_hint') }}:
+                            <span class="font-medium text-foreground">{{ form.work_email || '-' }}</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <Label for="portal_password" class="mb-2">{{ t('employees.portal_password') }}</Label>
+                                <div class="relative">
+                                    <Input
+                                        id="portal_password"
+                                        v-model="form.portal_password"
+                                        :type="showPortalPassword ? 'text' : 'password'"
+                                        autocomplete="new-password"
+                                        :placeholder="t('employees.portal_password_placeholder')"
+                                        :class="[
+                                            'pr-20',
+                                            form.errors.portal_password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
+                                        ]"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
+                                        :aria-label="showPortalPassword ? t('employees.hide_password') : t('employees.show_password')"
+                                        @click="showPortalPassword = !showPortalPassword"
+                                    >
+                                        <Icon :name="showPortalPassword ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <div v-if="form.errors.portal_password" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                    <Icon name="AlertCircle" class="h-4 w-4" />
+                                    {{ translateValidationError(form.errors.portal_password || '') }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <Label for="portal_password_confirmation" class="mb-2">{{ t('employees.portal_password_confirmation') }}</Label>
+                                <div class="relative">
+                                    <Input
+                                        id="portal_password_confirmation"
+                                        v-model="form.portal_password_confirmation"
+                                        :type="showPortalPasswordConfirmation ? 'text' : 'password'"
+                                        autocomplete="new-password"
+                                        :placeholder="t('employees.portal_password_confirmation_placeholder')"
+                                        class="pr-20"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
+                                        :aria-label="showPortalPasswordConfirmation ? t('employees.hide_password') : t('employees.show_password')"
+                                        @click="showPortalPasswordConfirmation = !showPortalPasswordConfirmation"
+                                    >
+                                        <Icon :name="showPortalPasswordConfirmation ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
                         </div>

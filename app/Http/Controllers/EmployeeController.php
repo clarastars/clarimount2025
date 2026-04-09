@@ -195,6 +195,7 @@ class EmployeeController extends Controller
             'nationalities' => Nationality::active()->orderByName()->get(),
             'defaultResidenceCountryId' => $saudiArabia?->id,
             'shifts' => Shift::orderBy('name')->get(),
+            'canManagePortalAccount' => $user->hasRole('super-admin'),
         ]);
     }
 
@@ -204,6 +205,7 @@ class EmployeeController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
+        $isSuperAdmin = $user->hasRole('super-admin');
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
 
         // Debug logging
@@ -281,10 +283,20 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+            'portal_password' => 'nullable|string|min:8|confirmed',
+            'portal_password_reset' => 'nullable|boolean',
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'email.unique' => __('employees.email_already_used'),
         ]);
+
+        if (! $isSuperAdmin && (
+            $request->filled('portal_password') ||
+            $request->filled('portal_password_confirmation') ||
+            $request->boolean('portal_password_reset')
+        )) {
+            abort(403, 'Access denied. Super admin role required.');
+        }
 
         \Log::info('Validation passed, checking department...');
 
@@ -327,7 +339,11 @@ class EmployeeController extends Controller
             $employee = Employee::create($validated);
             \Log::info('Employee created successfully', ['employee_id' => $employee->id]);
 
-            app(EmployeePortalUserService::class)->createOrSyncPortalUser($employee);
+            app(EmployeePortalUserService::class)->createOrSyncPortalUser(
+                $employee,
+                $isSuperAdmin ? ($validated['portal_password'] ?? null) : null,
+                false
+            );
 
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Employee created successfully.');
@@ -402,7 +418,7 @@ class EmployeeController extends Controller
         // Get Saudi Arabia as default residence country
         $saudiArabia = Country::where('code', 'SA')->first();
 
-        $employee->load('debts');
+        $employee->load(['debts', 'user']);
 
         return Inertia::render('Employees/Edit', [
             'employee' => $employee,
@@ -414,6 +430,11 @@ class EmployeeController extends Controller
             'departments' => \App\Models\Department::all(),
             'locations' => \App\Models\Location::all(),
             'shifts' => Shift::orderBy('name')->get(),
+            'canManagePortalAccount' => $user->hasRole('super-admin'),
+            'portalAccount' => [
+                'exists' => (bool) $employee->user_id,
+                'email' => $employee->work_email ?: $employee->user?->email,
+            ],
         ]);
     }
 
@@ -447,6 +468,7 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee): Response|RedirectResponse
     {
         $user = Auth::user();
+        $isSuperAdmin = $user->hasRole('super-admin');
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
 
         // If user doesn't have any companies, redirect to create one
@@ -519,10 +541,20 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+            'portal_password' => 'nullable|string|min:8|confirmed',
+            'portal_password_reset' => 'nullable|boolean',
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'email.unique' => __('employees.email_already_used'),
         ]);
+
+        if (! $isSuperAdmin && (
+            $request->filled('portal_password') ||
+            $request->filled('portal_password_confirmation') ||
+            $request->boolean('portal_password_reset')
+        )) {
+            abort(403, 'Access denied. Super admin role required.');
+        }
 
         // Validate department belongs to selected company if specified
         if (!empty($validated['department_id'])) {
@@ -547,6 +579,12 @@ class EmployeeController extends Controller
         $validated['allowances'] = $validated['allowances'] ?? 0;
 
         $employee->update($validated);
+
+        app(EmployeePortalUserService::class)->createOrSyncPortalUser(
+            $employee->fresh(),
+            $isSuperAdmin ? ($validated['portal_password'] ?? null) : null,
+            $isSuperAdmin && (bool) ($validated['portal_password_reset'] ?? false)
+        );
 
         return redirect()->route('employees.show', $employee)
             ->with('success', 'Employee updated successfully.');

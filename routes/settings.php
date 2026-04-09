@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
+use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -25,4 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::put('settings/employee-reference-data/nationalities/{nationality}', [EmployeeReferenceDataController::class, 'updateNationality'])->name('settings.employee-reference-data.nationalities.update');
     Route::post('settings/employee-reference-data/countries', [EmployeeReferenceDataController::class, 'storeCountry'])->name('settings.employee-reference-data.countries.store');
     Route::put('settings/employee-reference-data/countries/{country}', [EmployeeReferenceDataController::class, 'updateCountry'])->name('settings.employee-reference-data.countries.update');
+
+    Route::get('settings/email-test', [EmailTestController::class, 'index'])->name('settings.email-test.index');
+    Route::post('settings/email-test', [EmailTestController::class, 'send'])->name('settings.email-test.send');
 });

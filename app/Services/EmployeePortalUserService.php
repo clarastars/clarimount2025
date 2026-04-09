@@ -20,7 +20,11 @@ class EmployeePortalUserService
      * Create or get portal user for the employee. Assigns role "employee" and links employee.user_id.
      * Uses work_email or email; password defaults to 12345678.
      */
-    public function createOrSyncPortalUser(Employee $employee): ?User
+    public function createOrSyncPortalUser(
+        Employee $employee,
+        ?string $plainPassword = null,
+        bool $forcePasswordReset = false
+    ): ?User
     {
         $email = $this->getLoginEmail($employee);
         if ($email === null || $email === '') {
@@ -34,9 +38,35 @@ class EmployeePortalUserService
             return null;
         }
 
-        $user = User::where('email', $email)->first();
+        $user = $employee->user()->first();
+        if (! $user) {
+            $user = User::where('email', $email)->first();
+        }
 
         if ($user) {
+            if ($user->email !== $email) {
+                $emailTaken = User::query()
+                    ->where('email', $email)
+                    ->where('id', '!=', $user->id)
+                    ->exists();
+
+                if (! $emailTaken) {
+                    $user->update(['email' => $email]);
+                } else {
+                    Log::warning('[EmployeePortalUser] Cannot sync login email because it is already used', [
+                        'employee_id' => $employee->id,
+                        'user_id' => $user->id,
+                        'email' => $email,
+                    ]);
+                }
+            }
+
+            if ($plainPassword !== null && trim($plainPassword) !== '') {
+                $user->update(['password' => Hash::make($plainPassword)]);
+            } elseif ($forcePasswordReset) {
+                $user->update(['password' => Hash::make(self::DEFAULT_PASSWORD)]);
+            }
+
             $hasEmployeeRole = $user->roles()->where('roles.id', $role->id)->wherePivot('team_id', null)->exists();
             if (! $hasEmployeeRole) {
                 $user->roles()->attach($role->id, ['team_id' => null]);
@@ -48,11 +78,14 @@ class EmployeePortalUserService
         }
 
         $name = trim($employee->first_name . ' ' . $employee->last_name) ?: $email;
+        $passwordToUse = $plainPassword !== null && trim($plainPassword) !== ''
+            ? $plainPassword
+            : self::DEFAULT_PASSWORD;
 
         $user = User::create([
             'name' => $name,
             'email' => $email,
-            'password' => Hash::make(self::DEFAULT_PASSWORD),
+            'password' => Hash::make($passwordToUse),
             'language' => 'ar',
         ]);
 
