@@ -69,6 +69,7 @@ export interface Company {
     description_en?: string;
     description_ar?: string;
     logo?: string;
+    logo_url?: string | null;
     website?: string;
     settings?: Record<string, any>;
     is_active: boolean;

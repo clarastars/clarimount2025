@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -50,10 +50,72 @@ const form = useForm({
     description_ar: props.company.description_ar || '',
     website: props.company.website || '',
     fingerprint_report_name: props.company.fingerprint_report_name || '',
+    logo: null as File | null,
+    remove_logo: false as boolean,
 });
 
+const logoPreview = ref<string | null>(null);
+
+const handleLogoChange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+
+    if (!file) {
+        form.logo = null;
+        logoPreview.value = null;
+        return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        form.setError('logo', t('companies.logo_invalid_type'));
+        target.value = '';
+        return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+        form.setError('logo', t('companies.logo_invalid_size'));
+        target.value = '';
+        return;
+    }
+
+    form.clearErrors('logo');
+    form.logo = file;
+    form.remove_logo = false;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        logoPreview.value = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+};
+
+const removeCurrentLogo = () => {
+    form.logo = null;
+    logoPreview.value = null;
+    form.remove_logo = true;
+    const input = document.getElementById('logo') as HTMLInputElement | null;
+    if (input) {
+        input.value = '';
+    }
+};
+
+const restoreCurrentLogo = () => {
+    form.remove_logo = false;
+};
+
 const submit = () => {
-    form.put(route('companies.update', props.company.id));
+    form.transform((data) => ({
+        ...data,
+        _method: 'put',
+    })).post(route('companies.update', props.company.id), {
+        forceFormData: true,
+        onSuccess: () => {
+            form.logo = null;
+            logoPreview.value = null;
+            form.remove_logo = false;
+        },
+    });
 };
 </script>
 
@@ -125,6 +187,41 @@ const submit = () => {
                                 :placeholder="t('companies.website_placeholder')"
                             />
                             <InputError :message="form.errors.website" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="logo">{{ t('companies.logo') }}</Label>
+                            <Input
+                                id="logo"
+                                type="file"
+                                accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                                @change="handleLogoChange"
+                            />
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ t('companies.logo_help') }}
+                            </p>
+
+                            <div v-if="!form.remove_logo && (logoPreview || company.logo_url)" class="space-y-2">
+                                <img
+                                    :src="logoPreview || company.logo_url || ''"
+                                    alt="Company logo"
+                                    class="h-20 w-20 rounded-md border object-contain p-1"
+                                />
+                                <Button variant="outline" type="button" @click="removeCurrentLogo">
+                                    {{ t('companies.remove_logo') }}
+                                </Button>
+                            </div>
+
+                            <div v-if="form.remove_logo" class="space-y-2">
+                                <p class="text-sm text-red-600 dark:text-red-400">
+                                    {{ t('companies.logo_will_be_removed') }}
+                                </p>
+                                <Button variant="outline" type="button" @click="restoreCurrentLogo">
+                                    {{ t('common.undo') }}
+                                </Button>
+                            </div>
+
+                            <InputError :message="form.errors.logo" />
                         </div>
 
                         <div class="space-y-2">

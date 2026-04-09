@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
@@ -46,10 +47,15 @@ class CompanyController extends Controller
             'description_en' => 'nullable|string|max:1000',
             'description_ar' => 'nullable|string|max:1000',
             'website' => 'nullable|url|max:255',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $validated['owner_id'] = Auth::id();
         $validated['slug'] = Str::slug($validated['name_en']);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('company-logos', 'public');
+        }
 
         $company = Company::create($validated);
 
@@ -115,12 +121,29 @@ class CompanyController extends Controller
             'description_ar' => 'nullable|string|max:1000',
             'website' => 'nullable|url|max:255',
             'fingerprint_report_name' => 'nullable|string|max:255',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'remove_logo' => 'nullable|boolean',
         ]);
 
         // Update slug if English name changed
         if ($validated['name_en'] !== $company->name_en) {
             $validated['slug'] = Str::slug($validated['name_en']);
         }
+
+        if ($request->boolean('remove_logo') && !empty($company->logo)) {
+            Storage::disk('public')->delete($company->logo);
+            $validated['logo'] = null;
+        }
+
+        if ($request->hasFile('logo')) {
+            if (!empty($company->logo)) {
+                Storage::disk('public')->delete($company->logo);
+            }
+
+            $validated['logo'] = $request->file('logo')->store('company-logos', 'public');
+        }
+
+        unset($validated['remove_logo']);
 
         $company->update($validated);
 
@@ -136,6 +159,10 @@ class CompanyController extends Controller
         // Check if user owns this company
         if ($company->owner_id !== Auth::id()) {
             abort(403);
+        }
+
+        if (!empty($company->logo)) {
+            Storage::disk('public')->delete($company->logo);
         }
 
         $company->delete();

@@ -120,6 +120,17 @@ const formatLastSync = (lastSync: string | null) => {
                         <CardTitle>{{ t('companies.company_details') }}</CardTitle>
                     </CardHeader>
                     <CardContent class="space-y-4">
+                        <div v-if="company.logo_url" class="flex items-center space-x-3">
+                            <div>
+                                <p class="text-sm font-medium mb-2">{{ t('companies.logo') }}</p>
+                                <img
+                                    :src="company.logo_url"
+                                    alt="Company logo"
+                                    class="h-20 w-20 rounded-md border object-contain p-1"
+                                />
+                            </div>
+                        </div>
+
                         <div class="flex items-center space-x-3">
                             <Mail class="h-4 w-4 text-gray-500" />
                             <div>

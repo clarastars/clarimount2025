@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Company extends Model
@@ -37,6 +38,7 @@ class Company extends Model
      */
     protected $appends = [
         'name',
+        'logo_url',
     ];
 
     protected static function boot()
@@ -160,6 +162,18 @@ class Company extends Model
     {
         $locale = $locale ?? app()->getLocale();
         return $locale === 'ar' ? $this->description_ar : $this->description_en;
+    }
+
+    /**
+     * Get public URL for company logo.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        if (empty($this->logo)) {
+            return null;
+        }
+
+        return Storage::url($this->logo);
     }
 
     /**
