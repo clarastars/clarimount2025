@@ -169,6 +169,9 @@ const formatDate = (dateString: string) => {
 };
 
 const companies = computed(() => props.companies || []);
+const hasActiveFilters = computed(() =>
+    Boolean(search.value || statusFilter.value || departmentFilter.value || companyFilter.value)
+);
 
 const uniqueDepartments = computed(() => {
     const departments = props.employees.data
@@ -248,8 +251,10 @@ watch([search, statusFilter, departmentFilter, companyFilter], () => {
         if (companyFilter.value) params.company_id = companyFilter.value;
         
         router.get('/employees', params, {
-            preserveState: false,
+            preserveState: true,
+            preserveScroll: true,
             replace: true,
+            only: ['employees', 'stats'],
         });
     }, 300);
 });
@@ -491,7 +496,11 @@ async function unlinkFingerprint() {
                                 </option>
                             </select>
 
-                            <Button variant="ghost" @click="clearFilters" v-if="search || statusFilter || departmentFilter || companyFilter">
+                            <Button
+                                variant="ghost"
+                                @click="clearFilters"
+                                :class="hasActiveFilters ? '' : 'invisible pointer-events-none'"
+                            >
                                 <Icon name="X" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
                                 {{ t('common.clear') }}
                             </Button>
