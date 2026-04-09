@@ -7,6 +7,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\RejectPenaltyRequest;
 use App\Mail\AttendancePenaltyApprovedMail;
 use App\Models\AttendancePenalty;
+use App\Services\AttendancePenaltyService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +18,10 @@ use Illuminate\Support\Str;
 
 class AttendancePenaltyApprovalController extends Controller
 {
+    public function __construct(
+        private AttendancePenaltyService $attendancePenaltyService
+    ) {}
+
     /**
      * Approve a penalty
      */
@@ -79,6 +85,16 @@ class AttendancePenaltyApprovalController extends Controller
         }
 
         $penalty->update($data);
+
+        // After rejecting one penalty, re-sequence remaining penalties for same employee/type/month
+        // so later occurrences shift down (e.g. third becomes second).
+        $attDate = Carbon::parse($penalty->attendance_date);
+        $this->attendancePenaltyService->resequenceMonthlyPenaltiesAfterRejection(
+            (int) $penalty->employee_id,
+            (string) $penalty->violation_type,
+            (int) $attDate->year,
+            (int) $attDate->month
+        );
 
         return back()->with('success', __('Penalty rejected successfully.'));
     }

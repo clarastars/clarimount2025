@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\LaborLawRule;
 use App\Models\ZkDailyAttendance;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AttendancePenaltyService
@@ -183,6 +184,7 @@ class AttendancePenaltyService
             ->byViolationType($violationType)
             ->forMonthYear($year, $month)
             ->whereDate('attendance_date', '<', $attendanceDate)
+            ->where('approval_status', '!=', 'rejected')
             ->count();
 
         // Actual repeat number for this occurrence
@@ -194,6 +196,68 @@ class AttendancePenaltyService
 
         // If actual repeat exceeds the maximum defined, cycle back from 1 (e.g. 1,2,1,2,1,2…)
         return (int) ((($repeatNumber - 1) % $maxDefinedRepeat) + 1);
+    }
+
+    /**
+     * Re-sequence repeat_number for one employee/violation_type/month after state changes
+     * (e.g. when one penalty is rejected) so later rows shift correctly.
+     * Rejected rows are excluded from the counting sequence.
+     */
+    public function resequenceMonthlyPenaltiesAfterRejection(
+        int $employeeId,
+        string $violationType,
+        int $year,
+        int $month
+    ): void {
+        DB::transaction(function () use ($employeeId, $violationType, $year, $month): void {
+            /** @var \Illuminate\Database\Eloquent\Collection<int, AttendancePenalty> $activePenalties */
+            $activePenalties = AttendancePenalty::query()
+                ->forEmployee($employeeId)
+                ->byViolationType($violationType)
+                ->forMonthYear($year, $month)
+                ->where('approval_status', '!=', 'rejected')
+                ->orderBy('attendance_date')
+                ->orderBy('id')
+                ->get();
+
+            if ($activePenalties->isEmpty()) {
+                return;
+            }
+
+            $maxDefinedRepeat = (int) (LaborLawRule::byViolationType($violationType)->max('repeat_number') ?? 1);
+            $maxDefinedRepeat = max(1, $maxDefinedRepeat);
+
+            $seq = 0;
+            foreach ($activePenalties as $penalty) {
+                $seq++;
+                $repeatNumber = (int) ((($seq - 1) % $maxDefinedRepeat) + 1);
+
+                $rule = LaborLawRule::byViolationType($violationType)
+                    ->byRepeatNumber($repeatNumber)
+                    ->first();
+
+                if (! $rule) {
+                    continue;
+                }
+
+                $actionText = $this->generateActionText(
+                    $rule->action_type,
+                    $rule->action_value,
+                    $rule->action_value_gross_days,
+                    $rule->action_value_basic_days
+                );
+
+                $penalty->update([
+                    'repeat_number' => $repeatNumber,
+                    'action_type' => $rule->action_type,
+                    'action_value' => $rule->action_value,
+                    'action_value_gross_days' => $rule->action_value_gross_days,
+                    'action_value_basic_days' => $rule->action_value_basic_days,
+                    'action_text' => $actionText,
+                    'reason_text' => $rule->reason_text,
+                ]);
+            }
+        });
     }
 
     /**
