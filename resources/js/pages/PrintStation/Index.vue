@@ -742,16 +742,15 @@ const debugJSPrintManager = async () => {
     }
 };
 
-onMounted(() => {
-    // Initial load
+onMounted(async () => {
     refreshJobs();
-    
-    // Load printers from JSPrintManager with delay to ensure scripts are loaded
-    setTimeout(() => {
-        loadPrintersFromJSPM();
-    }, 3000);
-    
-    // Set up periodic refresh every 10 seconds
     setInterval(refreshJobs, 10000);
+
+    try {
+        await printService.initializeJSPrintManager();
+    } catch (e) {
+        console.warn('PrintStation: JSPrintManager failed to initialize', e);
+    }
+    await loadPrintersFromJSPM();
 });
 </script> 
