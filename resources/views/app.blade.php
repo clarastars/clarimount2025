@@ -43,7 +43,7 @@
         {{-- JSPrintManager (bluebird/jquery/jspm) is loaded on demand via PrintService / asset pages to avoid replacing native Promise before Vue mounts (breaks Inertia/Vue; Firefox XrayWrapper noise). --}}
 
         @routes
-        @vite(['resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
+        @vite(['resources/js/app.ts'])
         @inertiaHead
     </head>
     <body class="font-sans antialiased">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { useI18n } from 'vue-i18n'
@@ -28,7 +28,16 @@ interface Props {
     departments: {
         data: Department[]
         links: any[]
-        meta: any
+        /** Present when props use API-style pagination wrapper */
+        meta?: {
+            from?: number | null
+            to?: number | null
+            total?: number
+        }
+        /** Laravel LengthAwarePaginator JSON puts these on the root (no `meta`) */
+        from?: number | null
+        to?: number | null
+        total?: number
     }
     companies: Company[]
     filters?: {
@@ -38,6 +47,23 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+/** Supports Laravel paginator JSON (top-level from/to/total) and wrapped `meta` shape */
+const paginationSummary = computed(() => {
+    const d = props.departments
+    if (d.meta && typeof d.meta === 'object') {
+        return {
+            from: d.meta.from ?? 0,
+            to: d.meta.to ?? 0,
+            total: d.meta.total ?? 0,
+        }
+    }
+    return {
+        from: d.from ?? 0,
+        to: d.to ?? 0,
+        total: d.total ?? 0,
+    }
+})
 
 const search = ref(props.filters?.search || '')
 const selectedCompanyId = ref(props.filters?.company_id || '')
@@ -209,9 +235,9 @@ const getCompanyName = (company: Company) => {
                     <div class="flex justify-between items-center">
                         <div class="text-sm text-gray-700">
                             {{ t('departments.showing_results', { 
-                                from: departments.meta.from || 0, 
-                                to: departments.meta.to || 0, 
-                                total: departments.meta.total 
+                                from: paginationSummary.from || 0,
+                                to: paginationSummary.to || 0,
+                                total: paginationSummary.total,
                             }) }}
                         </div>
                         <div class="flex gap-1">
