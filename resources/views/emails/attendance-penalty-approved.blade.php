@@ -8,9 +8,9 @@
 <body style="direction: rtl; text-align: right; font-family: Tahoma, Arial, sans-serif; color: #111827; line-height: 1.8; background: #f9fafb; margin: 0; padding: 24px;">
     <div style="direction: rtl; text-align: right; max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
         <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f3f4f6;">
-            @if(!empty($companyLogoDataUri))
+            @if(!empty($companyLogoPath))
                 <div style="margin-bottom: 12px;">
-                    <img src="{{ $companyLogoDataUri }}" alt="Company Logo" style="display: block; max-height: 56px; max-width: 180px; object-fit: contain;">
+                    <img src="{{ $message->embed($companyLogoPath) }}" alt="{{ __('messages.companies.logo') }}" style="display: block; max-height: 56px; max-width: 180px; object-fit: contain;">
                 </div>
             @endif
             <h2 style="margin: 0; font-size: 20px;">{{ __('messages.attendance.penalty_email_subject') }}</h2>

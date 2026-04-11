@@ -34,13 +34,12 @@ class AttendancePenaltyApprovedMail extends Mailable
         $employee = $this->penalty->employee;
         $company = $employee?->company;
 
-        $companyLogoDataUri = null;
+        // Absolute path for Laravel $message->embed() — Gmail often blocks data: URIs.
+        $companyLogoPath = null;
         if (!empty($company?->logo)) {
             $logoPath = Storage::disk('public')->path($company->logo);
-            if (File::exists($logoPath)) {
-                $mimeType = File::mimeType($logoPath) ?: 'image/png';
-                $encoded = base64_encode((string) File::get($logoPath));
-                $companyLogoDataUri = "data:{$mimeType};base64,{$encoded}";
+            if (File::isFile($logoPath)) {
+                $companyLogoPath = $logoPath;
             }
         }
 
@@ -50,7 +49,7 @@ class AttendancePenaltyApprovedMail extends Mailable
                 'penalty' => $this->penalty,
                 'employee' => $employee,
                 'company' => $company,
-                'companyLogoDataUri' => $companyLogoDataUri,
+                'companyLogoPath' => $companyLogoPath,
             ],
         );
     }
