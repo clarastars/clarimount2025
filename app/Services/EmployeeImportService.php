@@ -18,6 +18,16 @@ use Carbon\Carbon;
 
 class EmployeeImportService
 {
+    private const UTF8_BOM = "\xEF\xBB\xBF";
+
+    /**
+     * Prefix CSV with UTF-8 BOM so Microsoft Excel detects UTF-8 (fixes Arabic mojibake).
+     */
+    private function csvForExcelDownload(string $csv): string
+    {
+        return self::UTF8_BOM . $csv;
+    }
+
     /**
      * Generate a sample CSV file for employee import.
      */
@@ -134,7 +144,7 @@ class EmployeeImportService
             return '"' . str_replace('"', '""', $field) . '"';
         }, $sampleData)) . "\n";
 
-        return $csv;
+        return $this->csvForExcelDownload($csv);
     }
 
     /**
@@ -256,7 +266,7 @@ class EmployeeImportService
             }, $row)) . "\n";
         }
 
-        return $csv;
+        return $this->csvForExcelDownload($csv);
     }
 
     /**
@@ -356,6 +366,11 @@ class EmployeeImportService
                 $csvData[] = $row;
             }
             fclose($handle);
+        }
+
+        // Strip UTF-8 BOM from first header cell (present when re-importing Excel-exported CSV).
+        if (!empty($csvData[0][0]) && str_starts_with($csvData[0][0], self::UTF8_BOM)) {
+            $csvData[0][0] = substr($csvData[0][0], strlen(self::UTF8_BOM));
         }
 
         return $csvData;

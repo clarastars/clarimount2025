@@ -92,7 +92,7 @@ class EmployeeImportController extends Controller
         
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
@@ -124,7 +124,7 @@ class EmployeeImportController extends Controller
         
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**
