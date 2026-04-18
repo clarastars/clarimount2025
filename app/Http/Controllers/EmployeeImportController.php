@@ -145,6 +145,7 @@ class EmployeeImportController extends Controller
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|mimes:csv,txt|max:10240', // 10MB max
             'company_id' => 'required|integer|in:' . $ownedCompanyIds->implode(','),
+            'import_mode' => 'sometimes|string|in:create,update',
         ]);
 
         if ($validator->fails()) {
@@ -170,8 +171,12 @@ class EmployeeImportController extends Controller
             $filename = 'import_' . uniqid() . '_' . $file->getClientOriginalName();
             $path = $file->storeAs('imports', $filename, 'local');
 
+            $importMode = $request->input('import_mode') === 'update'
+                ? EmployeeImportService::IMPORT_MODE_UPDATE
+                : EmployeeImportService::IMPORT_MODE_CREATE;
+
             // Process and validate the CSV
-            $result = $this->importService->validateCsv($path, $company);
+            $result = $this->importService->validateCsv($path, $company, $importMode);
 
             if ($result['success']) {
                 // Store the validated data temporarily

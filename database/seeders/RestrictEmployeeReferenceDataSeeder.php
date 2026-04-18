@@ -21,7 +21,7 @@ class RestrictEmployeeReferenceDataSeeder extends Seeder
             ['code' => 'JO', 'code_alpha3' => 'JOR', 'name_en' => 'Jordan', 'name_ar' => 'الأردن'],
             ['code' => 'YE', 'code_alpha3' => 'YEM', 'name_en' => 'Yemen', 'name_ar' => 'اليمن'],
             ['code' => 'IN', 'code_alpha3' => 'IND', 'name_en' => 'India', 'name_ar' => 'الهند'],
-            ['code' => 'BD', 'code_alpha3' => 'BGD', 'name_en' => 'Bangladesh', 'name_ar' => 'بنجلاديش'],
+            ['code' => 'BD', 'code_alpha3' => 'BGD', 'name_en' => 'Bangladesh', 'name_ar' => 'بنغلاديش'],
             ['code' => 'PK', 'code_alpha3' => 'PAK', 'name_en' => 'Pakistan', 'name_ar' => 'باكستان'],
         ];
 
@@ -32,19 +32,15 @@ class RestrictEmployeeReferenceDataSeeder extends Seeder
             );
         }
 
-        $nationalities = [
-            ['code' => 'SAU', 'name_en' => 'Saudi', 'name_ar' => 'سعودي'],
-            ['code' => 'EGY', 'name_en' => 'Egyptian', 'name_ar' => 'مصري'],
-            ['code' => 'SYR', 'name_en' => 'Syrian', 'name_ar' => 'سوري'],
-            ['code' => 'PSE', 'name_en' => 'Palestinian', 'name_ar' => 'فلسطيني'],
-            ['code' => 'JOR', 'name_en' => 'Jordanian', 'name_ar' => 'أردني'],
-            ['code' => 'YEM', 'name_en' => 'Yemeni', 'name_ar' => 'يمني'],
-            ['code' => 'IND', 'name_en' => 'Indian', 'name_ar' => 'هندي'],
-            ['code' => 'BGD', 'name_en' => 'Bangladeshi', 'name_ar' => 'بنغلاديشي'],
-            ['code' => 'PAK', 'name_en' => 'Pakistani', 'name_ar' => 'باكستاني'],
-        ];
+        /** @var list<array{code: string, name_en: string, name_ar: string}> $allLabels */
+        $allLabels = require database_path('data/nationality_labels.php');
+        $allowedCodes = ['SAU', 'EGY', 'SYR', 'PSE', 'JOR', 'YEM', 'IND', 'BGD', 'PAK'];
 
-        foreach ($nationalities as $nationality) {
+        foreach ($allLabels as $nationality) {
+            if (! in_array($nationality['code'], $allowedCodes, true)) {
+                continue;
+            }
+
             Nationality::query()->updateOrCreate(
                 ['code' => $nationality['code']],
                 $nationality + ['is_active' => true],
@@ -52,4 +48,3 @@ class RestrictEmployeeReferenceDataSeeder extends Seeder
         }
     }
 }
-

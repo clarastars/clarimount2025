@@ -1035,6 +1035,18 @@ interface Props {
 
 const props = defineProps<Props>();
 
+/**
+ * Laravel date casts serialize as ISO-8601 strings. HTML date inputs only accept yyyy-MM-dd.
+ */
+function dateToInputValue(value: unknown): string {
+    if (value == null || value === '') {
+        return '';
+    }
+    const s = String(value).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m?.[1] ?? '';
+}
+
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     {
         title: t('nav.dashboard'),
@@ -1062,7 +1074,7 @@ const form = useForm({
     last_name: props.employee.last_name || '',
     nationality_id: props.employee.nationality_id || null as number | null,
     residence_country_id: props.employee.residence_country_id || props.defaultResidenceCountryId || null,
-    birth_date: props.employee.birth_date || '',
+    birth_date: dateToInputValue(props.employee.birth_date),
     personal_email: props.employee.personal_email || '',
     work_email: props.employee.work_email || '',
     phone: props.employee.phone || '',
@@ -1070,8 +1082,8 @@ const form = useForm({
     
     // Work Details
     company_id: props.employee.company_id || props.defaultCompanyId || null,
-    employment_date: props.employee.employment_date || '',
-    probation_end_date: props.employee.probation_end_date || '',
+    employment_date: dateToInputValue(props.employee.employment_date),
+    probation_end_date: dateToInputValue(props.employee.probation_end_date),
     mobile: props.employee.mobile || '',
     fingerprint_device_id: props.employee.fingerprint_device_id || '',
     shift_id: props.employee.shift_id || null as number | null,
@@ -1090,21 +1102,21 @@ const form = useForm({
 
     // Legal Information
     id_number: props.employee.id_number || '',
-    residence_expiry_date: props.employee.residence_expiry_date || '',
-    contract_end_date: props.employee.contract_end_date || '',
-    exit_reentry_visa_expiry: props.employee.exit_reentry_visa_expiry || '',
+    residence_expiry_date: dateToInputValue(props.employee.residence_expiry_date),
+    contract_end_date: dateToInputValue(props.employee.contract_end_date),
+    exit_reentry_visa_expiry: dateToInputValue(props.employee.exit_reentry_visa_expiry),
     passport_number: props.employee.passport_number || '',
-    passport_expiry_date: props.employee.passport_expiry_date || '',
+    passport_expiry_date: dateToInputValue(props.employee.passport_expiry_date),
     
     // Insurance
     insurance_policy: props.employee.insurance_policy || '',
-    insurance_expiry_date: props.employee.insurance_expiry_date || '',
+    insurance_expiry_date: dateToInputValue(props.employee.insurance_expiry_date),
     
     // Employment Status
-    hire_date: props.employee.hire_date || '',
+    hire_date: dateToInputValue(props.employee.hire_date),
     employment_status: props.employee.employment_status || 'active' as 'active' | 'inactive' | 'terminated',
-    termination_date: props.employee.termination_date || '',
-    departure_date: props.employee.departure_date || '',
+    termination_date: dateToInputValue(props.employee.termination_date),
+    departure_date: dateToInputValue(props.employee.departure_date),
     departure_reason: props.employee.departure_reason || '',
     
     // Managers / Workflow

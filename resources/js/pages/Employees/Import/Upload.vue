@@ -50,6 +50,9 @@ const validationErrors = ref<string[]>([]);
 // Company selection state
 const selectedCompanyId = ref<string>(props.currentCompany?.id?.toString() || props.companies[0]?.id?.toString() || '');
 
+/** create = new rows (id optional for mixed updates); update = every row must be an existing employee id (partial update). */
+const importMode = ref<'create' | 'update'>('create');
+
 const selectedCompany = computed(() => {
     return props.companies.find(c => c.id.toString() === selectedCompanyId.value);
 });
@@ -110,6 +113,7 @@ const validateFile = async () => {
         const formData = new FormData();
         formData.append('file', selectedFile.value);
         formData.append('company_id', selectedCompanyId.value);
+        formData.append('import_mode', importMode.value);
         
         const response = await fetch(route('employees.import.process'), {
             method: 'POST',
@@ -329,6 +333,49 @@ const formatFileSize = (bytes: number): string => {
                     </CardContent>
                 </Card>
 
+                <!-- Import mode -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <Icon name="Settings" class="h-5 w-5 text-blue-600" />
+                            {{ t('employees.import_mode_label') }}
+                        </CardTitle>
+                        <CardDescription>
+                            {{ t('employees.import_mode_description') }}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent class="space-y-3">
+                        <label class="flex items-start gap-3 cursor-pointer rounded-lg border border-transparent p-2 hover:bg-muted/50">
+                            <input
+                                v-model="importMode"
+                                type="radio"
+                                value="create"
+                                class="mt-1"
+                            />
+                            <div>
+                                <div class="font-medium text-sm">{{ t('employees.import_mode_create') }}</div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                    {{ t('employees.import_mode_create_hint') }}
+                                </p>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-3 cursor-pointer rounded-lg border border-transparent p-2 hover:bg-muted/50">
+                            <input
+                                v-model="importMode"
+                                type="radio"
+                                value="update"
+                                class="mt-1"
+                            />
+                            <div>
+                                <div class="font-medium text-sm">{{ t('employees.import_mode_update') }}</div>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                    {{ t('employees.import_mode_update_hint') }}
+                                </p>
+                            </div>
+                        </label>
+                    </CardContent>
+                </Card>
+
                 <!-- File Upload -->
                 <Card>
                     <CardHeader>
@@ -544,7 +591,7 @@ const formatFileSize = (bytes: number): string => {
                     <Button 
                         v-if="state.step === 'upload'" 
                         @click="validateFile" 
-                        :disabled="!selectedFile || !isValidFileType(selectedFile!) || !selectedCompanyId || isUploading"
+                        :disabled="!selectedFile || !isValidFileType(selectedFile) || !selectedCompanyId || isUploading"
                     >
                         <Icon name="Upload" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
                         {{ t('employees.validate_file') }}
