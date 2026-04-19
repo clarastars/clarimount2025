@@ -113,6 +113,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /** Fingerprint → Bayzat HTTP push only (see BayzatFingerprintAttendancePushService) */
+        'bayzat_fingerprint_send' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/bayzat-fingerprint-send.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_BAYZAT_SEND_LOG_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'syslog' => [
             'driver' => 'syslog',
             'level' => env('LOG_LEVEL', 'debug'),
