@@ -48,13 +48,22 @@ class BayzatFingerprintAttendancePushService
 
     public function pushForDate(Carbon $date): void
     {
+        $phaseStart = microtime(true);
         if (empty($this->apiKey)) {
-            Log::channel('daily')->info('[BayzatFingerprintPush] Skipped: BAYZAT_API_KEY not set');
+            Log::channel('daily')->info('[BayzatFingerprintPush] Skipped: BAYZAT_API_KEY not set', [
+                'date' => $date->format('Y-m-d'),
+            ]);
 
             return;
         }
 
         $attDate = $date->format('Y-m-d');
+
+        $url = $this->apiUrl;
+        if (! str_starts_with($url, 'http')) {
+            $url = 'https://' . $url;
+        }
+        $urlHost = (string) parse_url($url, PHP_URL_HOST);
 
         /** @var Collection<int, Employee> $employeesWithPin */
         $employeesWithPin = Employee::query()
@@ -63,7 +72,9 @@ class BayzatFingerprintAttendancePushService
             ->get();
 
         if ($employeesWithPin->isEmpty()) {
-            Log::channel('daily')->info('[BayzatFingerprintPush] No employees with fingerprint_device_id for ' . $attDate);
+            Log::channel('daily')->info('[BayzatFingerprintPush] No employees with fingerprint_device_id for ' . $attDate, [
+                'date' => $attDate,
+            ]);
 
             return;
         }
@@ -78,25 +89,48 @@ class BayzatFingerprintAttendancePushService
         /** @var Collection<string, ZkDailyAttendance> $attendanceByPin */
         $attendanceByPin = $this->loadPreferredDailyAttendanceByPin($this->expandPinsForWhereIn($pins), $attDate);
 
+        $buildStats = [
+            'skipped_empty_emp_id' => 0,
+            'skipped_duplicate_emp' => 0,
+            'skipped_no_attendance_row' => 0,
+            'skipped_no_checkin' => 0,
+        ];
+        $sampleNoRow = [];
+        $sampleNoCheckin = [];
+
         $pairs = [];
         $seenEmpIds = [];
         foreach ($employeesWithPin as $employee) {
             $empId = $this->normalizeDevicePin($employee->fingerprint_device_id);
             if ($empId === '') {
+                $buildStats['skipped_empty_emp_id']++;
+
                 continue;
             }
 
             if (isset($seenEmpIds[$empId])) {
+                $buildStats['skipped_duplicate_emp']++;
+
                 continue;
             }
 
             $row = $this->resolveAttendanceForEmployeePin($attendanceByPin, $empId);
             if ($row === null) {
+                $buildStats['skipped_no_attendance_row']++;
+                if (count($sampleNoRow) < 5) {
+                    $sampleNoRow[] = $empId;
+                }
+
                 continue;
             }
 
             $checkIn = $this->punchToRiyadhFromModel($row, 'first_punch');
             if ($checkIn === null) {
+                $buildStats['skipped_no_checkin']++;
+                if (count($sampleNoCheckin) < 5) {
+                    $sampleNoCheckin[] = $empId;
+                }
+
                 continue;
             }
 
@@ -110,19 +144,38 @@ class BayzatFingerprintAttendancePushService
             $seenEmpIds[$empId] = true;
         }
 
+        Log::channel('daily')->info('[BayzatFingerprintPush] Prepared payload context', [
+            'date' => $attDate,
+            'target_host' => $urlHost,
+            'employees_with_pin' => $employeesWithPin->count(),
+            'distinct_pins' => count($pins),
+            'zk_rows_loaded_keys' => $attendanceByPin->count(),
+            'pairs_to_send' => count($pairs),
+            'build_stats' => $buildStats,
+            'sample_emp_ids_no_attendance_row' => $sampleNoRow,
+            'sample_emp_ids_no_checkin_time' => $sampleNoCheckin,
+            'max_records_per_request' => $this->maxRecordsPerRequest,
+            'chunk_delay_seconds' => $this->chunkDelaySeconds,
+        ]);
+
         if ($pairs === []) {
-            Log::channel('daily')->info('[BayzatFingerprintPush] No valid pairs built for ' . $attDate);
+            Log::channel('daily')->warning('[BayzatFingerprintPush] No valid pairs to send; aborting HTTP calls', [
+                'date' => $attDate,
+                'build_stats' => $buildStats,
+            ]);
 
             return;
         }
 
         $maxEmployeesPerChunk = max(1, intdiv($this->maxRecordsPerRequest, 2));
         $chunks = array_chunk($pairs, $maxEmployeesPerChunk);
+        $chunkCount = count($chunks);
 
-        $url = $this->apiUrl;
-        if (! str_starts_with($url, 'http')) {
-            $url = 'https://' . $url;
-        }
+        $httpStats = [
+            'chunks_total' => $chunkCount,
+            'chunks_ok' => 0,
+            'chunks_failed' => 0,
+        ];
 
         foreach ($chunks as $index => $pairChunk) {
             if ($index > 0 && $this->chunkDelaySeconds > 0) {
@@ -158,30 +211,50 @@ class BayzatFingerprintAttendancePushService
                     && (($body['success'] ?? false) === true);
 
                 if (! $ok) {
+                    $httpStats['chunks_failed']++;
+                    $bodyPreview = mb_substr($response->body(), 0, 1200);
                     Log::channel('daily')->warning('[BayzatFingerprintPush] Request not successful', [
                         'date' => $attDate,
-                        'chunk' => $index,
+                        'chunk_index' => $index,
+                        'chunks_total' => $chunkCount,
                         'status' => $response->status(),
-                        'body' => $response->body(),
+                        'response_success_flag' => is_array($body) ? ($body['success'] ?? null) : null,
+                        'response_message' => is_array($body) ? ($body['message'] ?? null) : null,
+                        'body_preview' => $bodyPreview,
+                        'employees_in_chunk' => count($pairChunk),
+                        'records_in_chunk' => count($records),
                     ]);
 
                     continue;
                 }
 
+                $httpStats['chunks_ok']++;
                 Log::channel('daily')->info('[BayzatFingerprintPush] Chunk sent', [
                     'date' => $attDate,
-                    'chunk' => $index,
+                    'chunk_index' => $index,
+                    'chunks_total' => $chunkCount,
                     'employees' => count($pairChunk),
                     'records' => count($records),
                 ]);
             } catch (\Throwable $e) {
+                $httpStats['chunks_failed']++;
                 Log::channel('daily')->error('[BayzatFingerprintPush] Exception', [
                     'date' => $attDate,
-                    'chunk' => $index,
+                    'chunk_index' => $index,
+                    'chunks_total' => $chunkCount,
                     'error' => $e->getMessage(),
+                    'exception_class' => $e::class,
                 ]);
             }
         }
+
+        $durationMs = (int) round((microtime(true) - $phaseStart) * 1000);
+        Log::channel('daily')->info('[BayzatFingerprintPush] Push phase summary', [
+            'date' => $attDate,
+            'duration_ms' => $durationMs,
+            'pairs_total' => count($pairs),
+            'http' => $httpStats,
+        ]);
     }
 
     /**

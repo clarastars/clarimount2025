@@ -74,13 +74,19 @@ class FingerprintIclockAttendanceService
     public function syncForDate(Carbon $date): void
     {
         if (empty($this->baseUrl) || empty($this->token)) {
-            Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured');
+            Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured', [
+                'att_date' => $date->format('Y-m-d'),
+                'base_url_configured' => ! empty($this->baseUrl),
+                'token_configured' => ! empty($this->token),
+            ]);
             if ($this->progressEnabled) {
                 Log::channel('stderr')->error('[FingerprintIclock] Sync skipped: base_url or token not configured');
             }
+
             return;
         }
 
+        $startedAt = microtime(true);
         $device = $this->getOrCreateApiDevice();
         $startTime = $date->copy()->startOfDay()->format('Y-m-d H:i:s');
         $endTime = $date->copy()->endOfDay()->format('Y-m-d H:i:s');
@@ -90,19 +96,48 @@ class FingerprintIclockAttendanceService
             ->where('fingerprint_device_id', '!=', '')
             ->get();
 
+        $stats = [
+            'employees_total' => $employees->count(),
+            'attendance_rows_saved' => 0,
+            'no_transactions' => 0,
+            'exceptions' => 0,
+        ];
+
+        Log::channel('daily')->info('[FingerprintIclock] Sync started', [
+            'att_date' => $attDate,
+            'range' => ['start_time' => $startTime, 'end_time' => $endTime],
+            'employees_total' => $stats['employees_total'],
+            'device_id' => $device->id,
+            'api_base_host' => (string) parse_url((string) $this->baseUrl, PHP_URL_HOST),
+        ]);
+
         foreach ($employees as $employee) {
             try {
-                $lateMinutes = $this->syncEmployeeForDate($device, $employee->fingerprint_device_id, $attDate, $startTime, $endTime);
+                $result = $this->syncEmployeeForDate($device, $employee->fingerprint_device_id, $attDate, $startTime, $endTime);
+                if ($result['stored']) {
+                    $stats['attendance_rows_saved']++;
+                } else {
+                    $stats['no_transactions']++;
+                }
                 if ($this->progressEnabled) {
-                    Log::channel('stderr')->info(
-                        '[FingerprintIclock] Employee pin ' . $employee->fingerprint_device_id . ' on ' . $attDate .
-                        ($lateMinutes !== null ? ' lateMinutes=' . $lateMinutes : ' no-late-penalty')
-                    );
+                    $pin = $employee->fingerprint_device_id;
+                    $msg = '[FingerprintIclock] Employee pin ' . $pin . ' on ' . $attDate;
+                    if ($result['stored']) {
+                        $msg .= $result['late_minutes'] !== null
+                            ? ' lateMinutes=' . $result['late_minutes']
+                            : ' stored, no late penalty';
+                    } else {
+                        $msg .= ' no transactions / no row saved';
+                    }
+                    Log::channel('stderr')->info($msg);
                 }
             } catch (\Throwable $e) {
+                $stats['exceptions']++;
                 Log::channel('daily')->warning('[FingerprintIclock] Error syncing employee', [
                     'fingerprint_device_id' => $employee->fingerprint_device_id,
+                    'att_date' => $attDate,
                     'error' => $e->getMessage(),
+                    'exception_class' => $e::class,
                 ]);
                 if ($this->progressEnabled) {
                     Log::channel('stderr')->error(
@@ -112,6 +147,13 @@ class FingerprintIclockAttendanceService
                 }
             }
         }
+
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        Log::channel('daily')->info('[FingerprintIclock] Sync summary', [
+            'att_date' => $attDate,
+            'duration_ms' => $durationMs,
+            ...$stats,
+        ]);
     }
 
     /**
@@ -172,6 +214,8 @@ class FingerprintIclockAttendanceService
 
     /**
      * Fetch transactions from API for one employee and one day, then upsert zk_daily_attendance.
+     *
+     * @return array{stored: bool, late_minutes: ?int}
      */
     public function syncEmployeeForDate(
         ZkDevice $device,
@@ -179,10 +223,10 @@ class FingerprintIclockAttendanceService
         string $attDate,
         string $startTime,
         string $endTime
-    ): ?int {
+    ): array {
         $punchTimes = $this->fetchTransactions($empCode, $startTime, $endTime);
         if ($punchTimes === []) {
-            return null;
+            return ['stored' => false, 'late_minutes' => null];
         }
 
         sort($punchTimes);
@@ -215,7 +259,9 @@ class FingerprintIclockAttendanceService
 
         // Calculate late penalty so "الإجراء المتخذ / سبب الإجراء / اعتماد الجزاء" appear in UI
         $penaltyService = new AttendancePenaltyService();
-        return $penaltyService->calculatePenaltyForDailyAttendance($attendance, $attDate);
+        $lateMinutes = $penaltyService->calculatePenaltyForDailyAttendance($attendance, $attDate);
+
+        return ['stored' => true, 'late_minutes' => $lateMinutes];
     }
 
     /**
@@ -244,16 +290,26 @@ class FingerprintIclockAttendanceService
                 ->get($currentUrl);
 
             if (! $response->successful()) {
+                $bodySample = mb_substr($response->body(), 0, 800);
                 Log::channel('daily')->warning('[FingerprintIclock] API error', [
+                    'emp_code' => $empCode,
                     'url' => $currentUrl,
                     'status' => $response->status(),
+                    'body_preview' => $bodySample,
                 ]);
+
                 return $allPunchTimes;
             }
 
             $body = $response->json();
             $data = $body['data'] ?? [];
             if (! is_array($data)) {
+                Log::channel('daily')->warning('[FingerprintIclock] API response missing or invalid data array', [
+                    'emp_code' => $empCode,
+                    'att_date_range' => ['start_time' => $startTime, 'end_time' => $endTime],
+                    'body_keys' => is_array($body) ? array_keys($body) : null,
+                ]);
+
                 return $allPunchTimes;
             }
 
