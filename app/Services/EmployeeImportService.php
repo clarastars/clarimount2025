@@ -828,17 +828,29 @@ class EmployeeImportService
 
         $rowData = $this->applyLegacyCsvAliases($rowData);
 
-        $requiredFields = ['first_name', 'last_name'];
-        foreach ($requiredFields as $field) {
-            if (empty(trim((string) ($rowData[$field] ?? '')))) {
-                $errors[] = "Row {$rowNumber}: {$field} is required.";
-            }
-        }
-
         $workEmail = trim((string) ($rowData['work_email'] ?? ''));
         $personalEmail = trim((string) ($rowData['personal_email'] ?? ''));
-        if ($workEmail === '' && $personalEmail === '') {
-            $errors[] = "Row {$rowNumber}: Either work_email or personal_email is required.";
+        $personalPhone = trim((string) ($rowData['personal_phone'] ?? ''));
+        $workPhone = trim((string) ($rowData['work_phone'] ?? ''));
+
+        /** Updating an existing employee by row id: do not require names/contacts — blanks keep DB values (filled above). */
+        $isExistingEmployeeUpdate = $isUpdate && $existingEmployee !== null;
+
+        if (! $isExistingEmployeeUpdate) {
+            $requiredFields = ['first_name', 'last_name'];
+            foreach ($requiredFields as $field) {
+                if (empty(trim((string) ($rowData[$field] ?? '')))) {
+                    $errors[] = "Row {$rowNumber}: {$field} is required.";
+                }
+            }
+
+            if ($workEmail === '' && $personalEmail === '') {
+                $errors[] = "Row {$rowNumber}: Either work_email or personal_email is required.";
+            }
+
+            if ($personalPhone === '' && $workPhone === '') {
+                $errors[] = "Row {$rowNumber}: Either personal_phone or work_phone is required.";
+            }
         }
 
         $excludeId = $isUpdate ? $existingEmployee?->id : null;
@@ -859,12 +871,6 @@ class EmployeeImportService
             if ($dup) {
                 $errors[] = "Row {$rowNumber}: {$column} already exists for another employee.";
             }
-        }
-
-        $personalPhone = trim((string) ($rowData['personal_phone'] ?? ''));
-        $workPhone = trim((string) ($rowData['work_phone'] ?? ''));
-        if ($personalPhone === '' && $workPhone === '') {
-            $errors[] = "Row {$rowNumber}: Either personal_phone or work_phone is required.";
         }
 
         if (! empty($rowData['employment_status']) && ! in_array($rowData['employment_status'], ['active', 'inactive', 'terminated'], true)) {
