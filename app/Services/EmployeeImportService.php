@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Database\QueryException;
 
 class EmployeeImportService
 {
@@ -1001,8 +1002,10 @@ class EmployeeImportService
 
     /**
      * Import employees from validated data.
+     *
+     * @param  string|null  $importId  Client import session id (for logs only).
      */
-    public function importEmployees(array $validatedData, Company $company, User $user): array
+    public function importEmployees(array $validatedData, Company $company, User $user, ?string $importId = null): array
     {
         $created = 0;
         $updated = 0;
@@ -1011,29 +1014,60 @@ class EmployeeImportService
         DB::beginTransaction();
 
         try {
-            foreach ($validatedData as $data) {
-                if (! empty($data['id'])) {
-                    $employeeId = (int) $data['id'];
-                    unset($data['id']);
+            foreach ($validatedData as $rowIndex => $data) {
+                $spreadsheetRow = $rowIndex + 2;
+                $snapshotPk = isset($data['id']) && $data['id'] !== '' && $data['id'] !== null
+                    ? (int) $data['id']
+                    : null;
 
-                    $employee = Employee::query()
-                        ->where('id', $employeeId)
-                        ->where('company_id', $company->id)
-                        ->first();
+                $payload = null;
 
-                    if (! $employee) {
-                        $errors[] = "Employee with ID {$employeeId} not found for update.";
+                try {
+                    if ($snapshotPk !== null) {
+                        $employee = Employee::query()
+                            ->where('id', $snapshotPk)
+                            ->where('company_id', $company->id)
+                            ->first();
 
-                        continue;
+                        if (! $employee) {
+                            $errors[] = "Employee with ID {$snapshotPk} not found for update.";
+
+                            continue;
+                        }
+
+                        $updateData = $data;
+                        unset($updateData['id']);
+                        $payload = $this->normalizePersistedEmployeeAttributes($updateData);
+                        $employee->update($payload);
+                        $updated++;
+                    } else {
+                        $createData = $data;
+                        unset($createData['id']);
+                        $payload = $this->normalizePersistedEmployeeAttributes($createData);
+                        Employee::create($payload);
+                        $created++;
                     }
+                } catch (\Throwable $e) {
+                    Log::error('Employee CSV import failed on row', [
+                        'import_id' => $importId,
+                        'company_id' => $company->id,
+                        'validated_data_row_index' => $rowIndex,
+                        'spreadsheet_row_estimate' => $spreadsheetRow,
+                        'note' => 'spreadsheet_row_estimate assumes row 1 is headers; blank rows skipped during validation are not counted here.',
+                        'target_employee_primary_key' => $snapshotPk,
+                        'employee_number_column_employee_id' => $payload['employee_id'] ?? ($data['employee_id'] ?? null),
+                        'payload_preview' => $payload ?? null,
+                        'exception_class' => $e::class,
+                        'exception_message' => $e->getMessage(),
+                        'exception_code' => $e->getCode(),
+                        'exception_file' => $e->getFile(),
+                        'exception_line' => $e->getLine(),
+                        'sql' => $e instanceof QueryException ? $e->getSql() : null,
+                        'sql_bindings' => $e instanceof QueryException ? $e->getBindings() : null,
+                        'trace_snippet' => substr($e->getTraceAsString(), 0, 4000),
+                    ]);
 
-                    $payload = $this->normalizePersistedEmployeeAttributes($data);
-                    $employee->update($payload);
-                    $updated++;
-                } else {
-                    unset($data['id']);
-                    Employee::create($this->normalizePersistedEmployeeAttributes($data));
-                    $created++;
+                    throw $e;
                 }
             }
 
@@ -1045,7 +1079,7 @@ class EmployeeImportService
                 'errors' => $errors,
                 'total' => $created + $updated,
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
             throw $e;
         }
@@ -1148,6 +1182,23 @@ class EmployeeImportService
     protected function normalizePersistedEmployeeAttributes(array $data): array
     {
         $data = Arr::only($data, (new Employee)->getFillable());
+
+        // Excel/CSV often sends ""; unique nullable columns (e.g. employee_id) must be NULL not '' or MySQL reports duplicate ''.
+        foreach ($data as $key => $value) {
+            if ($value === '') {
+                $data[$key] = null;
+            }
+        }
+
+        if (array_key_exists('basic_salary', $data) && $data['basic_salary'] === null) {
+            $data['basic_salary'] = 0;
+        }
+        if (array_key_exists('allowances', $data) && $data['allowances'] === null) {
+            $data['allowances'] = 0;
+        }
+        if (array_key_exists('employment_status', $data) && $data['employment_status'] === null) {
+            $data['employment_status'] = 'active';
+        }
 
         foreach (self::EMPLOYEE_IMPORT_DATE_FIELDS as $field) {
             if (! array_key_exists($field, $data)) {

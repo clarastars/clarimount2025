@@ -270,7 +270,7 @@ class EmployeeImportController extends Controller
             $company = Company::findOrFail($companyId);
 
             // Execute the import
-            $result = $this->importService->importEmployees($validatedData, $company, $user);
+            $result = $this->importService->importEmployees($validatedData, $company, $user, $importId);
 
             // Clean up temporary files
             Storage::disk('local')->delete($validatedDataPath);
@@ -280,10 +280,14 @@ class EmployeeImportController extends Controller
                 'message' => 'Import completed successfully.',
                 'summary' => $result,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('CSV import execution failed: ' . $e->getMessage(), [
                 'user_id' => $user->id,
                 'import_id' => $request->input('import_id'),
+                'exception_class' => $e::class,
+                'exception_file' => $e->getFile(),
+                'exception_line' => $e->getLine(),
+                'hint' => 'If this follows "Employee CSV import failed on row", use spreadsheet_row_estimate and payload_preview there.',
                 'trace' => $e->getTraceAsString(),
             ]);
 
