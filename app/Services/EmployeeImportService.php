@@ -1038,12 +1038,14 @@ class EmployeeImportService
                         $updateData = $data;
                         unset($updateData['id']);
                         $payload = $this->normalizePersistedEmployeeAttributes($updateData);
+                        $payload = $this->ensureValidEmployeeImportForeignKeys($company, $payload);
                         $employee->update($payload);
                         $updated++;
                     } else {
                         $createData = $data;
                         unset($createData['id']);
                         $payload = $this->normalizePersistedEmployeeAttributes($createData);
+                        $payload = $this->ensureValidEmployeeImportForeignKeys($company, $payload);
                         Employee::create($payload);
                         $created++;
                     }
@@ -1236,6 +1238,60 @@ class EmployeeImportService
     }
 
     /**
+     * Ensure foreign keys reference existing rows (and company-scoped departments) before create/update.
+     * Resolves department by exact name when the stored id is stale or invalid (e.g. JSON round-trip, env mismatch).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function ensureValidEmployeeImportForeignKeys(Company $company, array $payload): array
+    {
+        if (array_key_exists('department_id', $payload)) {
+            $departmentId = $payload['department_id'];
+            if ($departmentId !== null && $departmentId !== '') {
+                $exists = Department::query()
+                    ->where('company_id', $company->id)
+                    ->where('id', $departmentId)
+                    ->exists();
+
+                if (! $exists) {
+                    $nameFromPayload = isset($payload['department']) ? trim((string) $payload['department']) : '';
+                    $resolved = null;
+                    if ($nameFromPayload !== '') {
+                        $resolved = Department::query()
+                            ->where('company_id', $company->id)
+                            ->where('name', $nameFromPayload)
+                            ->first();
+                    }
+
+                    if ($resolved !== null) {
+                        $payload['department_id'] = $resolved->getKey();
+                    } else {
+                        Log::warning('Employee import: invalid department_id omitted (not found for company)', [
+                            'company_id' => $company->id,
+                            'department_id' => $departmentId,
+                            'department_name' => $nameFromPayload !== '' ? $nameFromPayload : null,
+                        ]);
+                        $payload['department_id'] = null;
+                    }
+                }
+            }
+        }
+
+        if (array_key_exists('shift_id', $payload)) {
+            $shiftId = $payload['shift_id'];
+            if ($shiftId !== null && $shiftId !== '') {
+                if (! Shift::query()->whereKey($shiftId)->exists()) {
+                    Log::warning('Employee import: invalid shift_id omitted', ['shift_id' => $shiftId]);
+                    $payload['shift_id'] = null;
+                }
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
      * Validate date format.
      */
     protected function isValidDate(string $date): bool
@@ -1267,13 +1323,13 @@ class EmployeeImportService
     }
 
     /**
-     * Find department ID by name.
+     * Find department primary key by name (UUID string in this application — do not cast to int).
      */
-    protected function findDepartmentId(string $name, array $departments): ?int
+    protected function findDepartmentId(string $name, array $departments): ?string
     {
         foreach ($departments as $id => $department) {
             if (strcasecmp((string) $department, $name) === 0) {
-                return (int) $id;
+                return (string) $id;
             }
         }
 
