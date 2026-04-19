@@ -564,6 +564,12 @@ class EmployeeImportService
                     $rowData[$k] = $this->cleanCsvCell((string) $v);
                 }
 
+                if ($this->isBlankImportRow($rowData)) {
+                    $rowNumber++;
+
+                    continue;
+                }
+
                 $validationResult = $this->validateRow(
                     $rowData,
                     $rowNumber,
@@ -721,6 +727,22 @@ class EmployeeImportService
         $v = preg_replace('/^\p{Z}+|\p{Z}+$/u', '', $v) ?? $v;
 
         return trim($v);
+    }
+
+    /**
+     * True when the row has no non-empty cells (after cleaning). Excel often appends thousands of empty rows.
+     *
+     * @param  array<string, string>  $rowData
+     */
+    protected function isBlankImportRow(array $rowData): bool
+    {
+        foreach ($rowData as $value) {
+            if ($value !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
