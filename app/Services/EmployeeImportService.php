@@ -1171,7 +1171,9 @@ class EmployeeImportService
     protected function findNationalityId(string $name, array $nationalities): ?int
     {
         $key = mb_strtolower($name);
-        return $nationalities[$key] ?? null;
+        $id = $nationalities[$key] ?? null;
+
+        return $id !== null ? (int) $id : null;
     }
 
     /**
@@ -1180,7 +1182,9 @@ class EmployeeImportService
     protected function findCountryId(string $name, array $countries): ?int
     {
         $key = mb_strtolower($name);
-        return $countries[$key] ?? null;
+        $id = $countries[$key] ?? null;
+
+        return $id !== null ? (int) $id : null;
     }
 
     /**
@@ -1189,10 +1193,11 @@ class EmployeeImportService
     protected function findDepartmentId(string $name, array $departments): ?int
     {
         foreach ($departments as $id => $department) {
-            if (strcasecmp($department, $name) === 0) {
-                return $id;
+            if (strcasecmp((string) $department, $name) === 0) {
+                return (int) $id;
             }
         }
+
         return null;
     }
 } 
