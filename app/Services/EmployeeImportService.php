@@ -781,12 +781,12 @@ class EmployeeImportService
                 return ['errors' => ["Row {$rowNumber}: Employee with ID {$idRaw} not found for this company."], 'data' => null];
             }
 
-            $rowData = $this->fillRowDataBlanksFromEmployee($rowData, $existingEmployee);
             $isUpdate = true;
         } else {
             $isUpdate = ! empty($rowData['id']) && is_numeric($rowData['id']);
             if ($isUpdate) {
                 $existingEmployee = Employee::query()
+                    ->with(['nationality', 'residenceCountry', 'department'])
                     ->where('id', (int) $rowData['id'])
                     ->where('company_id', $company->id)
                     ->first();
@@ -795,6 +795,11 @@ class EmployeeImportService
                     return ['errors' => ["Row {$rowNumber}: Employee with ID {$rowData['id']} not found."], 'data' => null];
                 }
             }
+        }
+
+        // Sparse CSV / Excel: columns not present must keep existing DB values (same as blank cells).
+        if ($isUpdate && $existingEmployee !== null) {
+            $rowData = $this->fillRowDataBlanksFromEmployee($rowData, $existingEmployee);
         }
 
         $rowData = $this->applyLegacyCsvAliases($rowData);
