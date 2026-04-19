@@ -487,7 +487,9 @@ class EmployeeImportService
                 ];
             }
 
-            if ($importMode === self::IMPORT_MODE_CREATE) {
+            // New-employee imports need name columns at file level. If the sheet includes "id",
+            // rows are treated as updates by id (partial) and names come from DB when omitted.
+            if ($importMode === self::IMPORT_MODE_CREATE && ! in_array('id', $headers, true)) {
                 $requiredHeaders = ['first_name', 'last_name'];
                 $missingHeaders = array_diff($requiredHeaders, $headers);
                 if (! empty($missingHeaders)) {
