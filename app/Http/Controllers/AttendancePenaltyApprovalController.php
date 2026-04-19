@@ -41,7 +41,7 @@ class AttendancePenaltyApprovalController extends Controller
             'approved_at' => now(),
         ]);
 
-        $employeeEmail = $penalty->employee->work_email ?: $penalty->employee->email;
+        $employeeEmail = $penalty->employee->work_email ?: $penalty->employee->personal_email;
         if (!empty($employeeEmail) && filter_var($employeeEmail, FILTER_VALIDATE_EMAIL)) {
             try {
                 Mail::to($employeeEmail)->send(new AttendancePenaltyApprovedMail($penalty));

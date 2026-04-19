@@ -49,7 +49,7 @@
                                 <span class="font-semibold text-gray-600">{{ t('custody.employee_id') }}:</span> {{ employee.employee_id }}
                             </div>
                             <div class="mb-2">
-                                <span class="font-semibold text-gray-600">{{ t('custody.email') }}:</span> {{ employee.email }}
+                                <span class="font-semibold text-gray-600">{{ t('custody.email') }}:</span> {{ employee.work_email || employee.personal_email }}
                             </div>
                         </div>
                         <div>

@@ -52,7 +52,8 @@ class EmployeeController extends Controller
                 $q->where('first_name', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('employee_id', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('work_email', 'like', "%{$search}%")
+                  ->orWhere('personal_email', 'like', "%{$search}%")
                   ->orWhere('job_title', 'like', "%{$search}%")
                   ->orWhere('department', 'like', "%{$search}%");
             });
@@ -227,7 +228,10 @@ class EmployeeController extends Controller
         // Convert empty strings to null for unique fields so validation allows multiple nulls
         $request->merge([
             'employee_id' => trim((string) $request->input('employee_id', '')) === '' ? null : $request->input('employee_id'),
-            'email' => trim((string) $request->input('email', '')) === '' ? null : $request->input('email'),
+            'personal_email' => trim((string) $request->input('personal_email', '')) === '' ? null : $request->input('personal_email'),
+            'work_email' => trim((string) $request->input('work_email', '')) === '' ? null : $request->input('work_email'),
+            'personal_phone' => trim((string) $request->input('personal_phone', '')) === '' ? null : $request->input('personal_phone'),
+            'work_phone' => trim((string) $request->input('work_phone', '')) === '' ? null : $request->input('work_phone'),
         ]);
 
         $validated = $request->validate([
@@ -239,12 +243,10 @@ class EmployeeController extends Controller
             'nationality_id' => 'required|exists:nationalities,id',
             'residence_country_id' => 'required|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'email' => 'nullable|email|max:255|unique:employees,email',
-            'personal_email' => 'nullable|email|max:255|required_without:work_email',
-            'work_email' => 'nullable|email|max:255|required_without:personal_email',
-            'phone' => 'nullable|string|max:20|required_without:mobile',
-            'work_phone' => 'nullable|string|max:20',
-            'mobile' => 'nullable|string|max:20|required_without:phone',
+            'personal_email' => 'nullable|email|max:255|required_without:work_email|unique:employees,personal_email',
+            'work_email' => 'nullable|email|max:255|required_without:personal_email|unique:employees,work_email',
+            'personal_phone' => 'nullable|string|max:20|required_without:work_phone',
+            'work_phone' => 'nullable|string|max:20|required_without:personal_phone',
             'fingerprint_device_id' => 'nullable|string|max:50',
             'shift_id' => 'nullable|exists:shifts,id',
             'work_address' => 'nullable|string|max:500',
@@ -287,7 +289,8 @@ class EmployeeController extends Controller
             'portal_password_reset' => 'nullable|boolean',
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
-            'email.unique' => __('employees.email_already_used'),
+            'personal_email.unique' => __('employees.email_already_used'),
+            'work_email.unique' => __('employees.email_already_used'),
         ]);
 
         if (! $isSuperAdmin && (
@@ -318,9 +321,6 @@ class EmployeeController extends Controller
             $validated['employment_status'] = 'active';
         }
 
-        if (isset($validated['email']) && $validated['email'] === '') {
-            $validated['email'] = null;
-        }
         if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
             $validated['employee_id'] = null;
         }
@@ -485,7 +485,10 @@ class EmployeeController extends Controller
         // Convert empty strings to null for unique fields
         $request->merge([
             'employee_id' => trim((string) $request->input('employee_id', '')) === '' ? null : $request->input('employee_id'),
-            'email' => trim((string) $request->input('email', '')) === '' ? null : $request->input('email'),
+            'personal_email' => trim((string) $request->input('personal_email', '')) === '' ? null : $request->input('personal_email'),
+            'work_email' => trim((string) $request->input('work_email', '')) === '' ? null : $request->input('work_email'),
+            'personal_phone' => trim((string) $request->input('personal_phone', '')) === '' ? null : $request->input('personal_phone'),
+            'work_phone' => trim((string) $request->input('work_phone', '')) === '' ? null : $request->input('work_phone'),
         ]);
 
         $validated = $request->validate([
@@ -497,12 +500,10 @@ class EmployeeController extends Controller
             'nationality_id' => 'required|exists:nationalities,id',
             'residence_country_id' => 'required|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'email' => 'nullable|email|max:255|unique:employees,email,' . $employee->id,
-            'personal_email' => 'nullable|email|max:255|required_without:work_email',
-            'work_email' => 'nullable|email|max:255|required_without:personal_email',
-            'phone' => 'nullable|string|max:20|required_without:mobile',
-            'work_phone' => 'nullable|string|max:20',
-            'mobile' => 'nullable|string|max:20|required_without:phone',
+            'personal_email' => 'nullable|email|max:255|required_without:work_email|unique:employees,personal_email,' . $employee->id,
+            'work_email' => 'nullable|email|max:255|required_without:personal_email|unique:employees,work_email,' . $employee->id,
+            'personal_phone' => 'nullable|string|max:20|required_without:work_phone',
+            'work_phone' => 'nullable|string|max:20|required_without:personal_phone',
             'fingerprint_device_id' => 'nullable|string|max:50',
             'shift_id' => 'nullable|exists:shifts,id',
             'work_address' => 'nullable|string|max:500',
@@ -545,7 +546,8 @@ class EmployeeController extends Controller
             'portal_password_reset' => 'nullable|boolean',
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
-            'email.unique' => __('employees.email_already_used'),
+            'personal_email.unique' => __('employees.email_already_used'),
+            'work_email.unique' => __('employees.email_already_used'),
         ]);
 
         if (! $isSuperAdmin && (
@@ -567,9 +569,6 @@ class EmployeeController extends Controller
             }
         }
 
-        if (isset($validated['email']) && $validated['email'] === '') {
-            $validated['email'] = null;
-        }
         if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
             $validated['employee_id'] = null;
         }
@@ -683,7 +682,8 @@ class EmployeeController extends Controller
                     $subQuery->where('first_name', 'like', "%{$query}%")
                         ->orWhere('last_name', 'like', "%{$query}%")
                         ->orWhere('employee_id', 'like', "%{$query}%")
-                        ->orWhere('email', 'like', "%{$query}%")
+                        ->orWhere('work_email', 'like', "%{$query}%")
+                        ->orWhere('personal_email', 'like', "%{$query}%")
                         ->orWhere('job_title', 'like', "%{$query}%");
                 });
             })
@@ -699,7 +699,7 @@ class EmployeeController extends Controller
                     'employee_id' => $employee->employee_id,
                     'first_name' => $employee->first_name,
                     'last_name' => $employee->last_name,
-                    'email' => $employee->email,
+                    'email' => $employee->work_email ?: $employee->personal_email,
                     'job_title' => $employee->job_title,
                     'department' => $employee->department,
                     'company_name' => $employee->company->name_en,

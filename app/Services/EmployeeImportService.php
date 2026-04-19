@@ -39,11 +39,12 @@ class EmployeeImportService
         'nationality',
         'residence_country',
         'birth_date',
-        'email',
         'personal_email',
         'work_email',
-        'phone',
+        'personal_phone',
         'work_phone',
+        'email',
+        'phone',
         'mobile',
         'fingerprint_device_id',
         'work_address',
@@ -124,12 +125,10 @@ class EmployeeImportService
             'nationality',
             'residence_country',
             'birth_date',
-            'email',
             'personal_email',
             'work_email',
-            'phone',
+            'personal_phone',
             'work_phone',
-            'mobile',
             'fingerprint_device_id',
             'work_address',
             'department',
@@ -177,12 +176,10 @@ class EmployeeImportService
             'American',
             'Saudi Arabia',
             '1990-01-15',
-            'john.doe@example.com',
             'john.personal@example.com',
             'john.work@company.com',
             '+1234567890',
             '+1234567891',
-            '+1234567892',
             'FP001',
             '123 Main St, City',
             'IT Department',
@@ -243,12 +240,10 @@ class EmployeeImportService
             'nationality',
             'residence_country',
             'birth_date',
-            'email',
             'personal_email',
             'work_email',
-            'phone',
+            'personal_phone',
             'work_phone',
-            'mobile',
             'fingerprint_device_id',
             'work_address',
             'department',
@@ -299,12 +294,10 @@ class EmployeeImportService
                 $employee->nationality ? $employee->nationality->name : '',
                 $employee->residenceCountry ? $employee->residenceCountry->name : '',
                 $employee->birth_date ? $employee->birth_date->format('Y-m-d') : '',
-                $employee->email,
                 $employee->personal_email,
                 $employee->work_email,
-                $employee->phone,
+                $employee->personal_phone,
                 $employee->work_phone,
-                $employee->mobile,
                 $employee->fingerprint_device_id,
                 $employee->work_address,
                 $employee->department,
@@ -402,12 +395,10 @@ class EmployeeImportService
         $setIfBlank('nationality', $employee->nationality !== null ? (string) $employee->nationality->name_en : null);
         $setIfBlank('residence_country', $employee->residenceCountry !== null ? (string) $employee->residenceCountry->name_en : null);
         $setIfBlank('birth_date', $date($employee->birth_date));
-        $setIfBlank('email', $employee->email);
         $setIfBlank('personal_email', $employee->personal_email);
         $setIfBlank('work_email', $employee->work_email);
-        $setIfBlank('phone', $employee->phone);
+        $setIfBlank('personal_phone', $employee->personal_phone);
         $setIfBlank('work_phone', $employee->work_phone);
-        $setIfBlank('mobile', $employee->mobile);
         $setIfBlank('fingerprint_device_id', $employee->fingerprint_device_id);
         $setIfBlank('work_address', $employee->work_address);
 
@@ -525,7 +516,6 @@ class EmployeeImportService
             })->toArray();
             $departments = Department::where('company_id', $company->id)->pluck('name', 'id')->toArray();
             $shiftIds = Shift::pluck('id')->toArray();
-            $existingEmployees = Employee::where('company_id', $company->id)->pluck('email', 'id')->toArray();
 
             $idColumnIndex = array_search('id', $headers, true);
             $preloadedEmployees = collect();
@@ -580,7 +570,6 @@ class EmployeeImportService
                     $nationalities,
                     $departments,
                     $shiftIds,
-                    $existingEmployees,
                     $importMode,
                     $preloadedEmployees
                 );
@@ -733,10 +722,35 @@ class EmployeeImportService
     }
 
     /**
+     * Map legacy CSV columns (email, phone, mobile) into work_email, personal_phone, and work_phone.
+     *
+     * @param  array<string, mixed>  $rowData
+     * @return array<string, mixed>
+     */
+    protected function applyLegacyCsvAliases(array $rowData): array
+    {
+        $legacyEmail = trim((string) ($rowData['email'] ?? ''));
+        if (trim((string) ($rowData['work_email'] ?? '')) === '' && $legacyEmail !== '') {
+            $rowData['work_email'] = $legacyEmail;
+        }
+
+        $legacyPhone = trim((string) ($rowData['phone'] ?? ''));
+        if (trim((string) ($rowData['personal_phone'] ?? '')) === '' && $legacyPhone !== '') {
+            $rowData['personal_phone'] = $legacyPhone;
+        }
+
+        $legacyMobile = trim((string) ($rowData['mobile'] ?? ''));
+        if (trim((string) ($rowData['work_phone'] ?? '')) === '' && $legacyMobile !== '') {
+            $rowData['work_phone'] = $legacyMobile;
+        }
+
+        return $rowData;
+    }
+
+    /**
      * Validate a single row of CSV data.
      *
      * @param  array<string, mixed>  $rowData
-     * @param  array<int|string, string|null>  $existingEmployees  email lookup keyed by employee id (legacy)
      */
     protected function validateRow(
         array $rowData,
@@ -746,7 +760,6 @@ class EmployeeImportService
         array $nationalities,
         array $departments,
         array $shiftIds,
-        array $existingEmployees,
         string $importMode = self::IMPORT_MODE_CREATE,
         ?Collection $preloadedEmployees = null
     ): array {
@@ -784,6 +797,8 @@ class EmployeeImportService
             }
         }
 
+        $rowData = $this->applyLegacyCsvAliases($rowData);
+
         $requiredFields = ['first_name', 'last_name'];
         foreach ($requiredFields as $field) {
             if (empty(trim((string) ($rowData[$field] ?? '')))) {
@@ -791,18 +806,36 @@ class EmployeeImportService
             }
         }
 
-        $email = isset($rowData['email']) ? trim((string) $rowData['email']) : '';
-        if ($email !== '') {
-            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $errors[] = "Row {$rowNumber}: Invalid email format.";
-            } else {
-                $existingEmailEmployee = Employee::where('email', $email)
-                    ->where('company_id', $company->id)
-                    ->first();
-                if ($existingEmailEmployee && (! $isUpdate || $existingEmailEmployee->id !== $existingEmployee?->id)) {
-                    $errors[] = "Row {$rowNumber}: Email already exists for another employee.";
-                }
+        $workEmail = trim((string) ($rowData['work_email'] ?? ''));
+        $personalEmail = trim((string) ($rowData['personal_email'] ?? ''));
+        if ($workEmail === '' && $personalEmail === '') {
+            $errors[] = "Row {$rowNumber}: Either work_email or personal_email is required.";
+        }
+
+        $excludeId = $isUpdate ? $existingEmployee?->id : null;
+        foreach (['work_email' => $workEmail, 'personal_email' => $personalEmail] as $column => $addr) {
+            if ($addr === '') {
+                continue;
             }
+            if (! filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = "Row {$rowNumber}: Invalid email format for {$column}.";
+
+                continue;
+            }
+            $dup = Employee::query()
+                ->where('company_id', $company->id)
+                ->where($column, $addr)
+                ->when($excludeId !== null, fn ($q) => $q->where('id', '!=', $excludeId))
+                ->exists();
+            if ($dup) {
+                $errors[] = "Row {$rowNumber}: {$column} already exists for another employee.";
+            }
+        }
+
+        $personalPhone = trim((string) ($rowData['personal_phone'] ?? ''));
+        $workPhone = trim((string) ($rowData['work_phone'] ?? ''));
+        if ($personalPhone === '' && $workPhone === '') {
+            $errors[] = "Row {$rowNumber}: Either personal_phone or work_phone is required.";
         }
 
         if (! empty($rowData['employment_status']) && ! in_array($rowData['employment_status'], ['active', 'inactive', 'terminated'], true)) {
@@ -886,12 +919,10 @@ class EmployeeImportService
             'last_name' => $rowData['last_name'],
             'father_name' => $rowData['father_name'] ?? null,
             'birth_date' => (isset($rowData['birth_date']) && trim((string) $rowData['birth_date']) !== '') ? $rowData['birth_date'] : null,
-            'email' => $email !== '' ? $email : null,
-            'personal_email' => $rowData['personal_email'] ?? null,
-            'work_email' => $rowData['work_email'] ?? null,
-            'phone' => $rowData['phone'] ?? null,
-            'work_phone' => $rowData['work_phone'] ?? null,
-            'mobile' => $rowData['mobile'] ?? null,
+            'personal_email' => $personalEmail !== '' ? $personalEmail : null,
+            'work_email' => $workEmail !== '' ? $workEmail : null,
+            'personal_phone' => $personalPhone !== '' ? $personalPhone : null,
+            'work_phone' => $workPhone !== '' ? $workPhone : null,
             'fingerprint_device_id' => $rowData['fingerprint_device_id'] ?? null,
             'work_address' => $rowData['work_address'] ?? null,
             'department' => $rowData['department'] ?? null,

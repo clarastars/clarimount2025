@@ -950,7 +950,7 @@ class AssetController extends Controller
         </div>
         <div class="info-row">
             <span class="info-label">Email:</span>
-            <span class="info-value">' . ($assignment->employee->email ?? 'N/A') . '</span>
+            <span class="info-value">' . ($assignment->employee->work_email ?? $assignment->employee->personal_email ?? 'N/A') . '</span>
         </div>
     </div>
 

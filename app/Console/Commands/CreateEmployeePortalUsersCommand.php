@@ -21,8 +21,11 @@ class CreateEmployeePortalUsersCommand extends Command
 
         $employees = Employee::whereNull('user_id')
             ->where(function ($q) {
-                $q->whereNotNull('work_email')->where('work_email', '!=', '')
-                    ->orWhereNotNull('email')->where('email', '!=', '');
+                $q->where(function ($q2) {
+                    $q2->whereNotNull('work_email')->where('work_email', '!=', '');
+                })->orWhere(function ($q2) {
+                    $q2->whereNotNull('personal_email')->where('personal_email', '!=', '');
+                });
             })
             ->get();
 
@@ -34,7 +37,7 @@ class CreateEmployeePortalUsersCommand extends Command
         if ($dryRun) {
             $this->info('Would create portal users for ' . $employees->count() . ' employee(s):');
             foreach ($employees as $e) {
-                $this->line('  - ' . $e->id . ': ' . ($e->work_email ?? $e->email) . ' (' . $e->full_name . ')');
+                $this->line('  - ' . $e->id . ': ' . ($e->work_email ?? $e->personal_email ?? '') . ' (' . $e->full_name . ')');
             }
             return 0;
         }
@@ -45,7 +48,7 @@ class CreateEmployeePortalUsersCommand extends Command
                 $user = $service->createOrSyncPortalUser($employee);
                 if ($user) {
                     $created++;
-                    $this->line('Created/linked user for employee: ' . $employee->full_name . ' (' . ($employee->work_email ?? $employee->email) . ')');
+                    $this->line('Created/linked user for employee: ' . $employee->full_name . ' (' . ($employee->work_email ?? $employee->personal_email ?? '') . ')');
                 }
             } catch (\Throwable $e) {
                 $this->warn('Failed for employee ' . $employee->id . ': ' . $e->getMessage());

@@ -36,8 +36,8 @@
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.birth_date') }}</Label><p>{{ displayDate(employee.birth_date) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.work_email') }}</Label><p>{{ displayValue(employee.work_email) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.personal_email') }}</Label><p>{{ displayValue(employee.personal_email) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">رقم الجوال الشخصي</Label><p>{{ displayValue(employee.phone) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">رقم جوال العمل</Label><p>{{ displayValue(employee.mobile) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">رقم الجوال الشخصي</Label><p>{{ displayValue(employee.personal_phone) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">رقم جوال العمل</Label><p>{{ displayValue(employee.work_phone) }}</p></div>
                     </CardContent>
                 </Card>
 

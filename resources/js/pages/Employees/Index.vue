@@ -645,10 +645,10 @@ async function unlinkFingerprint() {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <div class="text-sm text-gray-900 dark:text-gray-100">
-                                        {{ employee.email }}
+                                        {{ employee.work_email || employee.personal_email || '-' }}
                                     </div>
                                     <div class="text-sm text-gray-500 dark:text-gray-400">
-                                        {{ employee.phone || '-' }}
+                                        {{ employee.personal_phone || employee.work_phone || '-' }}
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">

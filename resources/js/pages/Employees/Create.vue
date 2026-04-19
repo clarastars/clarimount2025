@@ -56,8 +56,8 @@ const form = useForm({
     birth_date: '',
     personal_email: '',
     work_email: '',
-    phone: '',
-    mobile: '',
+    personal_phone: '',
+    work_phone: '',
     
     // Work Details
     company_id: props.defaultCompanyId || null,
@@ -314,8 +314,6 @@ const getFieldLabel = (field: string) => {
             return t('employees.residence_country')
         case 'birth_date':
             return t('employees.birth_date')
-        case 'email':
-            return t('employees.email')
         case 'personal_email':
             return t('employees.personal_email')
         case 'work_email':
@@ -328,10 +326,8 @@ const getFieldLabel = (field: string) => {
             return t('employees.job_title')
         case 'work_phone':
             return t('employees.work_phone')
-        case 'phone':
-            return t('employees.phone')
-        case 'mobile':
-            return t('employees.mobile')
+        case 'personal_phone':
+            return t('employees.personal_phone')
         case 'fingerprint_device_id':
             return t('employees.fingerprint_device_id')
         case 'work_address':
@@ -536,7 +532,9 @@ const translateValidationError = (error: string) => {
     }
     
     // Handle phone number validation errors
-    if (lowerError.includes('phone') || 
+    if (lowerError.includes('phone') ||
+        lowerError.includes('personal_phone') ||
+        lowerError.includes('work_phone') ||
         lowerError.includes('telephone')) {
         return t('validation.phone')
     }
@@ -671,7 +669,7 @@ const formatCurrency = (amount: number) => {
                                 <Icon name="User" class="h-5 w-5 text-blue-600" />
                                 <CardTitle class="text-xl">{{ t('employees.general_information') }}</CardTitle>
                                 <Badge v-if="completedSections.general" variant="default">✓</Badge>
-                                <Badge v-if="hasErrorsInSection(['employee_id', 'first_name', 'father_name', 'last_name', 'nationality_id', 'residence_country_id', 'birth_date', 'personal_email', 'work_email', 'phone', 'mobile'])" variant="destructive">!</Badge>
+                                <Badge v-if="hasErrorsInSection(['employee_id', 'first_name', 'father_name', 'last_name', 'nationality_id', 'residence_country_id', 'birth_date', 'personal_email', 'work_email', 'personal_phone', 'work_phone'])" variant="destructive">!</Badge>
                             </div>
                             <Icon :name="!sectionGeneral ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
                         </div>
@@ -866,38 +864,38 @@ const formatCurrency = (amount: number) => {
                             </div>
 
                             <div>
-                                <Label for="phone" class="mb-2">
-                                    رقم الجوال الشخصي
-                                    <span v-if="form.errors.phone" class="text-red-500 ml-1">*</span>
+                                <Label for="personal_phone" class="mb-2">
+                                    {{ t('employees.personal_phone') }}
+                                    <span v-if="form.errors.personal_phone" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <Input
-                                    id="phone"
-                                    v-model="form.phone"
+                                    id="personal_phone"
+                                    v-model="form.personal_phone"
                                     type="text"
                                     :placeholder="t('employees.phone_placeholder')"
-                                    :class="form.errors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                    :class="form.errors.personal_phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
-                                <div v-if="form.errors.phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                <div v-if="form.errors.personal_phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                     <Icon name="AlertCircle" class="h-4 w-4" />
-                                    {{ translateValidationError(form.errors.phone || "") }}
+                                    {{ translateValidationError(form.errors.personal_phone || "") }}
                                 </div>
                             </div>
 
                             <div>
-                                <Label for="mobile" class="mb-2">
-                                    رقم جوال العمل
-                                    <span v-if="form.errors.mobile" class="text-red-500 ml-1">*</span>
+                                <Label for="work_phone" class="mb-2">
+                                    {{ t('employees.work_phone') }}
+                                    <span v-if="form.errors.work_phone" class="text-red-500 ml-1">*</span>
                                 </Label>
                                 <Input
-                                    id="mobile"
-                                    v-model="form.mobile"
+                                    id="work_phone"
+                                    v-model="form.work_phone"
                                     type="text"
                                     :placeholder="t('employees.mobile_placeholder')"
-                                    :class="form.errors.mobile ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                    :class="form.errors.work_phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
                                 />
-                                <div v-if="form.errors.mobile" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                <div v-if="form.errors.work_phone" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                     <Icon name="AlertCircle" class="h-4 w-4" />
-                                    {{ translateValidationError(form.errors.mobile || "") }}
+                                    {{ translateValidationError(form.errors.work_phone || "") }}
                                 </div>
                             </div>
                         </div>

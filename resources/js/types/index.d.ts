@@ -113,11 +113,9 @@ export interface Employee {
     residence_country?: Country | string;
     residence_country_id?: number;
     birth_date?: string;
-    email: string;
     personal_email?: string;
     work_email?: string;
-    phone?: string;
-    mobile?: string;
+    personal_phone?: string;
     work_phone?: string;
     department?: string | Department;
     department_id?: number;

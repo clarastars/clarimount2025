@@ -98,7 +98,7 @@ class EmployeePortalUserService
 
     private function getLoginEmail(Employee $employee): ?string
     {
-        $email = $employee->work_email ?? $employee->email ?? null;
+        $email = $employee->work_email ?? $employee->personal_email ?? null;
         return $email ? trim((string) $email) : null;
     }
 }

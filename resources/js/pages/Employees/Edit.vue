@@ -153,27 +153,26 @@
                                         <div v-if="form.errors.work_email" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.work_email || "") }}</div>
                                     </div>
 
-                                    <!-- Phone -->
                                     <div>
-                                        <Label for="phone" class="mb-2">رقم الجوال الشخصي</Label>
-                                        <Input 
-                                            id="phone"
-                                            v-model="form.phone" 
-                                            type="text" 
+                                        <Label for="personal_phone" class="mb-2">{{ t('employees.personal_phone') }}</Label>
+                                        <Input
+                                            id="personal_phone"
+                                            v-model="form.personal_phone"
+                                            type="text"
                                             :placeholder="t('employees.phone_placeholder')"
                                         />
-                                        <div v-if="form.errors.phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.phone || "") }}</div>
+                                        <div v-if="form.errors.personal_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.personal_phone || "") }}</div>
                                     </div>
 
                                     <div>
-                                        <Label for="mobile" class="mb-2">رقم جوال العمل</Label>
+                                        <Label for="work_phone" class="mb-2">{{ t('employees.work_phone') }}</Label>
                                         <Input
-                                            id="mobile"
-                                            v-model="form.mobile"
+                                            id="work_phone"
+                                            v-model="form.work_phone"
                                             type="text"
                                             :placeholder="t('employees.mobile_placeholder')"
                                         />
-                                        <div v-if="form.errors.mobile" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.mobile || "") }}</div>
+                                        <div v-if="form.errors.work_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.work_phone || "") }}</div>
                                     </div>
 
                                     <!-- Location -->
@@ -1077,14 +1076,14 @@ const form = useForm({
     birth_date: dateToInputValue(props.employee.birth_date),
     personal_email: props.employee.personal_email || '',
     work_email: props.employee.work_email || '',
-    phone: props.employee.phone || '',
+    personal_phone: props.employee.personal_phone || '',
+    work_phone: props.employee.work_phone || '',
     location_id: props.employee.location_id || null as number | null,
     
     // Work Details
     company_id: props.employee.company_id || props.defaultCompanyId || null,
     employment_date: dateToInputValue(props.employee.employment_date),
     probation_end_date: dateToInputValue(props.employee.probation_end_date),
-    mobile: props.employee.mobile || '',
     fingerprint_device_id: props.employee.fingerprint_device_id || '',
     shift_id: props.employee.shift_id || null as number | null,
     work_address: props.employee.work_address || '',
@@ -1490,7 +1489,9 @@ const translateValidationError = (error: string) => {
     }
     
     // Handle phone number validation errors
-    if (lowerError.includes('phone') || 
+    if (lowerError.includes('phone') ||
+        lowerError.includes('personal_phone') ||
+        lowerError.includes('work_phone') ||
         lowerError.includes('telephone')) {
         return t('validation.phone')
     }

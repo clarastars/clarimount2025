@@ -134,7 +134,7 @@
                 <span class="info-label">Employee ID:</span> {{ $employee->employee_id }}
             </div>
             <div class="info-item">
-                <span class="info-label">Email:</span> {{ $employee->email }}
+                <span class="info-label">Email:</span> {{ $employee->work_email ?: $employee->personal_email }}
             </div>
         </div>
         <div>
