@@ -845,13 +845,6 @@ class EmployeeImportService
                 }
             }
 
-            if ($workEmail === '' && $personalEmail === '') {
-                $errors[] = "Row {$rowNumber}: Either work_email or personal_email is required.";
-            }
-
-            if ($personalPhone === '' && $workPhone === '') {
-                $errors[] = "Row {$rowNumber}: Either personal_phone or work_phone is required.";
-            }
         }
 
         $excludeId = $isUpdate ? $existingEmployee?->id : null;
