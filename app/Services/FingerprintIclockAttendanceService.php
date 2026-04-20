@@ -42,17 +42,17 @@ class FingerprintIclockAttendanceService
     /**
      * Sync attendance for today from iClock API for all employees with fingerprint_device_id.
      */
-    public function syncToday(): void
+    public function syncToday(?int $companyId = null): void
     {
         $today = Carbon::today('Asia/Riyadh');
-        $this->syncForDate($today);
+        $this->syncForDate($today, $companyId);
     }
 
     /**
      * Sync attendance for the current month from the 1st day until today (inclusive).
      * This is useful when starting the system mid‑month and needing to backfill data.
      */
-    public function syncCurrentMonthUntilToday(): void
+    public function syncCurrentMonthUntilToday(?int $companyId = null): void
     {
         $now = Carbon::now('Asia/Riyadh');
         $startOfMonth = $now->copy()->startOfMonth();
@@ -63,7 +63,7 @@ class FingerprintIclockAttendanceService
             if ($this->progressEnabled) {
                 Log::channel('stderr')->info('[FingerprintIclock] Sync day: ' . $current->format('Y-m-d'));
             }
-            $this->syncForDate($current);
+            $this->syncForDate($current, $companyId);
             $current->addDay();
         }
     }
@@ -71,7 +71,7 @@ class FingerprintIclockAttendanceService
     /**
      * Sync attendance for a specific date from iClock API for all employees with fingerprint_device_id.
      */
-    public function syncForDate(Carbon $date): void
+    public function syncForDate(Carbon $date, ?int $companyId = null): void
     {
         if (empty($this->baseUrl) || empty($this->token)) {
             Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured', [
@@ -94,6 +94,7 @@ class FingerprintIclockAttendanceService
 
         $employees = Employee::whereNotNull('fingerprint_device_id')
             ->where('fingerprint_device_id', '!=', '')
+            ->when($companyId !== null, fn ($q) => $q->where('company_id', $companyId))
             ->get();
 
         $stats = [
@@ -106,6 +107,7 @@ class FingerprintIclockAttendanceService
         Log::channel('daily')->info('[FingerprintIclock] Sync started', [
             'att_date' => $attDate,
             'range' => ['start_time' => $startTime, 'end_time' => $endTime],
+            'company_id' => $companyId,
             'employees_total' => $stats['employees_total'],
             'device_id' => $device->id,
             'api_base_host' => (string) parse_url((string) $this->baseUrl, PHP_URL_HOST),

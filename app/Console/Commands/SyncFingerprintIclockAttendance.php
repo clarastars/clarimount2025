@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Company;
 use App\Services\AttendancePresentationRebuildService;
 use App\Services\FingerprintIclockAttendanceService;
 use Carbon\Carbon;
@@ -15,12 +16,30 @@ class SyncFingerprintIclockAttendance extends Command
                            {--job : Dispatch the job to the queue instead of running synchronously}
                            {--month : Sync attendance from start of current month until today}
                            {--date= : Sync attendance for one day only (Y-m-d, Asia/Riyadh)}
+                           {--company_id= : Limit sync to a specific company id}
                            {--progress : Print per-day/per-employee progress to the terminal while running}';
 
     protected $description = 'Sync today\'s attendance from fingerprint iClock API (first punch = check-in, last = check-out)';
 
     public function handle(FingerprintIclockAttendanceService $service, AttendancePresentationRebuildService $presentationRebuild): int
     {
+        $companyId = null;
+        $companyIdOption = $this->option('company_id');
+        if ($companyIdOption !== null && $companyIdOption !== '') {
+            if (! ctype_digit((string) $companyIdOption)) {
+                $this->error('Invalid --company_id. It must be a positive integer.');
+
+                return 1;
+            }
+
+            $companyId = (int) $companyIdOption;
+            if ($companyId <= 0 || ! Company::query()->whereKey($companyId)->exists()) {
+                $this->error("Company with id {$companyId} was not found.");
+
+                return 1;
+            }
+        }
+
         if ($this->option('month') && $this->option('date')) {
             $this->error('Use either --month or --date, not both.');
 
@@ -38,10 +57,15 @@ class SyncFingerprintIclockAttendance extends Command
             }
 
             $service->setProgressEnabled(true);
-            $this->info('Syncing iClock attendance for '.$date->format('Y-m-d').' (Asia/Riyadh)...');
-            $service->syncForDate($date);
+            $scope = $companyId !== null ? " for company #{$companyId}" : '';
+            $this->info('Syncing iClock attendance for '.$date->format('Y-m-d').' (Asia/Riyadh)'.$scope.'...');
+            $service->syncForDate($date, $companyId);
             $this->info('Rebuilding attendance presentations for '.$date->format('Y-m-d').'...');
-            $presentationRebuild->rebuildDateForAllCompanies($date->format('Y-m-d'));
+            if ($companyId !== null) {
+                $presentationRebuild->rebuildCompanyDateRange($companyId, $date->format('Y-m-d'), $date->format('Y-m-d'));
+            } else {
+                $presentationRebuild->rebuildDateForAllCompanies($date->format('Y-m-d'));
+            }
             $this->info('Done.');
 
             return 0;
@@ -52,24 +76,43 @@ class SyncFingerprintIclockAttendance extends Command
             // For backfills we usually want to see what employee/day is processing right now.
             $service->setProgressEnabled(true);
 
-            $this->info('Syncing current month attendance (from start of month until today) from iClock API...');
-            $service->syncCurrentMonthUntilToday();
+            $scope = $companyId !== null ? " for company #{$companyId}" : '';
+            $this->info('Syncing current month attendance (from start of month until today) from iClock API'.$scope.'...');
+            $service->syncCurrentMonthUntilToday($companyId);
             $this->info('Rebuilding attendance presentations for current month...');
-            $presentationRebuild->rebuildCurrentMonthForAllCompanies();
+            if ($companyId !== null) {
+                $now = Carbon::now('Asia/Riyadh');
+                $presentationRebuild->rebuildCompanyDateRange(
+                    $companyId,
+                    $now->copy()->startOfMonth()->format('Y-m-d'),
+                    Carbon::today('Asia/Riyadh')->format('Y-m-d')
+                );
+            } else {
+                $presentationRebuild->rebuildCurrentMonthForAllCompanies();
+            }
             $this->info('Done syncing current month.');
             return 0;
         }
 
         if ($this->option('job')) {
+            if ($companyId !== null) {
+                $this->warn('The --job mode currently queues all companies; --company_id is ignored in --job mode.');
+            }
             \App\Jobs\SyncFingerprintIclockAttendanceJob::dispatch();
             $this->info('Sync job dispatched to the queue.');
             return 0;
         }
 
-        $this->info('Syncing today\'s attendance from iClock API...');
-        $service->syncToday();
+        $scope = $companyId !== null ? " for company #{$companyId}" : '';
+        $this->info('Syncing today\'s attendance from iClock API'.$scope.'...');
+        $service->syncToday($companyId);
         $this->info('Rebuilding attendance presentations for today...');
-        $presentationRebuild->rebuildDateForAllCompanies(Carbon::today('Asia/Riyadh')->format('Y-m-d'));
+        $today = Carbon::today('Asia/Riyadh')->format('Y-m-d');
+        if ($companyId !== null) {
+            $presentationRebuild->rebuildCompanyDateRange($companyId, $today, $today);
+        } else {
+            $presentationRebuild->rebuildDateForAllCompanies($today);
+        }
         $this->info('Done.');
         return 0;
     }

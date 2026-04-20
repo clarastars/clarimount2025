@@ -15,6 +15,7 @@ class RebuildAttendancePresentationsCommand extends Command
                             {--date= : Single day Y-m-d (Asia/Riyadh); default today when not using --month}
                             {--month : Rebuild from start of current month through today}
                             {--company= : Only this company id (runs in-process, not queued)}
+                            {--company_id= : Alias of --company for consistency with other commands}
                             {--sync : Run in this PHP process for all companies (no queue)}';
 
     protected $description = 'Rebuild cached attendance index rows (status, late minutes, punches) and absence penalties';
@@ -27,8 +28,13 @@ class RebuildAttendancePresentationsCommand extends Command
             return 1;
         }
 
-        $companyId = $this->option('company') !== null && $this->option('company') !== ''
-            ? (int) $this->option('company')
+        $companyOption = $this->option('company_id');
+        if ($companyOption === null || $companyOption === '') {
+            $companyOption = $this->option('company');
+        }
+
+        $companyId = $companyOption !== null && $companyOption !== ''
+            ? (int) $companyOption
             : null;
 
         if ($companyId !== null) {
