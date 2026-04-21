@@ -161,6 +161,106 @@ class AttendancePresentationRebuildService
         $this->persistRows($companyId, $startDate->format('Y-m-d'), $endDate->format('Y-m-d'), $rows);
     }
 
+    public function rebuildEmployeeDateRange(int $employeeId, string $startDateYmd, string $endDateYmd): void
+    {
+        $startDate = Carbon::parse($startDateYmd, self::TZ)->startOfDay();
+        $endDate = Carbon::parse($endDateYmd, self::TZ)->endOfDay();
+        $today = Carbon::today(self::TZ);
+
+        if ($endDate->gt($today)) {
+            $endDate = $today->copy()->endOfDay();
+        }
+
+        if ($startDate->gt($endDate)) {
+            return;
+        }
+
+        $employee = Employee::with(['shift.workdays'])->find($employeeId);
+        if (! $employee) {
+            return;
+        }
+
+        $workdays = [];
+        if ($employee->shift) {
+            $workdays = $employee->shift->workdays
+                ->where('is_workday', true)
+                ->pluck('weekday')
+                ->toArray();
+        }
+
+        $employeesKeyed = collect([$employee->id => $employee]);
+        $shiftWorkdayMaps = [$employee->id => $workdays];
+
+        $existingAttendance = ZkDailyAttendance::query()
+            ->select([
+                'zk_daily_attendance.*',
+                'employees.id as employee_id',
+                'employees.first_name',
+                'employees.last_name',
+                'employees.employee_id as emp_code',
+                'employees.company_id',
+                'zk_devices.name as device_name',
+                'zk_devices.serial_number',
+            ])
+            ->leftJoin('employees', function ($join) {
+                $join->on('employees.fingerprint_device_id', '=', 'zk_daily_attendance.device_pin');
+            })
+            ->leftJoin('zk_devices', 'zk_devices.id', '=', 'zk_daily_attendance.device_id')
+            ->whereBetween('zk_daily_attendance.att_date', [
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->where('employees.company_id', $employee->company_id)
+            ->where('employees.id', $employee->id)
+            ->orderByRaw("(zk_devices.serial_number = 'FINGERPRINT_ICLOCK_API') ASC")
+            ->get()
+            ->keyBy(function ($record) {
+                $dateStr = $record->att_date instanceof Carbon
+                    ? $record->att_date->format('Y-m-d')
+                    : (string) $record->att_date;
+
+                return ($record->employee_id ?? 'no_emp') . '_' . $dateStr;
+            });
+
+        $rows = [];
+        $currentDate = $startDate->copy()->startOfDay();
+
+        while ($currentDate->lte($endDate)) {
+            if ($currentDate->isFuture()) {
+                break;
+            }
+
+            $dateStr = $currentDate->format('Y-m-d');
+            $weekday = $currentDate->dayOfWeek;
+            $isWorkday = in_array($weekday, $workdays, true);
+            $key = $employee->id . '_' . $dateStr;
+            $existingRecord = $existingAttendance->get($key);
+
+            if ($existingRecord) {
+                $rows[] = $this->rowFromZkRecord($existingRecord, $employee, $dateStr);
+            } elseif ($isWorkday) {
+                $rows[] = $this->rowVirtual($employee, $dateStr);
+            }
+
+            $currentDate->addDay();
+        }
+
+        $this->applyAbsencePenaltyLogic($rows, $employeesKeyed, $shiftWorkdayMaps);
+
+        foreach ($rows as $i => $row) {
+            $rows[$i] = $this->withStatusAndLateMinutes($row, $employeesKeyed, $shiftWorkdayMaps);
+            $this->reconcileLatePenalty($rows[$i]);
+        }
+
+        $this->persistRowsForEmployee(
+            (int) $employee->company_id,
+            (int) $employee->id,
+            $startDate->format('Y-m-d'),
+            $endDate->format('Y-m-d'),
+            $rows
+        );
+    }
+
     /**
      * @param  object  $r  joined zk_daily_attendance row
      * @return array<string, mixed>
@@ -348,6 +448,52 @@ class AttendancePresentationRebuildService
     {
         DB::transaction(function () use ($companyId, $startStr, $endStr, $rows) {
             AttendanceDailyPresentation::where('company_id', $companyId)
+                ->whereBetween('att_date', [$startStr, $endStr])
+                ->delete();
+
+            if ($rows === []) {
+                return;
+            }
+
+            $now = now();
+            $insert = [];
+
+            foreach ($rows as $row) {
+                $insert[] = [
+                    'company_id' => $companyId,
+                    'employee_id' => $row['employee_id'],
+                    'att_date' => $row['att_date'],
+                    'status_ar' => $row['status_ar'],
+                    'late_minutes' => $row['late_minutes'],
+                    'is_virtual_absence' => $row['is_virtual_absence'] ? 1 : 0,
+                    'zk_daily_attendance_id' => $row['zk_daily_attendance_id'],
+                    'first_punch' => $this->formatDateTimeForDb($row['first_punch']),
+                    'last_punch' => $this->formatDateTimeForDb($row['last_punch']),
+                    'punch_count' => $row['punch_count'],
+                    'first_verify_mode' => $row['first_verify_mode'],
+                    'last_verify_mode' => $row['last_verify_mode'],
+                    'device_pin' => $row['device_pin'],
+                    'device_name' => $row['device_name'],
+                    'serial_number' => $row['serial_number'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            foreach (array_chunk($insert, 400) as $chunk) {
+                DB::table('attendance_daily_presentations')->insert($chunk);
+            }
+        });
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function persistRowsForEmployee(int $companyId, int $employeeId, string $startStr, string $endStr, array $rows): void
+    {
+        DB::transaction(function () use ($companyId, $employeeId, $startStr, $endStr, $rows) {
+            AttendanceDailyPresentation::where('company_id', $companyId)
+                ->where('employee_id', $employeeId)
                 ->whereBetween('att_date', [$startStr, $endStr])
                 ->delete();
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Jobs\RebuildAttendancePresentationJob;
+use App\Models\Employee;
 use App\Services\AttendancePresentationRebuildService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -16,6 +17,7 @@ class RebuildAttendancePresentationsCommand extends Command
                             {--month : Rebuild from start of current month through today}
                             {--company= : Only this company id (runs in-process, not queued)}
                             {--company_id= : Alias of --company for consistency with other commands}
+                            {--employee_id= : Only this employee id (runs in-process)}
                             {--sync : Run in this PHP process for all companies (no queue)}';
 
     protected $description = 'Rebuild cached attendance index rows (status, late minutes, punches) and absence penalties';
@@ -28,6 +30,23 @@ class RebuildAttendancePresentationsCommand extends Command
             return 1;
         }
 
+        $employeeId = null;
+        $employeeOption = $this->option('employee_id');
+        if ($employeeOption !== null && $employeeOption !== '') {
+            if (! ctype_digit((string) $employeeOption)) {
+                $this->error('Invalid --employee_id. It must be a positive integer.');
+
+                return 1;
+            }
+
+            $employeeId = (int) $employeeOption;
+            if ($employeeId <= 0 || ! Employee::query()->whereKey($employeeId)->exists()) {
+                $this->error("Employee with id {$employeeId} was not found.");
+
+                return 1;
+            }
+        }
+
         $companyOption = $this->option('company_id');
         if ($companyOption === null || $companyOption === '') {
             $companyOption = $this->option('company');
@@ -36,6 +55,29 @@ class RebuildAttendancePresentationsCommand extends Command
         $companyId = $companyOption !== null && $companyOption !== ''
             ? (int) $companyOption
             : null;
+
+        if ($employeeId !== null && $companyId !== null) {
+            $this->warn('--company/--company_id is ignored when --employee_id is provided.');
+        }
+
+        if ($employeeId !== null) {
+            if ($this->option('month')) {
+                $now = Carbon::now('Asia/Riyadh');
+                $start = $now->copy()->startOfMonth()->format('Y-m-d');
+                $end = Carbon::today('Asia/Riyadh')->format('Y-m-d');
+                $this->info("Rebuilding presentations for employee {$employeeId} from {$start} to {$end}...");
+                $service->rebuildEmployeeDateRange($employeeId, $start, $end);
+            } else {
+                $date = $this->option('date')
+                    ? Carbon::parse($this->option('date'), 'Asia/Riyadh')->format('Y-m-d')
+                    : Carbon::today('Asia/Riyadh')->format('Y-m-d');
+                $this->info("Rebuilding presentations for employee {$employeeId} on {$date}...");
+                $service->rebuildEmployeeDateRange($employeeId, $date, $date);
+            }
+            $this->info('Done.');
+
+            return 0;
+        }
 
         if ($companyId !== null) {
             if ($this->option('month')) {
