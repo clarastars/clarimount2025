@@ -294,7 +294,9 @@ class SalaryRunController extends Controller
         // Recalculate net salary
         $grossSalary = $item->gross_salary;
         $penaltiesTotal = $item->penalties_total;
-        $netSalary = $grossSalary - $penaltiesTotal - $totalDeduction;
+        $unpaidLeaveTotal = (float) $item->unpaid_leave_total;
+        $socialInsuranceDeductionTotal = (float) $item->social_insurance_deduction_total;
+        $netSalary = $grossSalary - $penaltiesTotal - $unpaidLeaveTotal - $socialInsuranceDeductionTotal - $totalDeduction;
 
         $item->update([
             'debt_deductions' => $debtDeductions,
@@ -393,7 +395,7 @@ class SalaryRunController extends Controller
         }
 
         $netSalary = round(
-            (float) $item->gross_salary - $penaltiesTotal - $unpaidLeaveTotal - $debtTotal,
+            (float) $item->gross_salary - $penaltiesTotal - (float) $item->social_insurance_deduction_total - $unpaidLeaveTotal - $debtTotal,
             2
         );
 

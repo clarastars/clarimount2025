@@ -118,6 +118,17 @@
         </Card>
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">{{ t('salary_runs.social_insurance_deduction') }}</CardTitle>
+            <Icon name="Shield" class="h-4 w-4 text-rose-600" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold text-rose-600">
+              {{ formatCurrency(totalSocialInsuranceDeductions) }}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">{{ t('debts.total_debt_deductions') }}</CardTitle>
             <Icon name="CreditCard" class="h-4 w-4 text-purple-600" />
           </CardHeader>
@@ -163,6 +174,9 @@
                     {{ t('salary_runs.penalties_total') }}
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {{ t('salary_runs.social_insurance_deduction') }}
+                  </th>
+                  <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('debts.total_debts') }}
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -204,6 +218,11 @@
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-orange-600 dark:text-orange-400">
                       {{ formatCurrency(item.penalties_total) }}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-rose-600 dark:text-rose-400">
+                      {{ formatCurrency(item.social_insurance_deduction_total || 0) }}
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
@@ -444,6 +463,7 @@ interface Props {
       allowances: number;
       gross_salary: number;
       penalties_total: number;
+      social_insurance_deduction_total: number;
       net_salary: number;
       debt_deductions?: Array<{
         debt_id: number;
@@ -571,6 +591,10 @@ const totalPenalties = computed(() => {
 
 const totalDebtDeductions = computed(() => {
   return props.salaryRun.items?.reduce((sum, item) => sum + getDebtDeductionsTotal(item), 0) || 0;
+});
+
+const totalSocialInsuranceDeductions = computed(() => {
+  return props.salaryRun.items?.reduce((sum, item) => sum + parseFloat(item.social_insurance_deduction_total || 0), 0) || 0;
 });
 
 const totalNet = computed(() => {

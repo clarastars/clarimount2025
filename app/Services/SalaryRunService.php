@@ -52,6 +52,11 @@ class SalaryRunService
                 $breakdownExclusions = $existingItem?->breakdown_exclusions ?? [];
 
                 $grossSalary = ($employee->basic_salary ?? 0) + ($employee->allowances ?? 0);
+                $insuranceBase = (float) ($employee->basic_salary ?? 0) + (float) ($employee->allowance_housing ?? 0);
+                $insuranceRate = (float) ($employee->social_insurance_deduction_rate ?? 0);
+                $socialInsuranceDeductionTotal = $insuranceRate > 0
+                    ? round(($insuranceBase * $insuranceRate) / 100, 2)
+                    : 0.0;
                 $dailyWage = $grossSalary / 30; // Simplified: using 30 days
 
                 // Get approved penalties for this employee in this month
@@ -154,7 +159,11 @@ class SalaryRunService
                     ];
                 }
 
-                $netSalary = $grossSalary - $penaltiesTotal - (float) $unpaidLeaveTotal - $debtDeductionsTotal;
+                $netSalary = $grossSalary
+                    - $penaltiesTotal
+                    - (float) $unpaidLeaveTotal
+                    - $debtDeductionsTotal
+                    - $socialInsuranceDeductionTotal;
 
                 // Upsert salary run item
                 SalaryRunItem::updateOrCreate(
@@ -167,6 +176,7 @@ class SalaryRunService
                         'allowances' => $employee->allowances ?? 0,
                         'gross_salary' => $grossSalary,
                         'penalties_total' => $penaltiesTotal,
+                        'social_insurance_deduction_total' => $socialInsuranceDeductionTotal,
                         'unpaid_leave_total' => $unpaidLeaveTotal,
                         'net_salary' => $netSalary,
                         'breakdown' => $breakdown,

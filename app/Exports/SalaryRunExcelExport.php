@@ -95,7 +95,7 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
             $debtTotal > 0 ? $debtTotal : '',
             '', // مخالفات مرورية تحمل حادث - لا يوجد في النظام
             $item->penalties_total !== null ? (float) $item->penalties_total : '',
-            '', // خصم تأمينات - لا يوجد في النظام
+            $item->social_insurance_deduction_total !== null ? (float) $item->social_insurance_deduction_total : '',
             '', // غيابات - منفصل عن انقطاع ساعات إن لم يكن لدينا حقل
             '', // تصديقات - لا يوجد في النظام
             $item->net_salary !== null ? (float) $item->net_salary : '',

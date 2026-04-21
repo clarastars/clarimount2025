@@ -59,6 +59,7 @@ class EmployeeImportService
         'allowance_other',
         'allowance_food',
         'allowance_personal_car',
+        'social_insurance_deduction_rate',
         'manager',
         'direct_manager',
         'additional_approver_2',
@@ -142,6 +143,7 @@ class EmployeeImportService
             'allowance_other',
             'allowance_food',
             'allowance_personal_car',
+            'social_insurance_deduction_rate',
             'manager',
             'direct_manager',
             'additional_approver_2',
@@ -193,6 +195,7 @@ class EmployeeImportService
             '0.00',
             '200.00',
             '100.00',
+            '',
             'Jane Smith',
             'Bob Johnson',
             'Alice Brown',
@@ -257,6 +260,7 @@ class EmployeeImportService
             'allowance_other',
             'allowance_food',
             'allowance_personal_car',
+            'social_insurance_deduction_rate',
             'manager',
             'direct_manager',
             'additional_approver_2',
@@ -311,6 +315,7 @@ class EmployeeImportService
                 $employee->allowance_other ?? '',
                 $employee->allowance_food ?? '',
                 $employee->allowance_personal_car ?? '',
+                $employee->social_insurance_deduction_rate ?? '',
                 $employee->manager,
                 $employee->direct_manager,
                 $employee->additional_approver_2,
@@ -421,6 +426,7 @@ class EmployeeImportService
         $setIfBlank('allowance_other', $employee->allowance_other !== null ? (string) $employee->allowance_other : null);
         $setIfBlank('allowance_food', $employee->allowance_food !== null ? (string) $employee->allowance_food : null);
         $setIfBlank('allowance_personal_car', $employee->allowance_personal_car !== null ? (string) $employee->allowance_personal_car : null);
+        $setIfBlank('social_insurance_deduction_rate', $employee->social_insurance_deduction_rate !== null ? (string) $employee->social_insurance_deduction_rate : null);
 
         $setIfBlank('manager', $employee->manager);
         $setIfBlank('direct_manager', $employee->direct_manager);
@@ -921,7 +927,7 @@ class EmployeeImportService
 
         $numericFields = [
             'basic_salary', 'allowances', 'allowance_housing', 'allowance_transportation',
-            'allowance_other', 'allowance_food', 'allowance_personal_car',
+            'allowance_other', 'allowance_food', 'allowance_personal_car', 'social_insurance_deduction_rate',
         ];
         foreach ($numericFields as $field) {
             if (isset($rowData[$field]) && $rowData[$field] !== '' && $rowData[$field] !== null) {
@@ -929,6 +935,16 @@ class EmployeeImportService
                     $errors[] = "Row {$rowNumber}: {$field} must be a number.";
                 }
             }
+        }
+
+        if (
+            isset($rowData['social_insurance_deduction_rate']) &&
+            $rowData['social_insurance_deduction_rate'] !== '' &&
+            $rowData['social_insurance_deduction_rate'] !== null &&
+            is_numeric($rowData['social_insurance_deduction_rate']) &&
+            ((float) $rowData['social_insurance_deduction_rate'] < 0 || (float) $rowData['social_insurance_deduction_rate'] > 100)
+        ) {
+            $errors[] = "Row {$rowNumber}: social_insurance_deduction_rate must be between 0 and 100.";
         }
 
         if (! empty($errors)) {
@@ -964,6 +980,7 @@ class EmployeeImportService
             'allowance_other' => isset($rowData['allowance_other']) && $rowData['allowance_other'] !== '' && is_numeric($rowData['allowance_other']) ? (float) $rowData['allowance_other'] : null,
             'allowance_food' => isset($rowData['allowance_food']) && $rowData['allowance_food'] !== '' && is_numeric($rowData['allowance_food']) ? (float) $rowData['allowance_food'] : null,
             'allowance_personal_car' => isset($rowData['allowance_personal_car']) && $rowData['allowance_personal_car'] !== '' && is_numeric($rowData['allowance_personal_car']) ? (float) $rowData['allowance_personal_car'] : null,
+            'social_insurance_deduction_rate' => isset($rowData['social_insurance_deduction_rate']) && $rowData['social_insurance_deduction_rate'] !== '' && is_numeric($rowData['social_insurance_deduction_rate']) ? (float) $rowData['social_insurance_deduction_rate'] : null,
             'manager' => $rowData['manager'] ?? null,
             'direct_manager' => $rowData['direct_manager'] ?? null,
             'additional_approver_2' => $rowData['additional_approver_2'] ?? null,

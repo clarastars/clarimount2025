@@ -54,6 +54,7 @@
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.job_title') }}</Label><p>{{ displayValue(employee.job_title) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.basic_salary') }}</Label><p>{{ displayCurrency(employee.basic_salary) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowances') }}</Label><p>{{ displayCurrency(employee.allowances) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.social_insurance_deduction_rate') }}</Label><p>{{ employee.social_insurance_deduction_rate !== null && employee.social_insurance_deduction_rate !== undefined && employee.social_insurance_deduction_rate !== '' ? `${employee.social_insurance_deduction_rate}%` : '-' }}</p></div>
                     </CardContent>
                 </Card>
 

@@ -337,6 +337,7 @@ class EmployeeImportController extends Controller
             'allowance_other' => 'Other Allowances',
             'allowance_food' => 'Food Allowance',
             'allowance_personal_car' => 'Personal Car Allowance',
+            'social_insurance_deduction_rate' => 'Social Insurance Deduction Rate (%)',
             'manager' => 'Manager',
             'direct_manager' => 'Direct Manager',
             'additional_approver_2' => 'Additional Approver 2',

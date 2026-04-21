@@ -76,6 +76,7 @@ const form = useForm({
     allowance_other: '',
     allowance_food: '',
     allowance_personal_car: '',
+    social_insurance_deduction_rate: '',
     
     // Legal Information
     id_number: '',
@@ -1131,6 +1132,28 @@ const formatCurrency = (amount: number) => {
                                             <div>
                                                 <Label for="allowance_personal_car" class="mb-1 text-sm">{{ t('employees.allowance_personal_car') }}</Label>
                                                 <Input id="allowance_personal_car" v-model="form.allowance_personal_car" type="number" step="0.01" min="0" class="h-9" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="md:col-span-2 lg:col-span-3 mt-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <p class="text-sm font-medium text-muted-foreground mb-3">{{ t('employees.social_insurance') }}</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div>
+                                                <Label for="social_insurance_deduction_rate" class="mb-1 text-sm">{{ t('employees.social_insurance_deduction_rate') }}</Label>
+                                                <Input
+                                                    id="social_insurance_deduction_rate"
+                                                    v-model="form.social_insurance_deduction_rate"
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    max="100"
+                                                    :placeholder="t('employees.social_insurance_deduction_rate_placeholder')"
+                                                    class="h-9"
+                                                />
+                                                <div v-if="form.errors.social_insurance_deduction_rate" class="text-red-500 text-xs mt-1">
+                                                    {{ translateValidationError(form.errors.social_insurance_deduction_rate || "") }}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

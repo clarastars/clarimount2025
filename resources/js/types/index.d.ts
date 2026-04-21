@@ -127,6 +127,7 @@ export interface Employee {
     allowance_other?: string | number;
     allowance_food?: string | number;
     allowance_personal_car?: string | number;
+    social_insurance_deduction_rate?: string | number;
     manager?: string;
     direct_manager?: string;
     additional_approver_2?: string;

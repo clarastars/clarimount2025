@@ -260,6 +260,7 @@ class EmployeeController extends Controller
             'allowance_other' => 'nullable|numeric|min:0',
             'allowance_food' => 'nullable|numeric|min:0',
             'allowance_personal_car' => 'nullable|numeric|min:0',
+            'social_insurance_deduction_rate' => 'nullable|numeric|min:0|max:100',
             'manager' => 'nullable|string|max:255',
             'direct_manager' => 'nullable|string|max:255',
             'additional_approver_2' => 'nullable|string|max:255',
@@ -333,6 +334,7 @@ class EmployeeController extends Controller
         $validated['allowance_other'] = $validated['allowance_other'] ?? null;
         $validated['allowance_food'] = $validated['allowance_food'] ?? null;
         $validated['allowance_personal_car'] = $validated['allowance_personal_car'] ?? null;
+        $validated['social_insurance_deduction_rate'] = $validated['social_insurance_deduction_rate'] ?? null;
 
         try {
             \Log::info('Creating employee...');
@@ -517,6 +519,7 @@ class EmployeeController extends Controller
             'allowance_other' => 'nullable|numeric|min:0',
             'allowance_food' => 'nullable|numeric|min:0',
             'allowance_personal_car' => 'nullable|numeric|min:0',
+            'social_insurance_deduction_rate' => 'nullable|numeric|min:0|max:100',
             'manager' => 'nullable|string|max:255',
             'direct_manager' => 'nullable|string|max:255',
             'additional_approver_2' => 'nullable|string|max:255',

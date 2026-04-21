@@ -36,6 +36,7 @@ class Employee extends Model
         'allowance_other',
         'allowance_food',
         'allowance_personal_car',
+        'social_insurance_deduction_rate',
         'annual_leave_balance',
         'manager',
         'direct_manager',
@@ -86,6 +87,7 @@ class Employee extends Model
         'allowance_other' => 'decimal:2',
         'allowance_food' => 'decimal:2',
         'allowance_personal_car' => 'decimal:2',
+        'social_insurance_deduction_rate' => 'decimal:2',
         'annual_leave_balance' => 'integer',
     ];
 
