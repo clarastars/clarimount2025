@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 
 const { t, locale } = useI18n();
@@ -23,106 +23,69 @@ const submit = () => {
         <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
     </Head>
 
-    <!-- Off-white background for entire page -->
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-
-        <!-- Centered rectangular container -->
-        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-            <!-- Split layout container -->
-            <div class="flex min-h-[600px]">
-
-                <!-- Left side - Background image -->
-                <div class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gray-200">
-                    <img
-                        src="/img/bg.jpg"
-                        alt="Background"
-                        class="w-full h-full object-cover"
-                        @error="(event: Event) => { const target = event.target as HTMLImageElement; if (target) target.style.display = 'none'; }"
-                    />
-<!--                    <div class="absolute inset-0 bg-black bg-opacity-20"></div>-->
-<!--                    <div class="absolute inset-0 flex items-center justify-center text-gray-400">-->
-<!--                        <div class="text-center">-->
-<!--                            <div class="text-6xl mb-4">🏢</div>-->
-<!--                            <div class="text-sm">Welcome</div>-->
-<!--                        </div>-->
-<!--                    </div>-->
-                </div>
-
-                <!-- Right side - Login form -->
-                <div class="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
-                    <div class="max-w-md w-full space-y-8">
-
-                        <!-- Header -->
-                        <div class="text-center">
-                            <h2 class="text-3xl font-bold text-gray-900 mb-2">
-                                {{ t('auth.welcome') }}
-                            </h2>
-                            <p class="text-gray-600">
-                                {{ t('auth.welcome_message') }}
-                            </p>
-                        </div>
-
-                        <!-- Login Form -->
-                        <form @submit.prevent="submit" class="space-y-6">
-
-                            <!-- Email Field -->
-                            <div>
-                                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                                    {{ t('auth.email') }}
-                                </label>
-                                <input
-                                    id="email"
-                                    v-model="form.email"
-                                    type="email"
-                                    dir="ltr"
-                                    required
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                />
-                                <div v-if="form.errors.email" class="mt-2 text-sm text-red-600">
-                                    {{ form.errors.email }}
-                                </div>
-                            </div>
-
-                            <!-- Password Field -->
-                            <div>
-                                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
-                                    {{ t('auth.password') }}
-                                </label>
-                                <input
-                                    id="password"
-                                    dir="ltr"
-                                    v-model="form.password"
-                                    type="password"
-                                    required
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                />
-                                <div v-if="form.errors.password" class="mt-2 text-sm text-red-600">
-                                    {{ form.errors.password }}
-                                </div>
-                            </div>
-
-                            <!-- Submit Button -->
-                            <div>
-                                <button
-                                    type="submit"
-                                    :disabled="form.processing"
-                                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <span v-if="form.processing">{{ t('auth.signing_in') }}</span>
-                                    <span v-else>{{ t('auth.sign_in') }}</span>
-                                </button>
-                            </div>
-
-                        </form>
-
+    <div class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-10 sm:px-6 lg:px-8">
+        <div class="mx-auto flex min-h-[85vh] w-full max-w-xl items-center justify-center">
+            <div class="w-full rounded-2xl border border-slate-200 bg-white/95 p-8 shadow-xl backdrop-blur sm:p-10">
+                <div class="mb-8 text-center">
+                    <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200">
+                        <span class="text-lg font-bold">HR</span>
                     </div>
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-900">
+                        {{ t('auth.welcome') }}
+                    </h2>
+                    <p class="mt-2 text-sm text-slate-600">
+                        {{ t('auth.welcome_message') }}
+                    </p>
                 </div>
 
+                <form @submit.prevent="submit" class="space-y-5">
+                    <div>
+                        <label for="email" class="mb-2 block text-sm font-medium text-slate-700">
+                            {{ t('auth.email') }}
+                        </label>
+                        <input
+                            id="email"
+                            v-model="form.email"
+                            type="email"
+                            dir="ltr"
+                            required
+                            autocomplete="username"
+                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <div v-if="form.errors.email" class="mt-2 text-sm text-red-600">
+                            {{ form.errors.email }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="password" class="mb-2 block text-sm font-medium text-slate-700">
+                            {{ t('auth.password') }}
+                        </label>
+                        <input
+                            id="password"
+                            dir="ltr"
+                            v-model="form.password"
+                            type="password"
+                            required
+                            autocomplete="current-password"
+                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <div v-if="form.errors.password" class="mt-2 text-sm text-red-600">
+                            {{ form.errors.password }}
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        :disabled="form.processing"
+                        class="mt-2 flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span v-if="form.processing">{{ t('auth.signing_in') }}</span>
+                        <span v-else>{{ t('auth.sign_in') }}</span>
+                    </button>
+                </form>
             </div>
-
         </div>
-
     </div>
 </template>
 
