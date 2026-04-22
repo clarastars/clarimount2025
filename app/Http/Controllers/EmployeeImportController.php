@@ -142,8 +142,10 @@ class EmployeeImportController extends Controller
             ], 403);
         }
 
+        $maxImportKb = (int) config('imports.employee_file_max_kb', 51200);
+
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:csv,txt|max:10240', // 10MB max
+            'file' => 'required|file|mimes:csv,txt|max:' . $maxImportKb,
             'company_id' => 'required|integer|in:' . $ownedCompanyIds->implode(','),
             'import_mode' => 'sometimes|string|in:create,update',
         ]);
