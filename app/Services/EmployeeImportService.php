@@ -612,7 +612,7 @@ class EmployeeImportService
                 'data' => $validatedData,
                 'summary' => $summary,
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('CSV validation failed: ' . $e->getMessage());
 
             return [
@@ -682,6 +682,18 @@ class EmployeeImportService
 
         $csvData = [];
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            $isBlank = true;
+            if (is_array($row)) {
+                foreach ($row as $cell) {
+                    if (trim((string) $cell) !== '') {
+                        $isBlank = false;
+                        break;
+                    }
+                }
+            }
+            if ($isBlank) {
+                continue;
+            }
             $csvData[] = $row;
         }
         fclose($handle);
