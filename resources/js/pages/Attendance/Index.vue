@@ -613,7 +613,10 @@ const getVerifyModeName = (mode) => {
 
 const getEmployeeName = (record) => {
   if (record.first_name && record.last_name) {
-    return `${record.first_name} ${record.last_name}`
+    const parts = [record.first_name, record.father_name, record.last_name]
+      .map((part) => String(part || '').trim())
+      .filter((part) => part !== '')
+    return parts.join(' ')
   }
   return t('attendance.unknown_employee', { pin: record.device_pin })
 }

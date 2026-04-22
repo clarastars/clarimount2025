@@ -95,15 +95,17 @@ class AttendanceController extends Controller
             ->where('attendance_daily_presentations.company_id', $company->id)
             ->whereBetween('att_date', [$startYmd, $endYmd])
             ->with(['employee' => static function ($q) {
-                $q->select('id', 'first_name', 'last_name', 'employee_id', 'company_id');
+                $q->select('id', 'first_name', 'father_name', 'last_name', 'employee_id', 'company_id');
             }]);
 
         if ($search !== '' && $search !== null) {
             $presentationQuery->where(function ($q) use ($search) {
                 $q->whereHas('employee', function ($eq) use ($search) {
                     $eq->where('first_name', 'like', '%'.$search.'%')
+                        ->orWhere('father_name', 'like', '%'.$search.'%')
                         ->orWhere('last_name', 'like', '%'.$search.'%')
                         ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%'.$search.'%'])
+                        ->orWhereRaw("CONCAT(first_name, ' ', father_name, ' ', last_name) LIKE ?", ['%'.$search.'%'])
                         ->orWhere('employee_id', 'like', '%'.$search.'%');
                 })->orWhere('attendance_daily_presentations.device_pin', 'like', '%'.$search.'%');
             });
@@ -135,6 +137,7 @@ class AttendanceController extends Controller
                 'id' => $p->id,
                 'employee_id' => $p->employee_id,
                 'first_name' => $e->first_name ?? '',
+                'father_name' => $e->father_name ?? '',
                 'last_name' => $e->last_name ?? '',
                 'emp_code' => $e->employee_id ?? null,
                 'company_id' => (int) $p->company_id,
