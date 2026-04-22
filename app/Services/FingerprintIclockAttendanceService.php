@@ -30,6 +30,7 @@ class FingerprintIclockAttendanceService
     }
 
     public function __construct(
+        private OperationalMonthService $operationalMonthService,
         private ?string $baseUrl = null,
         private ?string $token = null,
         private int $timeout = 15
@@ -55,8 +56,10 @@ class FingerprintIclockAttendanceService
     public function syncCurrentMonthUntilToday(?int $companyId = null): void
     {
         $now = Carbon::now('Asia/Riyadh');
-        $startOfMonth = $now->copy()->startOfMonth();
-        $today = $now->copy()->startOfDay();
+        $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+        $startOfMonth = $operationalRange['start']->copy()->startOfDay();
+        $periodEnd = $operationalRange['end']->copy()->startOfDay();
+        $today = $now->copy()->startOfDay()->min($periodEnd);
 
         $current = $startOfMonth->copy();
         while ($current->lte($today)) {
@@ -164,8 +167,10 @@ class FingerprintIclockAttendanceService
     public function syncCurrentMonthUntilTodayForEmployeeId(int $employeeId): void
     {
         $now = Carbon::now('Asia/Riyadh');
-        $startOfMonth = $now->copy()->startOfMonth();
-        $today = $now->copy()->startOfDay();
+        $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+        $startOfMonth = $operationalRange['start']->copy()->startOfDay();
+        $periodEnd = $operationalRange['end']->copy()->startOfDay();
+        $today = $now->copy()->startOfDay()->min($periodEnd);
 
         $current = $startOfMonth->copy();
         while ($current->lte($today)) {

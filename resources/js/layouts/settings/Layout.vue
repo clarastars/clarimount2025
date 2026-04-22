@@ -26,6 +26,10 @@ const sidebarNavItems = computed((): NavItem[] => [
         title: t('settings.email_test'),
         href: '/settings/email-test',
     },
+    {
+        title: t('settings.operational_month'),
+        href: '/settings/operational-month',
+    },
 ]);
 
 const page = usePage();

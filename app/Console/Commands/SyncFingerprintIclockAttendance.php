@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Company;
 use App\Services\AttendancePresentationRebuildService;
 use App\Services\FingerprintIclockAttendanceService;
+use App\Services\OperationalMonthService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -14,14 +15,18 @@ class SyncFingerprintIclockAttendance extends Command
 {
     protected $signature = 'attendance:sync-fingerprint-iclock
                            {--job : Dispatch the job to the queue instead of running synchronously}
-                           {--month : Sync attendance from start of current month until today}
+                           {--month : Sync attendance from start of current operational month until today}
                            {--date= : Sync attendance for one day only (Y-m-d, Asia/Riyadh)}
                            {--company_id= : Limit sync to a specific company id}
                            {--progress : Print per-day/per-employee progress to the terminal while running}';
 
     protected $description = 'Sync today\'s attendance from fingerprint iClock API (first punch = check-in, last = check-out)';
 
-    public function handle(FingerprintIclockAttendanceService $service, AttendancePresentationRebuildService $presentationRebuild): int
+    public function handle(
+        FingerprintIclockAttendanceService $service,
+        AttendancePresentationRebuildService $presentationRebuild,
+        OperationalMonthService $operationalMonthService
+    ): int
     {
         $companyId = null;
         $companyIdOption = $this->option('company_id');
@@ -77,15 +82,17 @@ class SyncFingerprintIclockAttendance extends Command
             $service->setProgressEnabled(true);
 
             $scope = $companyId !== null ? " for company #{$companyId}" : '';
-            $this->info('Syncing current month attendance (from start of month until today) from iClock API'.$scope.'...');
+            $this->info('Syncing current operational month attendance (from configured start day until today) from iClock API'.$scope.'...');
             $service->syncCurrentMonthUntilToday($companyId);
             $this->info('Rebuilding attendance presentations for current month...');
             if ($companyId !== null) {
                 $now = Carbon::now('Asia/Riyadh');
+                $operationalRange = $operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $end = Carbon::today('Asia/Riyadh')->min($operationalRange['end']->copy()->startOfDay())->format('Y-m-d');
                 $presentationRebuild->rebuildCompanyDateRange(
                     $companyId,
-                    $now->copy()->startOfMonth()->format('Y-m-d'),
-                    Carbon::today('Asia/Riyadh')->format('Y-m-d')
+                    $operationalRange['start']->format('Y-m-d'),
+                    $end
                 );
             } else {
                 $presentationRebuild->rebuildCurrentMonthForAllCompanies();

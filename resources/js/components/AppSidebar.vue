@@ -76,6 +76,11 @@ const settingsNavItems = computed((): NavItem[] => [
         href: '/settings/email-test',
         icon: Mail,
     },
+    {
+        title: t('settings.operational_month'),
+        href: '/settings/operational-month',
+        icon: Clock,
+    },
 ]);
 
 const footerNavItems = computed((): NavItem[] => [

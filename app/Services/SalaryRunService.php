@@ -11,11 +11,14 @@ use App\Models\EmployeeDeduction;
 use App\Models\Leave;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SalaryRunService
 {
+    public function __construct(
+        private OperationalMonthService $operationalMonthService
+    ) {}
+
     /**
      * Create or update salary run for a company, year, and month
      */
@@ -40,9 +43,10 @@ class SalaryRunService
                 ->where('employment_status', 'active')
                 ->get();
 
-            // Calculate start and end dates for the month
-            $startDate = Carbon::create($year, $month, 1)->startOfMonth();
-            $endDate = Carbon::create($year, $month, 1)->endOfMonth();
+            // Calculate start and end dates based on global operational month boundaries.
+            $operationalRange = $this->operationalMonthService->resolveRangeForPayrollMonth($year, $month);
+            $startDate = $operationalRange['start'];
+            $endDate = $operationalRange['end'];
 
             foreach ($employees as $employee) {
                 $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
@@ -84,7 +88,7 @@ class SalaryRunService
                     $penaltiesTotal += $totalForPenalty;
 
                     $breakdown[] = [
-                        'date' => $penalty->attendance_date->format('Y-m-d'),
+                        'date' => \Carbon\Carbon::parse((string) $penalty->attendance_date)->format('Y-m-d'),
                         'action_type' => $penalty->action_type,
                         'action_value' => $penalty->action_value,
                         'action_text' => $penalty->action_text,
@@ -113,7 +117,7 @@ class SalaryRunService
                     $amount = (float) $deduction->amount;
                     $penaltiesTotal += $amount;
                     $breakdown[] = [
-                        'date' => $deduction->deduction_date->format('Y-m-d'),
+                        'date' => \Carbon\Carbon::parse((string) $deduction->deduction_date)->format('Y-m-d'),
                         'action_type' => 'manual_deduction',
                         'action_value' => null,
                         'action_text' => $deduction->reason,
@@ -137,21 +141,24 @@ class SalaryRunService
                 $unpaidLeaves = Leave::where('employee_id', $employee->id)
                     ->where('is_paid', false)
                     ->get()
-                    ->filter(fn (Leave $leave) => $leave->overlapsMonth($year, $month));
+                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($startDate, $endDate));
 
                 $unpaidLeaveTotal = 0;
                 foreach ($unpaidLeaves as $leave) {
+                    /** @var Leave $leave */
                     if ($this->isBreakdownExcluded($breakdownExclusions, 'unpaid_leave', $leave->id)) {
                         continue;
                     }
 
-                    $daysInMonth = $leave->daysInMonth($year, $month);
-                    $amount = round($daysInMonth * $dailyWage, 2);
+                    $daysInOperationalRange = $leave->daysInDateRange($startDate, $endDate);
+                    $amount = round($daysInOperationalRange * $dailyWage, 2);
                     $unpaidLeaveTotal += $amount;
                     $breakdown[] = [
-                        'date' => $leave->start_date->format('Y-m-d') . ' / ' . $leave->end_date->format('Y-m-d'),
+                        'date' => \Carbon\Carbon::parse((string) $leave->start_date)->format('Y-m-d')
+                            . ' / '
+                            . \Carbon\Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
                         'action_type' => 'unpaid_leave',
-                        'action_value' => $daysInMonth,
+                        'action_value' => $daysInOperationalRange,
                         'action_text' => 'Unpaid leave',
                         'amount' => $amount,
                         'leave_id' => $leave->id,

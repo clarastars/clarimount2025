@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Jobs\RebuildAttendancePresentationJob;
 use App\Models\Employee;
 use App\Services\AttendancePresentationRebuildService;
+use App\Services\OperationalMonthService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -14,7 +15,7 @@ class RebuildAttendancePresentationsCommand extends Command
 {
     protected $signature = 'attendance:rebuild-presentations
                             {--date= : Single day Y-m-d (Asia/Riyadh); default today when not using --month}
-                            {--month : Rebuild from start of current month through today}
+                            {--month : Rebuild from start of current operational month through today}
                             {--company= : Only this company id (runs in-process, not queued)}
                             {--company_id= : Alias of --company for consistency with other commands}
                             {--employee_id= : Only this employee id (runs in-process)}
@@ -22,7 +23,7 @@ class RebuildAttendancePresentationsCommand extends Command
 
     protected $description = 'Rebuild cached attendance index rows (status, late minutes, punches) and absence penalties';
 
-    public function handle(AttendancePresentationRebuildService $service): int
+    public function handle(AttendancePresentationRebuildService $service, OperationalMonthService $operationalMonthService): int
     {
         if ($this->option('month') && $this->option('date')) {
             $this->error('Use either --month or --date, not both.');
@@ -63,8 +64,9 @@ class RebuildAttendancePresentationsCommand extends Command
         if ($employeeId !== null) {
             if ($this->option('month')) {
                 $now = Carbon::now('Asia/Riyadh');
-                $start = $now->copy()->startOfMonth()->format('Y-m-d');
-                $end = Carbon::today('Asia/Riyadh')->format('Y-m-d');
+                $operationalRange = $operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $start = $operationalRange['start']->format('Y-m-d');
+                $end = Carbon::today('Asia/Riyadh')->min($operationalRange['end']->copy()->startOfDay())->format('Y-m-d');
                 $this->info("Rebuilding presentations for employee {$employeeId} from {$start} to {$end}...");
                 $service->rebuildEmployeeDateRange($employeeId, $start, $end);
             } else {
@@ -82,8 +84,9 @@ class RebuildAttendancePresentationsCommand extends Command
         if ($companyId !== null) {
             if ($this->option('month')) {
                 $now = Carbon::now('Asia/Riyadh');
-                $start = $now->copy()->startOfMonth()->format('Y-m-d');
-                $end = Carbon::today('Asia/Riyadh')->format('Y-m-d');
+                $operationalRange = $operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $start = $operationalRange['start']->format('Y-m-d');
+                $end = Carbon::today('Asia/Riyadh')->min($operationalRange['end']->copy()->startOfDay())->format('Y-m-d');
                 $this->info("Rebuilding presentations for company {$companyId} from {$start} to {$end}...");
                 $service->rebuildCompanyDateRange($companyId, $start, $end);
             } else {

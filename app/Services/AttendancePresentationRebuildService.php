@@ -20,7 +20,8 @@ class AttendancePresentationRebuildService
     private const TZ = 'Asia/Riyadh';
 
     public function __construct(
-        private AttendancePenaltyService $penaltyService
+        private AttendancePenaltyService $penaltyService,
+        private OperationalMonthService $operationalMonthService
     ) {}
 
     public function rebuildDateForAllCompanies(string $attDateYmd): void
@@ -40,8 +41,9 @@ class AttendancePresentationRebuildService
     public function rebuildCurrentMonthForAllCompanies(): void
     {
         $now = Carbon::now(self::TZ);
-        $start = $now->copy()->startOfMonth()->format('Y-m-d');
-        $end = Carbon::today(self::TZ)->format('Y-m-d');
+        $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+        $start = $operationalRange['start']->format('Y-m-d');
+        $end = Carbon::today(self::TZ)->min($operationalRange['end']->copy()->startOfDay())->format('Y-m-d');
 
         $companyIds = Employee::query()
             ->whereNotNull('company_id')

@@ -13,6 +13,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ZkDailyAttendance;
 use App\Services\AttendanceImportService;
+use App\Services\OperationalMonthService;
 use App\Jobs\ProcessBayzatSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +25,7 @@ class AttendanceController extends Controller
 {
     public function __construct(
         private AttendanceImportService $importService,
+        private OperationalMonthService $operationalMonthService,
     ) {}
 
     public function index(Request $request, Company $company): Response
@@ -69,8 +71,9 @@ class AttendanceController extends Controller
                 $endDate = $now->copy()->endOfWeek();
                 break;
             case 'month':
-                $startDate = $now->copy()->startOfMonth();
-                $endDate = $now->copy()->endOfMonth();
+                $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $startDate = $operationalRange['start'];
+                $endDate = $operationalRange['end'];
                 break;
             case 'custom':
                 if ($fromDate && $toDate) {
@@ -220,22 +223,25 @@ class AttendanceController extends Controller
                 $endDate = $now->copy()->endOfWeek();
                 break;
             case 'month':
-                $startDate = $now->copy()->startOfMonth();
-                $endDate = $now->copy()->endOfMonth();
+                $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $startDate = $operationalRange['start'];
+                $endDate = $operationalRange['end'];
                 break;
             case 'custom':
                 if ($fromDate && $toDate) {
                     $startDate = Carbon::parse($fromDate, 'Asia/Riyadh')->startOfDay();
                     $endDate = Carbon::parse($toDate, 'Asia/Riyadh')->endOfDay();
                 } else {
-                    // Fallback to current month if dates not provided
-                    $startDate = $now->copy()->startOfMonth();
-                    $endDate = $now->copy()->endOfMonth();
+                    // Fallback to current operational month if dates not provided
+                    $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                    $startDate = $operationalRange['start'];
+                    $endDate = $operationalRange['end'];
                 }
                 break;
             default:
-                $startDate = $now->copy()->startOfMonth();
-                $endDate = $now->copy()->endOfMonth();
+                $operationalRange = $this->operationalMonthService->resolveCurrentOperationalMonthRange($now);
+                $startDate = $operationalRange['start'];
+                $endDate = $operationalRange['end'];
         }
 
         // Query late attendance records

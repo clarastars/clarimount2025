@@ -59,14 +59,10 @@ class Leave extends Model
      */
     public function overlapsMonth(int $year, int $month): bool
     {
-        /** @var \Carbon\Carbon $start */
-        $start = $this->start_date;
-        /** @var \Carbon\Carbon $end */
-        $end = $this->end_date;
         $monthStart = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $monthEnd = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->endOfDay();
 
-        return $start->lte($monthEnd) && $end->gte($monthStart);
+        return $this->overlapsDateRange($monthStart, $monthEnd);
     }
 
     /**
@@ -77,12 +73,27 @@ class Leave extends Model
         $monthStart = \Carbon\Carbon::create($year, $month, 1)->startOfDay();
         $monthEnd = \Carbon\Carbon::create($year, $month, 1)->endOfMonth()->endOfDay();
 
-        /** @var \Carbon\Carbon $startDate */
-        $startDate = $this->start_date;
-        /** @var \Carbon\Carbon $endDate */
-        $endDate = $this->end_date;
-        $overlapStart = $startDate->copy()->max($monthStart);
-        $overlapEnd = $endDate->copy()->min($monthEnd);
+        return $this->daysInDateRange($monthStart, $monthEnd);
+    }
+
+    public function overlapsDateRange(\Carbon\Carbon $startDate, \Carbon\Carbon $endDate): bool
+    {
+        /** @var \Carbon\Carbon $start */
+        $start = $this->start_date;
+        /** @var \Carbon\Carbon $end */
+        $end = $this->end_date;
+
+        return $start->lte($endDate) && $end->gte($startDate);
+    }
+
+    public function daysInDateRange(\Carbon\Carbon $startDate, \Carbon\Carbon $endDate): int
+    {
+        /** @var \Carbon\Carbon $leaveStart */
+        $leaveStart = $this->start_date;
+        /** @var \Carbon\Carbon $leaveEnd */
+        $leaveEnd = $this->end_date;
+        $overlapStart = $leaveStart->copy()->max($startDate);
+        $overlapEnd = $leaveEnd->copy()->min($endDate);
 
         if ($overlapStart->gt($overlapEnd)) {
             return 0;

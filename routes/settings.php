@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
+use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -29,4 +30,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/email-test', [EmailTestController::class, 'index'])->name('settings.email-test.index');
     Route::post('settings/email-test', [EmailTestController::class, 'send'])->name('settings.email-test.send');
+
+    Route::get('settings/operational-month', [OperationalMonthSettingsController::class, 'edit'])->name('settings.operational-month.edit');
+    Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
 });
