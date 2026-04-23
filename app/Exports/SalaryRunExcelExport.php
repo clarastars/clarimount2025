@@ -80,6 +80,12 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         $itemAllowances = $item->allowances !== null ? (float) $item->allowances : 0;
         $detailedSum = $housing + $transport + $other + $food + $personalCar;
         $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : '';
+        [
+            $penaltiesColumnTotal,
+            $trafficViolationTotal,
+            $absenceTotal,
+            $attestationsTotal,
+        ] = $this->splitTotalsForExportColumns($item);
 
         return [
             $employeeName,
@@ -93,12 +99,75 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
             $additionalAllowances,
             $item->unpaid_leave_total !== null ? (float) $item->unpaid_leave_total : '',
             $debtTotal > 0 ? $debtTotal : '',
-            '', // مخالفات مرورية تحمل حادث - لا يوجد في النظام
-            $item->penalties_total !== null ? (float) $item->penalties_total : '',
+            $trafficViolationTotal > 0 ? $trafficViolationTotal : '',
+            $penaltiesColumnTotal > 0 ? $penaltiesColumnTotal : '',
             $item->social_insurance_deduction_total !== null ? (float) $item->social_insurance_deduction_total : '',
-            '', // غيابات - منفصل عن انقطاع ساعات إن لم يكن لدينا حقل
-            '', // تصديقات - لا يوجد في النظام
+            $absenceTotal > 0 ? $absenceTotal : '',
+            $attestationsTotal > 0 ? $attestationsTotal : '',
             $item->net_salary !== null ? (float) $item->net_salary : '',
+        ];
+    }
+
+    /**
+     * @return array{0: float, 1: float, 2: float, 3: float}
+     */
+    private function splitTotalsForExportColumns(object $item): array
+    {
+        $penaltiesTotal = 0.0;
+        $trafficViolationTotal = 0.0;
+        $absenceTotal = 0.0;
+        $attestationsTotal = 0.0;
+        $breakdown = is_array($item->breakdown ?? null) ? $item->breakdown : [];
+
+        foreach ($breakdown as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+
+            if (($line['source'] ?? null) !== 'penalty') {
+                if (($line['source'] ?? null) !== 'manual_deduction') {
+                    continue;
+                }
+
+                $amount = (float) ($line['amount'] ?? 0);
+                if ($amount <= 0) {
+                    continue;
+                }
+
+                $deductionType = (string) ($line['deduction_type'] ?? '');
+                if ($deductionType === 'absence') {
+                    $absenceTotal += $amount;
+                } elseif ($deductionType === 'traffic_violation') {
+                    $trafficViolationTotal += $amount;
+                } elseif ($deductionType === 'attestations') {
+                    $attestationsTotal += $amount;
+                } else {
+                    $penaltiesTotal += $amount;
+                }
+
+                continue;
+            }
+
+            $amount = (float) ($line['amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $category = (string) ($line['penalty_category'] ?? '');
+            $violationType = (string) ($line['violation_type'] ?? '');
+
+            if ($category === 'absence' || $violationType === 'absent_without_excuse') {
+                $absenceTotal += $amount;
+            } else {
+                $penaltiesTotal += $amount;
+            }
+        }
+
+        return [
+            round($penaltiesTotal, 2),
+            round($trafficViolationTotal, 2),
+            round($absenceTotal, 2),
+            round($attestationsTotal, 2),
         ];
     }
 

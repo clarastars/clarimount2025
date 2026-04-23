@@ -53,6 +53,7 @@ interface ApprovedPenalty {
 interface ManualDeduction {
   id: number
   type: 'manual'
+  deduction_type: 'penalties' | 'absence' | 'traffic_violation' | 'attestations'
   employee_id: number
   employee_name: string
   employee_code?: string
@@ -81,6 +82,7 @@ const createForm = useForm({
   employee_id: '' as number | '',
   amount: '',
   deduction_date: new Date().toISOString().slice(0, 10),
+  deduction_type: 'penalties',
   reason: '',
 })
 const employeesForCreate = ref<EmployeeOption[]>(props.employees)
@@ -120,6 +122,7 @@ function openCreateModal() {
   createForm.reset()
   createForm.company_id = props.company.id
   createForm.deduction_date = new Date().toISOString().slice(0, 10)
+  createForm.deduction_type = 'penalties'
   employeesForCreate.value = props.employees
   createModalOpen.value = true
 }
@@ -139,6 +142,7 @@ const selectedDeduction = ref<ManualDeduction | null>(null)
 const editForm = useForm({
   amount: '',
   deduction_date: '',
+  deduction_type: 'penalties' as 'penalties' | 'absence' | 'traffic_violation' | 'attestations',
   reason: '',
 })
 
@@ -147,6 +151,7 @@ function openEditModal(row: ManualDeduction) {
   editForm.reset()
   editForm.amount = String(row.amount)
   editForm.deduction_date = row.date
+  editForm.deduction_type = row.deduction_type
   editForm.reason = row.reason
   editModalOpen.value = true
 }
@@ -239,6 +244,17 @@ function formatCurrency(amount: number) {
 
 function isManual(row: DeductionRow): row is ManualDeduction {
   return row.type === 'manual'
+}
+
+function deductionTypeLabel(type: string) {
+  const map: Record<string, string> = {
+    penalties: t('attendance.deduction_type_penalties'),
+    absence: t('attendance.deduction_type_absence'),
+    traffic_violation: t('attendance.deduction_type_traffic_violation'),
+    attestations: t('attendance.deduction_type_attestations'),
+  }
+
+  return map[type] ?? t('attendance.deduction_type_manual')
 }
 </script>
 
@@ -357,7 +373,7 @@ function isManual(row: DeductionRow): row is ManualDeduction {
                         {{ t('attendance.deduction_type_penalty') }}
                       </Badge>
                       <Badge v-else variant="default">
-                        {{ t('attendance.deduction_type_manual') }}
+                        {{ deductionTypeLabel(row.deduction_type) }}
                       </Badge>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
@@ -483,6 +499,23 @@ function isManual(row: DeductionRow): row is ManualDeduction {
             </p>
           </div>
           <div>
+            <Label for="create-deduction-type">{{ t('attendance.deduction_type_category') }}</Label>
+            <select
+              id="create-deduction-type"
+              v-model="createForm.deduction_type"
+              class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              required
+            >
+              <option value="penalties">{{ t('attendance.deduction_type_penalties') }}</option>
+              <option value="absence">{{ t('attendance.deduction_type_absence') }}</option>
+              <option value="traffic_violation">{{ t('attendance.deduction_type_traffic_violation') }}</option>
+              <option value="attestations">{{ t('attendance.deduction_type_attestations') }}</option>
+            </select>
+            <p v-if="createForm.errors.deduction_type" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.deduction_type }}
+            </p>
+          </div>
+          <div>
             <Label for="create-reason">{{ t('attendance.deduction_reason') }}</Label>
             <textarea
               id="create-reason"
@@ -539,6 +572,21 @@ function isManual(row: DeductionRow): row is ManualDeduction {
             <Label for="edit-date">{{ t('attendance.deduction_date') }}</Label>
             <Input id="edit-date" v-model="editForm.deduction_date" type="date" class="mt-1" required />
             <p v-if="editForm.errors.deduction_date" class="text-sm text-red-500 mt-1">{{ editForm.errors.deduction_date }}</p>
+          </div>
+          <div>
+            <Label for="edit-deduction-type">{{ t('attendance.deduction_type_category') }}</Label>
+            <select
+              id="edit-deduction-type"
+              v-model="editForm.deduction_type"
+              class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              required
+            >
+              <option value="penalties">{{ t('attendance.deduction_type_penalties') }}</option>
+              <option value="absence">{{ t('attendance.deduction_type_absence') }}</option>
+              <option value="traffic_violation">{{ t('attendance.deduction_type_traffic_violation') }}</option>
+              <option value="attestations">{{ t('attendance.deduction_type_attestations') }}</option>
+            </select>
+            <p v-if="editForm.errors.deduction_type" class="text-sm text-red-500 mt-1">{{ editForm.errors.deduction_type }}</p>
           </div>
           <div>
             <Label for="edit-reason">{{ t('attendance.deduction_reason') }}</Label>

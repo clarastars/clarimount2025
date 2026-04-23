@@ -301,8 +301,28 @@
               </Button>
               <div class="min-w-0 flex-1">
                 <div class="font-medium">{{ penalty.date }}</div>
+                <div v-if="penalty.source === 'penalty'" class="text-xs mb-0.5">
+                  <span
+                    v-if="resolvePenaltyCategory(penalty) === 'absence'"
+                    class="inline-flex rounded bg-red-100 px-2 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                  >
+                    {{ t('salary_runs.penalty_type_absence') }}
+                  </span>
+                  <span
+                    v-else-if="resolvePenaltyCategory(penalty) === 'late'"
+                    class="inline-flex rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  >
+                    {{ t('salary_runs.penalty_type_late') }}
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700 dark:bg-slate-900/30 dark:text-slate-300"
+                  >
+                    {{ t('salary_runs.penalty_type_other') }}
+                  </span>
+                </div>
                 <div v-if="penalty.source === 'manual_deduction'" class="text-xs text-blue-600 dark:text-blue-400 mb-0.5">
-                  {{ t('attendance.deduction_type_manual') }}
+                  {{ manualDeductionTypeLabel(penalty) }}
                 </div>
                 <div v-if="penalty.source === 'unpaid_leave'" class="text-xs text-purple-600 dark:text-purple-400 mb-0.5">
                   {{ t('salary_runs.unpaid_leave_label') }}
@@ -473,12 +493,15 @@ interface Props {
       }>;
       breakdown: Array<{
         date: string;
+        violation_type?: string;
+        penalty_category?: 'late' | 'absence' | 'other';
         action_type: string;
         action_value: number | null;
         action_text: string;
         amount: number;
         penalty_amount?: number;
         late_minutes_deduction_amount?: number;
+        deduction_type?: 'penalties' | 'absence' | 'traffic_violation' | 'attestations';
         attendance_penalty_id?: number;
         employee_deduction_id?: number;
         leave_id?: number;
@@ -624,6 +647,35 @@ function getBreakdownLineMeta(line: Record<string, unknown>): { line_type: strin
 function breakdownLineKey(itemId: number, line: Record<string, unknown>): string {
   const m = getBreakdownLineMeta(line);
   return m ? `${itemId}-${m.line_type}-${m.line_id}` : `${itemId}-legacy`;
+}
+
+function resolvePenaltyCategory(line: Record<string, unknown>): 'late' | 'absence' | 'other' {
+  const category = String(line.penalty_category || '');
+  if (category === 'late' || category === 'absence' || category === 'other') {
+    return category;
+  }
+
+  const violationType = String(line.violation_type || '');
+  if (violationType === 'absent_without_excuse') {
+    return 'absence';
+  }
+  if (violationType.startsWith('late_')) {
+    return 'late';
+  }
+
+  return 'other';
+}
+
+function manualDeductionTypeLabel(line: Record<string, unknown>): string {
+  const type = String(line.deduction_type || '')
+  const map: Record<string, string> = {
+    penalties: t('attendance.deduction_type_penalties'),
+    absence: t('attendance.deduction_type_absence'),
+    traffic_violation: t('attendance.deduction_type_traffic_violation'),
+    attestations: t('attendance.deduction_type_attestations'),
+  }
+
+  return map[type] ?? t('attendance.deduction_type_manual')
 }
 
 function removeBreakdownLine(line: Record<string, unknown>) {

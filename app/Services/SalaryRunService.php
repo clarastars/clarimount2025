@@ -86,9 +86,12 @@ class SalaryRunService
                     $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
                     $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
                     $penaltiesTotal += $totalForPenalty;
+                    $penaltyCategory = $this->resolvePenaltyCategory((string) $penalty->violation_type);
 
                     $breakdown[] = [
                         'date' => \Carbon\Carbon::parse((string) $penalty->attendance_date)->format('Y-m-d'),
+                        'violation_type' => $penalty->violation_type,
+                        'penalty_category' => $penaltyCategory,
                         'action_type' => $penalty->action_type,
                         'action_value' => $penalty->action_value,
                         'action_text' => $penalty->action_text,
@@ -119,6 +122,7 @@ class SalaryRunService
                     $breakdown[] = [
                         'date' => \Carbon\Carbon::parse((string) $deduction->deduction_date)->format('Y-m-d'),
                         'action_type' => 'manual_deduction',
+                        'deduction_type' => (string) $deduction->deduction_type,
                         'action_value' => null,
                         'action_text' => $deduction->reason,
                         'amount' => $amount,
@@ -284,6 +288,19 @@ class SalaryRunService
         }
 
         return false;
+    }
+
+    private function resolvePenaltyCategory(string $violationType): string
+    {
+        if ($violationType === 'absent_without_excuse') {
+            return 'absence';
+        }
+
+        if (str_starts_with($violationType, 'late_')) {
+            return 'late';
+        }
+
+        return 'other';
     }
 
     /**

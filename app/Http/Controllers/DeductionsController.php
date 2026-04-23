@@ -76,7 +76,7 @@ class DeductionsController extends Controller
                 'employee_id' => $p->employee_id,
                 'employee_name' => $p->employee ? $p->employee->full_name : '-',
                 'employee_code' => $p->employee?->employee_id,
-                'date' => $p->attendance_date->format('Y-m-d'),
+                'date' => \Carbon\Carbon::parse((string) $p->attendance_date)->format('Y-m-d'),
                 'action_text' => $p->action_text,
                 'reason_text' => $p->reason_text,
                 'late_minutes_deduction_amount' => $p->late_minutes_deduction_amount !== null ? (float) $p->late_minutes_deduction_amount : null,
@@ -89,8 +89,9 @@ class DeductionsController extends Controller
                 'employee_id' => $d->employee_id,
                 'employee_name' => $d->employee ? $d->employee->full_name : '-',
                 'employee_code' => $d->employee?->employee_id,
-                'date' => $d->deduction_date->format('Y-m-d'),
+                'date' => \Carbon\Carbon::parse((string) $d->deduction_date)->format('Y-m-d'),
                 'amount' => (float) $d->amount,
+                'deduction_type' => $d->deduction_type,
                 'reason' => $d->reason,
                 'created_at' => $d->created_at->toIso8601String(),
                 'creator_name' => $d->creator?->name,
@@ -112,6 +113,7 @@ class DeductionsController extends Controller
             ],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'deduction_date' => ['required', 'date'],
+            'deduction_type' => ['required', Rule::in(EmployeeDeduction::TYPES)],
             'reason' => ['required', 'string', 'max:65535'],
         ]);
 
@@ -119,6 +121,7 @@ class DeductionsController extends Controller
             'employee_id' => $validated['employee_id'],
             'amount' => $validated['amount'],
             'deduction_date' => $validated['deduction_date'],
+            'deduction_type' => $validated['deduction_type'],
             'reason' => $validated['reason'],
             'created_by' => $user->id,
         ]);
@@ -143,6 +146,7 @@ class DeductionsController extends Controller
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
             'deduction_date' => ['required', 'date'],
+            'deduction_type' => ['required', Rule::in(EmployeeDeduction::TYPES)],
             'reason' => ['required', 'string', 'max:65535'],
         ]);
 

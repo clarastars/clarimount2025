@@ -9,10 +9,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeDeduction extends Model
 {
+    public const TYPE_PENALTIES = 'penalties';
+    public const TYPE_ABSENCE = 'absence';
+    public const TYPE_TRAFFIC_VIOLATION = 'traffic_violation';
+    public const TYPE_ATTESTATIONS = 'attestations';
+
+    public const TYPES = [
+        self::TYPE_PENALTIES,
+        self::TYPE_ABSENCE,
+        self::TYPE_TRAFFIC_VIOLATION,
+        self::TYPE_ATTESTATIONS,
+    ];
+
     protected $fillable = [
         'employee_id',
         'amount',
         'deduction_date',
+        'deduction_type',
         'reason',
         'created_by',
     ];
