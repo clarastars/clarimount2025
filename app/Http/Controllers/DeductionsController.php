@@ -8,6 +8,7 @@ use App\Models\AttendancePenalty;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeDeduction;
+use App\Services\ManualDeductionAmountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,10 @@ use Inertia\Response;
 
 class DeductionsController extends Controller
 {
+    public function __construct(
+        private readonly ManualDeductionAmountService $manualDeductionAmountService
+    ) {}
+
     /**
      * List approved attendance penalties and manual deductions for the month.
      * Filter by company (from route) and optional employee.
@@ -30,14 +35,14 @@ class DeductionsController extends Controller
 
         $month = $request->query('month', now()->format('Y-m'));
         $employeeId = $request->query('employee_id');
-        $start = \Carbon\Carbon::parse($month . '-01')->startOfMonth();
+        $start = \Carbon\Carbon::parse($month.'-01')->startOfMonth();
         $end = $start->copy()->endOfMonth();
 
         $employees = Employee::query()
             ->where('company_id', $company->id)
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id']);
+            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'basic_salary']);
 
         $approvedPenaltiesQuery = AttendancePenalty::query()
             ->approved()
@@ -91,6 +96,9 @@ class DeductionsController extends Controller
                 'employee_code' => $d->employee?->employee_id,
                 'date' => \Carbon\Carbon::parse((string) $d->deduction_date)->format('Y-m-d'),
                 'amount' => (float) $d->amount,
+                'amount_input_mode' => $d->amount_input_mode ?? ManualDeductionAmountService::INPUT_MANUAL,
+                'amount_input_days' => $d->amount_input_days !== null ? (float) $d->amount_input_days : null,
+                'amount_input_percent' => $d->amount_input_percent !== null ? (float) $d->amount_input_percent : null,
                 'deduction_type' => $d->deduction_type,
                 'reason' => $d->reason,
                 'created_at' => $d->created_at->toIso8601String(),
@@ -105,24 +113,81 @@ class DeductionsController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
+
         $validated = $request->validate([
             'company_id' => ['required', Rule::in($user->ownedCompanies()->pluck('id')->toArray())],
             'employee_id' => [
                 'required',
                 Rule::exists('employees', 'id')->where('company_id', $request->input('company_id')),
             ],
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount_input_mode' => ['required', Rule::in(ManualDeductionAmountService::INPUT_MODES)],
+            'amount' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_MANUAL),
+                'nullable',
+                'numeric',
+                'min:0.01',
+            ],
+            'amount_input_days' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAYS),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:365',
+            ],
+            'amount_input_percent' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:100',
+            ],
             'deduction_date' => ['required', 'date'],
             'deduction_type' => ['required', Rule::in(EmployeeDeduction::TYPES)],
-            'reason' => ['required', 'string', 'max:65535'],
+            'reason' => ['nullable', 'string', 'max:65535'],
         ]);
+
+        $mode = $validated['amount_input_mode'];
+        $employee = Employee::query()->whereKey($validated['employee_id'])->firstOrFail();
+
+        if (in_array($mode, [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT], true)
+            && ! $this->manualDeductionAmountService->hasValidBasicSalary($employee)) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_basic_salary_required')]);
+        }
+
+        $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
+            ? (float) $validated['amount'] : null;
+        $days = isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null
+            ? (float) $validated['amount_input_days'] : null;
+        $percent = isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null
+            ? (float) $validated['amount_input_percent'] : null;
+
+        $resolved = $this->manualDeductionAmountService->resolveAmount(
+            $employee,
+            $mode,
+            $manualAmount,
+            $days,
+            $percent
+        );
+
+        if ($resolved === null || $resolved < 0.01) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_amount_invalid')]);
+        }
 
         EmployeeDeduction::create([
             'employee_id' => $validated['employee_id'],
-            'amount' => $validated['amount'],
+            'amount' => $resolved,
+            'amount_input_mode' => $mode,
+            'amount_input_days' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAYS ? $days : null,
+            'amount_input_percent' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT ? $percent : null,
             'deduction_date' => $validated['deduction_date'],
             'deduction_type' => $validated['deduction_type'],
-            'reason' => $validated['reason'],
+            'reason' => (string) ($validated['reason'] ?? ''),
             'created_by' => $user->id,
         ]);
 
@@ -144,13 +209,77 @@ class DeductionsController extends Controller
         }
 
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount_input_mode' => ['required', Rule::in(ManualDeductionAmountService::INPUT_MODES)],
+            'amount' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_MANUAL),
+                'nullable',
+                'numeric',
+                'min:0.01',
+            ],
+            'amount_input_days' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAYS),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:365',
+            ],
+            'amount_input_percent' => [
+                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:100',
+            ],
             'deduction_date' => ['required', 'date'],
             'deduction_type' => ['required', Rule::in(EmployeeDeduction::TYPES)],
-            'reason' => ['required', 'string', 'max:65535'],
+            'reason' => ['nullable', 'string', 'max:65535'],
         ]);
 
-        $deduction->update($validated);
+        $mode = $validated['amount_input_mode'];
+        $employee = $deduction->employee;
+        if ($employee === null) {
+            abort(500);
+        }
+
+        if (in_array($mode, [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT], true)
+            && ! $this->manualDeductionAmountService->hasValidBasicSalary($employee)) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_basic_salary_required')]);
+        }
+
+        $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
+            ? (float) $validated['amount'] : null;
+        $days = isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null
+            ? (float) $validated['amount_input_days'] : null;
+        $percent = isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null
+            ? (float) $validated['amount_input_percent'] : null;
+
+        $resolved = $this->manualDeductionAmountService->resolveAmount(
+            $employee,
+            $mode,
+            $manualAmount,
+            $days,
+            $percent
+        );
+
+        if ($resolved === null || $resolved < 0.01) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_amount_invalid')]);
+        }
+
+        $deduction->update([
+            'amount' => $resolved,
+            'amount_input_mode' => $mode,
+            'amount_input_days' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAYS ? $days : null,
+            'amount_input_percent' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT ? $percent : null,
+            'deduction_date' => $validated['deduction_date'],
+            'deduction_type' => $validated['deduction_type'],
+            'reason' => (string) ($validated['reason'] ?? ''),
+        ]);
 
         return redirect()
             ->route('attendance.deductions', ['company' => $deduction->employee->company_id])

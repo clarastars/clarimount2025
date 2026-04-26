@@ -10,8 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class EmployeeDeduction extends Model
 {
     public const TYPE_PENALTIES = 'penalties';
+
     public const TYPE_ABSENCE = 'absence';
+
     public const TYPE_TRAFFIC_VIOLATION = 'traffic_violation';
+
     public const TYPE_ATTESTATIONS = 'attestations';
 
     public const TYPES = [
@@ -24,6 +27,9 @@ class EmployeeDeduction extends Model
     protected $fillable = [
         'employee_id',
         'amount',
+        'amount_input_mode',
+        'amount_input_days',
+        'amount_input_percent',
         'deduction_date',
         'deduction_type',
         'reason',
@@ -33,6 +39,8 @@ class EmployeeDeduction extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'deduction_date' => 'date',
+        'amount_input_days' => 'decimal:4',
+        'amount_input_percent' => 'decimal:4',
     ];
 
     public function employee(): BelongsTo

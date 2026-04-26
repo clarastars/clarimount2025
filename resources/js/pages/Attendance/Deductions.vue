@@ -34,6 +34,7 @@ interface EmployeeOption {
   last_name: string
   employee_id?: string
   company_id: number
+  basic_salary?: number | string | null
 }
 
 interface ApprovedPenalty {
@@ -50,6 +51,8 @@ interface ApprovedPenalty {
   approver_name: string | null
 }
 
+type AmountInputMode = 'manual' | 'basic_days' | 'basic_daily_percent'
+
 interface ManualDeduction {
   id: number
   type: 'manual'
@@ -59,6 +62,9 @@ interface ManualDeduction {
   employee_code?: string
   date: string
   amount: number
+  amount_input_mode?: AmountInputMode
+  amount_input_days?: number | null
+  amount_input_percent?: number | null
   reason: string
   created_at: string
   creator_name: string | null
@@ -80,7 +86,10 @@ const createModalOpen = ref(false)
 const createForm = useForm({
   company_id: props.company.id,
   employee_id: '' as number | '',
+  amount_input_mode: 'manual' as AmountInputMode,
   amount: '',
+  amount_input_days: '',
+  amount_input_percent: '',
   deduction_date: new Date().toISOString().slice(0, 10),
   deduction_type: 'penalties',
   reason: '',
@@ -123,6 +132,10 @@ function openCreateModal() {
   createForm.company_id = props.company.id
   createForm.deduction_date = new Date().toISOString().slice(0, 10)
   createForm.deduction_type = 'penalties'
+  createForm.amount_input_mode = 'manual'
+  createForm.amount = ''
+  createForm.amount_input_days = ''
+  createForm.amount_input_percent = ''
   employeesForCreate.value = props.employees
   createModalOpen.value = true
 }
@@ -140,16 +153,113 @@ function submitCreate() {
 const editModalOpen = ref(false)
 const selectedDeduction = ref<ManualDeduction | null>(null)
 const editForm = useForm({
+  amount_input_mode: 'manual' as AmountInputMode,
   amount: '',
+  amount_input_days: '',
+  amount_input_percent: '',
   deduction_date: '',
   deduction_type: 'penalties' as 'penalties' | 'absence' | 'traffic_violation' | 'attestations',
   reason: '',
 })
 
+function toNum(v: string): number | null {
+  const n = parseFloat(String(v).replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+function basicDailyWageSar(emp: EmployeeOption | undefined): number | null {
+  if (!emp) return null
+  const b = emp.basic_salary
+  if (b === null || b === undefined || b === '') return null
+  const n = Number(b)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round((n / 30) * 1e6) / 1e6
+}
+
+function resolvePreviewAmount(
+  mode: AmountInputMode,
+  basicDaily: number | null,
+  manual: string,
+  daysStr: string,
+  pctStr: string
+): number | null {
+  if (mode === 'manual') {
+    const a = toNum(manual)
+    return a !== null && a > 0 ? Math.round(a * 100) / 100 : null
+  }
+  if (basicDaily == null) return null
+  if (mode === 'basic_days') {
+    const d = toNum(daysStr)
+    if (d === null || d <= 0) return null
+    return Math.round(d * basicDaily * 100) / 100
+  }
+  if (mode === 'basic_daily_percent') {
+    const p = toNum(pctStr)
+    if (p === null || p <= 0) return null
+    return Math.round((p / 100) * basicDaily * 100) / 100
+  }
+  return null
+}
+
+const createSelectedEmployee = computed((): EmployeeOption | undefined => {
+  const id = createForm.employee_id
+  if (id === '' || id == null) return undefined
+  return employeesForCreate.value.find((e) => e.id === id)
+})
+
+const createAmountPreview = computed(() => {
+  const daily = basicDailyWageSar(createSelectedEmployee.value)
+  return resolvePreviewAmount(
+    createForm.amount_input_mode,
+    daily,
+    createForm.amount,
+    createForm.amount_input_days,
+    createForm.amount_input_percent
+  )
+})
+
+const editSelectedEmployee = computed((): EmployeeOption | undefined => {
+  const id = selectedDeduction.value?.employee_id
+  if (id == null) return undefined
+  return props.employees.find((e) => e.id === id)
+})
+
+const editAmountPreview = computed(() => {
+  const daily = basicDailyWageSar(editSelectedEmployee.value)
+  return resolvePreviewAmount(
+    editForm.amount_input_mode,
+    daily,
+    editForm.amount,
+    editForm.amount_input_days,
+    editForm.amount_input_percent
+  )
+})
+
+const needsBasicForCreate = computed(
+  () =>
+    createForm.amount_input_mode === 'basic_days' || createForm.amount_input_mode === 'basic_daily_percent'
+)
+const hasBasicForCreate = computed(() => basicDailyWageSar(createSelectedEmployee.value) != null)
+const needsBasicForEdit = computed(
+  () =>
+    editForm.amount_input_mode === 'basic_days' || editForm.amount_input_mode === 'basic_daily_percent'
+)
+const hasBasicForEdit = computed(() => basicDailyWageSar(editSelectedEmployee.value) != null)
+
 function openEditModal(row: ManualDeduction) {
   selectedDeduction.value = row
   editForm.reset()
-  editForm.amount = String(row.amount)
+  const mode = (row.amount_input_mode ?? 'manual') as AmountInputMode
+  editForm.amount_input_mode = mode
+  if (mode === 'manual') {
+    editForm.amount = String(row.amount)
+    editForm.amount_input_days = ''
+    editForm.amount_input_percent = ''
+  } else {
+    editForm.amount = ''
+    editForm.amount_input_days = row.amount_input_days != null ? String(row.amount_input_days) : ''
+    editForm.amount_input_percent = row.amount_input_percent != null ? String(row.amount_input_percent) : ''
+  }
   editForm.deduction_date = row.date
   editForm.deduction_type = row.deduction_type
   editForm.reason = row.reason
@@ -385,7 +495,7 @@ function deductionTypeLabel(type: string) {
                     </td>
                     <td class="px-4 py-3 text-sm">
                       <template v-if="isManual(row)">
-                        <span class="font-medium">{{ row.amount }}</span>
+                        <span class="font-medium">{{ formatCurrency(row.amount) }}</span>
                       </template>
                       <template v-else>
                         <div class="flex flex-col gap-0.5">
@@ -397,7 +507,8 @@ function deductionTypeLabel(type: string) {
                       </template>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" :title="isManual(row) ? row.reason : row.reason_text">
-                      {{ isManual(row) ? row.reason : row.reason_text }}
+                      <template v-if="isManual(row)">{{ row.reason?.trim() ? row.reason : '—' }}</template>
+                      <template v-else>{{ row.reason_text }}</template>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                       <template v-if="isManual(row)">
@@ -431,7 +542,7 @@ function deductionTypeLabel(type: string) {
 
     <!-- Create deduction modal -->
     <Dialog :open="createModalOpen" @update:open="(v: boolean) => (createModalOpen = v)">
-      <DialogContent class="max-w-md">
+      <DialogContent class="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ t('attendance.create_deduction') }}</DialogTitle>
           <DialogDescription>
@@ -471,6 +582,26 @@ function deductionTypeLabel(type: string) {
             </p>
           </div>
           <div>
+            <Label for="create-amount-mode">{{ t('attendance.deduction_amount_mode') }}</Label>
+            <select
+              id="create-amount-mode"
+              v-model="createForm.amount_input_mode"
+              class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="manual">{{ t('attendance.deduction_mode_manual') }}</option>
+              <option value="basic_days">{{ t('attendance.deduction_mode_basic_days') }}</option>
+              <option value="basic_daily_percent">
+                {{ t('attendance.deduction_mode_basic_daily_percent') }}
+              </option>
+            </select>
+          </div>
+          <div
+            v-if="needsBasicForCreate && createForm.employee_id && !hasBasicForCreate"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_basic_salary_unavailable') }}
+          </div>
+          <div v-if="createForm.amount_input_mode === 'manual'">
             <Label for="create-amount">{{ t('attendance.deduction_amount') }}</Label>
             <Input
               id="create-amount"
@@ -479,11 +610,55 @@ function deductionTypeLabel(type: string) {
               step="0.01"
               min="0.01"
               class="mt-1"
-              required
+              :required="createForm.amount_input_mode === 'manual'"
             />
             <p v-if="createForm.errors.amount" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.amount }}
             </p>
+          </div>
+          <div v-else-if="createForm.amount_input_mode === 'basic_days'">
+            <Label for="create-input-days">{{ t('attendance.deduction_input_days') }}</Label>
+            <Input
+              id="create-input-days"
+              v-model="createForm.amount_input_days"
+              type="number"
+              step="any"
+              min="0.01"
+              class="mt-1"
+              :required="createForm.amount_input_mode === 'basic_days'"
+            />
+            <p v-if="createForm.errors.amount_input_days" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount_input_days }}
+            </p>
+            <p v-if="createForm.errors.amount" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount }}
+            </p>
+          </div>
+          <div v-else>
+            <Label for="create-input-pct">{{ t('attendance.deduction_input_percent') }}</Label>
+            <Input
+              id="create-input-pct"
+              v-model="createForm.amount_input_percent"
+              type="number"
+              step="any"
+              min="0.01"
+              max="100"
+              class="mt-1"
+              :required="createForm.amount_input_mode === 'basic_daily_percent'"
+            />
+            <p v-if="createForm.errors.amount_input_percent" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount_input_percent }}
+            </p>
+            <p v-if="createForm.errors.amount" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount }}
+            </p>
+          </div>
+          <div
+            v-if="createAmountPreview != null && createForm.employee_id"
+            class="text-sm text-muted-foreground"
+          >
+            <span class="font-medium text-foreground">{{ t('attendance.deduction_computed_amount') }}:</span>
+            {{ formatCurrency(createAmountPreview) }}
           </div>
           <div>
             <Label for="create-date">{{ t('attendance.deduction_date') }}</Label>
@@ -516,14 +691,16 @@ function deductionTypeLabel(type: string) {
             </p>
           </div>
           <div>
-            <Label for="create-reason">{{ t('attendance.deduction_reason') }}</Label>
+            <Label for="create-reason">
+              {{ t('attendance.deduction_reason') }}
+              <span class="text-muted-foreground font-normal text-xs">({{ t('common.optional') }})</span>
+            </Label>
             <textarea
               id="create-reason"
               v-model="createForm.reason"
               rows="3"
               class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               :placeholder="t('attendance.deduction_reason_placeholder')"
-              required
             />
             <p v-if="createForm.errors.reason" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.reason }}
@@ -543,7 +720,7 @@ function deductionTypeLabel(type: string) {
 
     <!-- Edit deduction modal -->
     <Dialog :open="editModalOpen" @update:open="(v: boolean) => !v && closeEditModal()">
-      <DialogContent class="max-w-md">
+      <DialogContent class="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{{ t('attendance.edit_deduction') }}</DialogTitle>
           <DialogDescription v-if="selectedDeduction">
@@ -556,6 +733,26 @@ function deductionTypeLabel(type: string) {
             <p class="mt-1 text-sm font-medium">{{ selectedDeduction.employee_name }}</p>
           </div>
           <div>
+            <Label for="edit-amount-mode">{{ t('attendance.deduction_amount_mode') }}</Label>
+            <select
+              id="edit-amount-mode"
+              v-model="editForm.amount_input_mode"
+              class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="manual">{{ t('attendance.deduction_mode_manual') }}</option>
+              <option value="basic_days">{{ t('attendance.deduction_mode_basic_days') }}</option>
+              <option value="basic_daily_percent">
+                {{ t('attendance.deduction_mode_basic_daily_percent') }}
+              </option>
+            </select>
+          </div>
+          <div
+            v-if="needsBasicForEdit && !hasBasicForEdit"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_basic_salary_unavailable') }}
+          </div>
+          <div v-if="editForm.amount_input_mode === 'manual'">
             <Label for="edit-amount">{{ t('attendance.deduction_amount') }}</Label>
             <Input
               id="edit-amount"
@@ -564,9 +761,46 @@ function deductionTypeLabel(type: string) {
               step="0.01"
               min="0.01"
               class="mt-1"
-              required
             />
             <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
+          </div>
+          <div v-else-if="editForm.amount_input_mode === 'basic_days'">
+            <Label for="edit-input-days">{{ t('attendance.deduction_input_days') }}</Label>
+            <Input
+              id="edit-input-days"
+              v-model="editForm.amount_input_days"
+              type="number"
+              step="any"
+              min="0.01"
+              class="mt-1"
+            />
+            <p v-if="editForm.errors.amount_input_days" class="text-sm text-red-500 mt-1">
+              {{ editForm.errors.amount_input_days }}
+            </p>
+            <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
+          </div>
+          <div v-else>
+            <Label for="edit-input-pct">{{ t('attendance.deduction_input_percent') }}</Label>
+            <Input
+              id="edit-input-pct"
+              v-model="editForm.amount_input_percent"
+              type="number"
+              step="any"
+              min="0.01"
+              max="100"
+              class="mt-1"
+            />
+            <p v-if="editForm.errors.amount_input_percent" class="text-sm text-red-500 mt-1">
+              {{ editForm.errors.amount_input_percent }}
+            </p>
+            <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
+          </div>
+          <div
+            v-if="editAmountPreview != null && selectedDeduction"
+            class="text-sm text-muted-foreground"
+          >
+            <span class="font-medium text-foreground">{{ t('attendance.deduction_computed_amount') }}:</span>
+            {{ formatCurrency(editAmountPreview) }}
           </div>
           <div>
             <Label for="edit-date">{{ t('attendance.deduction_date') }}</Label>
@@ -589,14 +823,16 @@ function deductionTypeLabel(type: string) {
             <p v-if="editForm.errors.deduction_type" class="text-sm text-red-500 mt-1">{{ editForm.errors.deduction_type }}</p>
           </div>
           <div>
-            <Label for="edit-reason">{{ t('attendance.deduction_reason') }}</Label>
+            <Label for="edit-reason">
+              {{ t('attendance.deduction_reason') }}
+              <span class="text-muted-foreground font-normal text-xs">({{ t('common.optional') }})</span>
+            </Label>
             <textarea
               id="edit-reason"
               v-model="editForm.reason"
               rows="3"
               class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               :placeholder="t('attendance.deduction_reason_placeholder')"
-              required
             />
             <p v-if="editForm.errors.reason" class="text-sm text-red-500 mt-1">{{ editForm.errors.reason }}</p>
           </div>
