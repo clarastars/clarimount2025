@@ -7,7 +7,8 @@ namespace App\Services;
 use App\Models\Employee;
 
 /**
- * Resolves manual deduction amount from the same daily-basic rules as {@see SalaryRunService} (basic ÷ 30).
+ * Resolves manual deduction using the same daily rates as {@see SalaryRunService}:
+ * daily basic = basic_salary / 30; daily gross = (basic_salary + allowances) / 30.
  */
 class ManualDeductionAmountService
 {
@@ -17,10 +18,16 @@ class ManualDeductionAmountService
 
     public const INPUT_BASIC_DAILY_PERCENT = 'basic_daily_percent';
 
+    public const INPUT_GROSS_DAYS = 'gross_days';
+
+    public const INPUT_GROSS_DAILY_PERCENT = 'gross_daily_percent';
+
     public const INPUT_MODES = [
         self::INPUT_MANUAL,
         self::INPUT_BASIC_DAYS,
         self::INPUT_BASIC_DAILY_PERCENT,
+        self::INPUT_GROSS_DAYS,
+        self::INPUT_GROSS_DAILY_PERCENT,
     ];
 
     public function hasValidBasicSalary(Employee $employee): bool
@@ -28,6 +35,19 @@ class ManualDeductionAmountService
         $basic = $employee->basic_salary;
 
         return $basic !== null && (float) $basic > 0;
+    }
+
+    public function grossMonthly(Employee $employee): float
+    {
+        $basic = (float) ($employee->basic_salary ?? 0);
+        $allowances = (float) ($employee->allowances ?? 0);
+
+        return $basic + $allowances;
+    }
+
+    public function hasValidGrossSalary(Employee $employee): bool
+    {
+        return $this->grossMonthly($employee) > 0;
     }
 
     /**
@@ -40,6 +60,18 @@ class ManualDeductionAmountService
         }
 
         return round((float) $employee->basic_salary / 30, 8);
+    }
+
+    /**
+     * Gross daily wage: (basic_salary + allowances) / 30, same as {@see SalaryRunService} dailyWage.
+     */
+    public function grossDailyWage(Employee $employee): ?float
+    {
+        if (! $this->hasValidGrossSalary($employee)) {
+            return null;
+        }
+
+        return round($this->grossMonthly($employee) / 30, 8);
     }
 
     public function resolveAmount(
@@ -55,6 +87,8 @@ class ManualDeductionAmountService
                 : null,
             self::INPUT_BASIC_DAYS => $this->fromBasicDays($employee, $days),
             self::INPUT_BASIC_DAILY_PERCENT => $this->fromBasicDailyPercent($employee, $percent),
+            self::INPUT_GROSS_DAYS => $this->fromGrossDays($employee, $days),
+            self::INPUT_GROSS_DAILY_PERCENT => $this->fromGrossDailyPercent($employee, $percent),
             default => null,
         };
     }
@@ -78,6 +112,32 @@ class ManualDeductionAmountService
             return null;
         }
         $daily = $this->basicDailyWage($employee);
+        if ($daily === null) {
+            return null;
+        }
+
+        return round(($percent / 100) * $daily, 2);
+    }
+
+    public function fromGrossDays(Employee $employee, ?float $days): ?float
+    {
+        if ($days === null || $days <= 0) {
+            return null;
+        }
+        $daily = $this->grossDailyWage($employee);
+        if ($daily === null) {
+            return null;
+        }
+
+        return round($days * $daily, 2);
+    }
+
+    public function fromGrossDailyPercent(Employee $employee, ?float $percent): ?float
+    {
+        if ($percent === null || $percent <= 0) {
+            return null;
+        }
+        $daily = $this->grossDailyWage($employee);
         if ($daily === null) {
             return null;
         }

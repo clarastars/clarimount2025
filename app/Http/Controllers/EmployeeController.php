@@ -710,6 +710,7 @@ class EmployeeController extends Controller
                     'first_name' => $employee->first_name,
                     'last_name' => $employee->last_name,
                     'basic_salary' => $employee->basic_salary,
+                    'allowances' => $employee->allowances,
                     'email' => $employee->work_email ?: $employee->personal_email,
                     'job_title' => $employee->job_title,
                     'department' => $employee->department,

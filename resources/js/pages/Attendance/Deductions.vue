@@ -35,6 +35,7 @@ interface EmployeeOption {
   employee_id?: string
   company_id: number
   basic_salary?: number | string | null
+  allowances?: number | string | null
 }
 
 interface ApprovedPenalty {
@@ -51,7 +52,12 @@ interface ApprovedPenalty {
   approver_name: string | null
 }
 
-type AmountInputMode = 'manual' | 'basic_days' | 'basic_daily_percent'
+type AmountInputMode =
+  | 'manual'
+  | 'basic_days'
+  | 'basic_daily_percent'
+  | 'gross_days'
+  | 'gross_daily_percent'
 
 interface ManualDeduction {
   id: number
@@ -176,9 +182,21 @@ function basicDailyWageSar(emp: EmployeeOption | undefined): number | null {
   return Math.round((n / 30) * 1e6) / 1e6
 }
 
+/** Gross daily = (basic + allowances) / 30, same as salary run. */
+function grossDailyWageSar(emp: EmployeeOption | undefined): number | null {
+  if (!emp) return null
+  const b = Number(emp.basic_salary ?? 0)
+  const a = Number(emp.allowances ?? 0)
+  if (!Number.isFinite(b) || !Number.isFinite(a)) return null
+  const gross = b + a
+  if (gross <= 0) return null
+  return Math.round((gross / 30) * 1e6) / 1e6
+}
+
 function resolvePreviewAmount(
   mode: AmountInputMode,
   basicDaily: number | null,
+  grossDaily: number | null,
   manual: string,
   daysStr: string,
   pctStr: string
@@ -187,16 +205,29 @@ function resolvePreviewAmount(
     const a = toNum(manual)
     return a !== null && a > 0 ? Math.round(a * 100) / 100 : null
   }
-  if (basicDaily == null) return null
   if (mode === 'basic_days') {
+    if (basicDaily == null) return null
     const d = toNum(daysStr)
     if (d === null || d <= 0) return null
     return Math.round(d * basicDaily * 100) / 100
   }
   if (mode === 'basic_daily_percent') {
+    if (basicDaily == null) return null
     const p = toNum(pctStr)
     if (p === null || p <= 0) return null
     return Math.round((p / 100) * basicDaily * 100) / 100
+  }
+  if (mode === 'gross_days') {
+    if (grossDaily == null) return null
+    const d = toNum(daysStr)
+    if (d === null || d <= 0) return null
+    return Math.round(d * grossDaily * 100) / 100
+  }
+  if (mode === 'gross_daily_percent') {
+    if (grossDaily == null) return null
+    const p = toNum(pctStr)
+    if (p === null || p <= 0) return null
+    return Math.round((p / 100) * grossDaily * 100) / 100
   }
   return null
 }
@@ -208,10 +239,11 @@ const createSelectedEmployee = computed((): EmployeeOption | undefined => {
 })
 
 const createAmountPreview = computed(() => {
-  const daily = basicDailyWageSar(createSelectedEmployee.value)
+  const emp = createSelectedEmployee.value
   return resolvePreviewAmount(
     createForm.amount_input_mode,
-    daily,
+    basicDailyWageSar(emp),
+    grossDailyWageSar(emp),
     createForm.amount,
     createForm.amount_input_days,
     createForm.amount_input_percent
@@ -225,10 +257,11 @@ const editSelectedEmployee = computed((): EmployeeOption | undefined => {
 })
 
 const editAmountPreview = computed(() => {
-  const daily = basicDailyWageSar(editSelectedEmployee.value)
+  const emp = editSelectedEmployee.value
   return resolvePreviewAmount(
     editForm.amount_input_mode,
-    daily,
+    basicDailyWageSar(emp),
+    grossDailyWageSar(emp),
     editForm.amount,
     editForm.amount_input_days,
     editForm.amount_input_percent
@@ -240,11 +273,20 @@ const needsBasicForCreate = computed(
     createForm.amount_input_mode === 'basic_days' || createForm.amount_input_mode === 'basic_daily_percent'
 )
 const hasBasicForCreate = computed(() => basicDailyWageSar(createSelectedEmployee.value) != null)
+const needsGrossForCreate = computed(
+  () =>
+    createForm.amount_input_mode === 'gross_days' || createForm.amount_input_mode === 'gross_daily_percent'
+)
+const hasGrossForCreate = computed(() => grossDailyWageSar(createSelectedEmployee.value) != null)
 const needsBasicForEdit = computed(
   () =>
     editForm.amount_input_mode === 'basic_days' || editForm.amount_input_mode === 'basic_daily_percent'
 )
 const hasBasicForEdit = computed(() => basicDailyWageSar(editSelectedEmployee.value) != null)
+const needsGrossForEdit = computed(
+  () => editForm.amount_input_mode === 'gross_days' || editForm.amount_input_mode === 'gross_daily_percent'
+)
+const hasGrossForEdit = computed(() => grossDailyWageSar(editSelectedEmployee.value) != null)
 
 function openEditModal(row: ManualDeduction) {
   selectedDeduction.value = row
@@ -593,6 +635,10 @@ function deductionTypeLabel(type: string) {
               <option value="basic_daily_percent">
                 {{ t('attendance.deduction_mode_basic_daily_percent') }}
               </option>
+              <option value="gross_days">{{ t('attendance.deduction_mode_gross_days') }}</option>
+              <option value="gross_daily_percent">
+                {{ t('attendance.deduction_mode_gross_daily_percent') }}
+              </option>
             </select>
           </div>
           <div
@@ -600,6 +646,12 @@ function deductionTypeLabel(type: string) {
             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
           >
             {{ t('attendance.deduction_basic_salary_unavailable') }}
+          </div>
+          <div
+            v-if="needsGrossForCreate && createForm.employee_id && !hasGrossForCreate"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_gross_salary_unavailable') }}
           </div>
           <div v-if="createForm.amount_input_mode === 'manual'">
             <Label for="create-amount">{{ t('attendance.deduction_amount') }}</Label>
@@ -616,8 +668,16 @@ function deductionTypeLabel(type: string) {
               {{ createForm.errors.amount }}
             </p>
           </div>
-          <div v-else-if="createForm.amount_input_mode === 'basic_days'">
-            <Label for="create-input-days">{{ t('attendance.deduction_input_days') }}</Label>
+          <div
+            v-else-if="
+              createForm.amount_input_mode === 'basic_days' || createForm.amount_input_mode === 'gross_days'
+            "
+          >
+            <Label for="create-input-days">{{
+              createForm.amount_input_mode === 'gross_days'
+                ? t('attendance.deduction_input_gross_days')
+                : t('attendance.deduction_input_days')
+            }}</Label>
             <Input
               id="create-input-days"
               v-model="createForm.amount_input_days"
@@ -625,7 +685,10 @@ function deductionTypeLabel(type: string) {
               step="any"
               min="0.01"
               class="mt-1"
-              :required="createForm.amount_input_mode === 'basic_days'"
+              :required="
+                createForm.amount_input_mode === 'basic_days' ||
+                createForm.amount_input_mode === 'gross_days'
+              "
             />
             <p v-if="createForm.errors.amount_input_days" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.amount_input_days }}
@@ -634,8 +697,17 @@ function deductionTypeLabel(type: string) {
               {{ createForm.errors.amount }}
             </p>
           </div>
-          <div v-else>
-            <Label for="create-input-pct">{{ t('attendance.deduction_input_percent') }}</Label>
+          <div
+            v-else-if="
+              createForm.amount_input_mode === 'basic_daily_percent' ||
+              createForm.amount_input_mode === 'gross_daily_percent'
+            "
+          >
+            <Label for="create-input-pct">{{
+              createForm.amount_input_mode === 'gross_daily_percent'
+                ? t('attendance.deduction_input_gross_percent')
+                : t('attendance.deduction_input_percent')
+            }}</Label>
             <Input
               id="create-input-pct"
               v-model="createForm.amount_input_percent"
@@ -644,7 +716,10 @@ function deductionTypeLabel(type: string) {
               min="0.01"
               max="100"
               class="mt-1"
-              :required="createForm.amount_input_mode === 'basic_daily_percent'"
+              :required="
+                createForm.amount_input_mode === 'basic_daily_percent' ||
+                createForm.amount_input_mode === 'gross_daily_percent'
+              "
             />
             <p v-if="createForm.errors.amount_input_percent" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.amount_input_percent }}
@@ -744,6 +819,10 @@ function deductionTypeLabel(type: string) {
               <option value="basic_daily_percent">
                 {{ t('attendance.deduction_mode_basic_daily_percent') }}
               </option>
+              <option value="gross_days">{{ t('attendance.deduction_mode_gross_days') }}</option>
+              <option value="gross_daily_percent">
+                {{ t('attendance.deduction_mode_gross_daily_percent') }}
+              </option>
             </select>
           </div>
           <div
@@ -751,6 +830,12 @@ function deductionTypeLabel(type: string) {
             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
           >
             {{ t('attendance.deduction_basic_salary_unavailable') }}
+          </div>
+          <div
+            v-if="needsGrossForEdit && !hasGrossForEdit"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_gross_salary_unavailable') }}
           </div>
           <div v-if="editForm.amount_input_mode === 'manual'">
             <Label for="edit-amount">{{ t('attendance.deduction_amount') }}</Label>
@@ -764,8 +849,16 @@ function deductionTypeLabel(type: string) {
             />
             <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
           </div>
-          <div v-else-if="editForm.amount_input_mode === 'basic_days'">
-            <Label for="edit-input-days">{{ t('attendance.deduction_input_days') }}</Label>
+          <div
+            v-else-if="
+              editForm.amount_input_mode === 'basic_days' || editForm.amount_input_mode === 'gross_days'
+            "
+          >
+            <Label for="edit-input-days">{{
+              editForm.amount_input_mode === 'gross_days'
+                ? t('attendance.deduction_input_gross_days')
+                : t('attendance.deduction_input_days')
+            }}</Label>
             <Input
               id="edit-input-days"
               v-model="editForm.amount_input_days"
@@ -779,8 +872,17 @@ function deductionTypeLabel(type: string) {
             </p>
             <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
           </div>
-          <div v-else>
-            <Label for="edit-input-pct">{{ t('attendance.deduction_input_percent') }}</Label>
+          <div
+            v-else-if="
+              editForm.amount_input_mode === 'basic_daily_percent' ||
+              editForm.amount_input_mode === 'gross_daily_percent'
+            "
+          >
+            <Label for="edit-input-pct">{{
+              editForm.amount_input_mode === 'gross_daily_percent'
+                ? t('attendance.deduction_input_gross_percent')
+                : t('attendance.deduction_input_percent')
+            }}</Label>
             <Input
               id="edit-input-pct"
               v-model="editForm.amount_input_percent"

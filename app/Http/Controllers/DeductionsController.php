@@ -42,7 +42,7 @@ class DeductionsController extends Controller
             ->where('company_id', $company->id)
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'basic_salary']);
+            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'basic_salary', 'allowances']);
 
         $approvedPenaltiesQuery = AttendancePenalty::query()
             ->approved()
@@ -128,14 +128,25 @@ class DeductionsController extends Controller
                 'min:0.01',
             ],
             'amount_input_days' => [
-                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAYS),
+                Rule::requiredIf(fn () => in_array(
+                    (string) $request->input('amount_input_mode'),
+                    [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
+                    true
+                )),
                 'nullable',
                 'numeric',
                 'min:0.01',
                 'max:365',
             ],
             'amount_input_percent' => [
-                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT),
+                Rule::requiredIf(fn () => in_array(
+                    (string) $request->input('amount_input_mode'),
+                    [
+                        ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT,
+                        ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT,
+                    ],
+                    true
+                )),
                 'nullable',
                 'numeric',
                 'min:0.01',
@@ -155,6 +166,14 @@ class DeductionsController extends Controller
                 ->back()
                 ->withInput()
                 ->withErrors(['amount' => __('messages.attendance.deduction_basic_salary_required')]);
+        }
+
+        if (in_array($mode, [ManualDeductionAmountService::INPUT_GROSS_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT], true)
+            && ! $this->manualDeductionAmountService->hasValidGrossSalary($employee)) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_gross_salary_required')]);
         }
 
         $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
@@ -183,8 +202,16 @@ class DeductionsController extends Controller
             'employee_id' => $validated['employee_id'],
             'amount' => $resolved,
             'amount_input_mode' => $mode,
-            'amount_input_days' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAYS ? $days : null,
-            'amount_input_percent' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT ? $percent : null,
+            'amount_input_days' => in_array(
+                $mode,
+                [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
+                true
+            ) ? $days : null,
+            'amount_input_percent' => in_array(
+                $mode,
+                [ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT],
+                true
+            ) ? $percent : null,
             'deduction_date' => $validated['deduction_date'],
             'deduction_type' => $validated['deduction_type'],
             'reason' => (string) ($validated['reason'] ?? ''),
@@ -217,14 +244,25 @@ class DeductionsController extends Controller
                 'min:0.01',
             ],
             'amount_input_days' => [
-                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAYS),
+                Rule::requiredIf(fn () => in_array(
+                    (string) $request->input('amount_input_mode'),
+                    [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
+                    true
+                )),
                 'nullable',
                 'numeric',
                 'min:0.01',
                 'max:365',
             ],
             'amount_input_percent' => [
-                Rule::requiredIf(fn () => $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT),
+                Rule::requiredIf(fn () => in_array(
+                    (string) $request->input('amount_input_mode'),
+                    [
+                        ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT,
+                        ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT,
+                    ],
+                    true
+                )),
                 'nullable',
                 'numeric',
                 'min:0.01',
@@ -247,6 +285,14 @@ class DeductionsController extends Controller
                 ->back()
                 ->withInput()
                 ->withErrors(['amount' => __('messages.attendance.deduction_basic_salary_required')]);
+        }
+
+        if (in_array($mode, [ManualDeductionAmountService::INPUT_GROSS_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT], true)
+            && ! $this->manualDeductionAmountService->hasValidGrossSalary($employee)) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_gross_salary_required')]);
         }
 
         $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
@@ -274,8 +320,16 @@ class DeductionsController extends Controller
         $deduction->update([
             'amount' => $resolved,
             'amount_input_mode' => $mode,
-            'amount_input_days' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAYS ? $days : null,
-            'amount_input_percent' => $mode === ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT ? $percent : null,
+            'amount_input_days' => in_array(
+                $mode,
+                [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
+                true
+            ) ? $days : null,
+            'amount_input_percent' => in_array(
+                $mode,
+                [ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT],
+                true
+            ) ? $percent : null,
             'deduction_date' => $validated['deduction_date'],
             'deduction_type' => $validated['deduction_type'],
             'reason' => (string) ($validated['reason'] ?? ''),
