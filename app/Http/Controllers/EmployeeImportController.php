@@ -159,6 +159,22 @@ class EmployeeImportController extends Controller
         }
 
         try {
+            // #region agent log
+            @file_put_contents(
+                base_path('.cursor/debug.log'),
+                json_encode([
+                    'timestamp' => (int) (microtime(true) * 1000),
+                    'location' => 'EmployeeImportController::processUpload',
+                    'message' => 'enter_try',
+                    'hypothesisId' => 'H5',
+                    'data' => [
+                        'company_id' => $request->input('company_id'),
+                        'has_file' => $request->hasFile('file'),
+                    ],
+                ], JSON_UNESCAPED_UNICODE) . "\n",
+                FILE_APPEND | LOCK_EX
+            );
+            // #endregion
             $company = Company::findOrFail($request->input('company_id'));
             
             // Double-check user owns this company
@@ -173,12 +189,38 @@ class EmployeeImportController extends Controller
             $filename = 'import_' . uniqid() . '_' . $file->getClientOriginalName();
             $path = $file->storeAs('imports', $filename, 'local');
 
+            // #region agent log
+            $agentLog = static function (string $hypothesisId, string $message, array $data = []): void {
+                $payload = json_encode([
+                    'timestamp' => (int) (microtime(true) * 1000),
+                    'location' => 'EmployeeImportController::processUpload',
+                    'message' => $message,
+                    'hypothesisId' => $hypothesisId,
+                    'data' => $data,
+                ], JSON_UNESCAPED_UNICODE) . "\n";
+                @file_put_contents(base_path('.cursor/debug.log'), $payload, FILE_APPEND | LOCK_EX);
+            };
+            $agentLog('H2', 'file_stored', [
+                'path' => $path,
+                'original' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime' => $file->getMimeType(),
+            ]);
+            // #endregion
+
             $importMode = $request->input('import_mode') === 'update'
                 ? EmployeeImportService::IMPORT_MODE_UPDATE
                 : EmployeeImportService::IMPORT_MODE_CREATE;
 
             // Process and validate the CSV
             $result = $this->importService->validateCsv($path, $company, $importMode);
+
+            // #region agent log
+            $agentLog('H2', 'validateCsv_done', [
+                'success' => (bool) ($result['success'] ?? false),
+                'errorCount' => isset($result['errors']) && is_array($result['errors']) ? count($result['errors']) : 0,
+            ]);
+            // #endregion
 
             if ($result['success']) {
                 // Store the validated data temporarily
@@ -207,6 +249,21 @@ class EmployeeImportController extends Controller
                 ], 422);
             }
         } catch (\Exception $e) {
+            // #region agent log
+            $agentPayload = json_encode([
+                'timestamp' => (int) (microtime(true) * 1000),
+                'location' => 'EmployeeImportController::processUpload',
+                'message' => 'exception_caught',
+                'hypothesisId' => 'H2',
+                'data' => [
+                    'class' => $e::class,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
+            ], JSON_UNESCAPED_UNICODE) . "\n";
+            @file_put_contents(base_path('.cursor/debug.log'), $agentPayload, FILE_APPEND | LOCK_EX);
+            // #endregion
             Log::error('CSV upload processing failed: ' . $e->getMessage(), [
                 'user_id' => $user->id,
                 'company_id' => $request->input('company_id'),

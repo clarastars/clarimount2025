@@ -126,15 +126,47 @@ const validateFile = async () => {
         clearInterval(progressInterval);
         uploadProgress.value = 100;
         
-        const result = await response.json();
-        
+        // #region agent log
+        const responseText = await response.clone().text();
+        let parseOk = true;
+        let result: { success?: boolean; message?: string; errors?: unknown; import_id?: string; summary?: unknown } = {};
+        try {
+            result = JSON.parse(responseText) as typeof result;
+        } catch {
+            parseOk = false;
+        }
+        fetch('http://127.0.0.1:7245/ingest/5d3f14be-35eb-4001-a112-1e3b2e386480', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location: 'Upload.vue:validateFile',
+                message: 'employees.import.process response',
+                hypothesisId: 'H1',
+                data: {
+                    status: response.status,
+                    ok: response.ok,
+                    contentType: response.headers.get('content-type'),
+                    parseOk,
+                    bodyPreview: responseText.slice(0, 200),
+                },
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+        if (!parseOk) {
+            validationErrors.value = [t('employees.file_processing_error')];
+            state.step = 'upload';
+            isUploading.value = false;
+            return;
+        }
+        // #endregion
+
         if (result.success) {
             validationResult.value = result;
             state.importId = result.import_id;
             state.importSummary = result.summary;
             state.step = 'results';
         } else {
-            validationErrors.value = result.errors || [result.message];
+            validationErrors.value = (result.errors as string[] | undefined) || [result.message];
             state.step = 'upload';
         }
     } catch (error) {

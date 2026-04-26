@@ -613,6 +613,21 @@ class EmployeeImportService
                 'summary' => $summary,
             ];
         } catch (\Throwable $e) {
+            // #region agent log
+            $agentPayload = json_encode([
+                'timestamp' => (int) (microtime(true) * 1000),
+                'location' => 'EmployeeImportService::validateCsv',
+                'message' => 'validateCsv_throwable',
+                'hypothesisId' => 'H2',
+                'data' => [
+                    'class' => $e::class,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
+            ], JSON_UNESCAPED_UNICODE) . "\n";
+            @file_put_contents(base_path('.cursor/debug.log'), $agentPayload, FILE_APPEND | LOCK_EX);
+            // #endregion
             Log::error('CSV validation failed: ' . $e->getMessage());
 
             return [
