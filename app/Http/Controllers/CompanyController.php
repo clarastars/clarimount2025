@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -13,17 +14,56 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    private function employeeCompanyId(): ?int
+    {
+        return Employee::query()
+            ->where('user_id', Auth::id())
+            ->value('company_id');
+    }
+
+    private function canViewCompanyReadOnly(): bool
+    {
+        return Auth::user()?->can('company.readonly') ?? false;
+    }
+
+    private function canManageCompany(Company $company): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return $company->owner_id === $user->id || $user->hasRole('super-admin');
+    }
+
     /**
      * Display a listing of the companies.
      */
     public function index(): Response
     {
-        $companies = Company::where('owner_id', Auth::id())
-            ->latest()
-            ->paginate(10);
+        $user = Auth::user();
+
+        if ($user->hasRole('super-admin')) {
+            $companies = Company::query()->latest()->paginate(10);
+        } else {
+            $ownedCompanies = Company::where('owner_id', $user->id);
+
+            if ($ownedCompanies->exists()) {
+                $companies = $ownedCompanies->latest()->paginate(10);
+            } elseif ($this->canViewCompanyReadOnly()) {
+                $employeeCompanyId = $this->employeeCompanyId();
+                $companies = Company::query()
+                    ->when($employeeCompanyId, fn ($q) => $q->where('id', $employeeCompanyId), fn ($q) => $q->whereRaw('1 = 0'))
+                    ->latest()
+                    ->paginate(10);
+            } else {
+                abort(403);
+            }
+        }
 
         return Inertia::render('Companies/Index', [
             'companies' => $companies,
+            'isReadOnly' => ! Company::where('owner_id', Auth::id())->exists() && ! $user->hasRole('super-admin'),
         ]);
     }
 
@@ -32,6 +72,13 @@ class CompanyController extends Controller
      */
     public function create(): Response
     {
+        $user = Auth::user();
+        $isReadOnlyOnly = $this->canViewCompanyReadOnly()
+            && ! $user?->hasRole('super-admin')
+            && ! Company::where('owner_id', $user?->id)->exists();
+
+        abort_if($isReadOnlyOnly, 403);
+
         return Inertia::render('Companies/Create');
     }
 
@@ -40,6 +87,13 @@ class CompanyController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        $isReadOnlyOnly = $this->canViewCompanyReadOnly()
+            && ! $user?->hasRole('super-admin')
+            && ! Company::where('owner_id', $user?->id)->exists();
+
+        abort_if($isReadOnlyOnly, 403);
+
         $validated = $request->validate([
             'name_en' => 'required|string|max:255',
             'name_ar' => 'required|string|max:255',
@@ -68,9 +122,9 @@ class CompanyController extends Controller
      */
     public function show(Company $company): Response
     {
-        // Check if user owns this company
-        if ($company->owner_id !== Auth::id()) {
-            abort(403);
+        $canManage = $this->canManageCompany($company);
+        if (! $canManage) {
+            abort_unless($this->canViewCompanyReadOnly() && (int) $this->employeeCompanyId() === (int) $company->id, 403);
         }
 
         // Load the company with owner and Bayzat configuration
@@ -85,6 +139,7 @@ class CompanyController extends Controller
         return Inertia::render('Companies/Show', [
             'company' => $company,
             'totalAssetsCount' => $totalAssetsCount,
+            'isReadOnly' => ! $canManage,
         ]);
     }
 
@@ -93,10 +148,7 @@ class CompanyController extends Controller
      */
     public function edit(Company $company): Response
     {
-        // Check if user owns this company
-        if ($company->owner_id !== Auth::id()) {
-            abort(403);
-        }
+        abort_unless($this->canManageCompany($company), 403);
 
         return Inertia::render('Companies/Edit', [
             'company' => $company,
@@ -108,10 +160,7 @@ class CompanyController extends Controller
      */
     public function update(Request $request, Company $company)
     {
-        // Check if user owns this company
-        if ($company->owner_id !== Auth::id()) {
-            abort(403);
-        }
+        abort_unless($this->canManageCompany($company), 403);
 
         $validated = $request->validate([
             'name_en' => 'required|string|max:255',
@@ -156,10 +205,7 @@ class CompanyController extends Controller
      */
     public function destroy(Company $company)
     {
-        // Check if user owns this company
-        if ($company->owner_id !== Auth::id()) {
-            abort(403);
-        }
+        abort_unless($this->canManageCompany($company), 403);
 
         if (!empty($company->logo)) {
             Storage::disk('public')->delete($company->logo);
@@ -178,8 +224,20 @@ class CompanyController extends Controller
     {
         $user = Auth::user();
         $query = $request->get('q', '');
-        
-        $companies = Company::where('owner_id', $user->id)
+
+        $companyQuery = Company::query();
+        if ($user->hasRole('super-admin')) {
+            // no extra filter
+        } elseif (Company::where('owner_id', $user->id)->exists()) {
+            $companyQuery->where('owner_id', $user->id);
+        } elseif ($this->canViewCompanyReadOnly()) {
+            $employeeCompanyId = $this->employeeCompanyId();
+            $companyQuery->when($employeeCompanyId, fn ($q) => $q->where('id', $employeeCompanyId), fn ($q) => $q->whereRaw('1 = 0'));
+        } else {
+            $companyQuery->whereRaw('1 = 0');
+        }
+
+        $companies = $companyQuery
             ->when($query, function ($q) use ($query) {
                 return $q->where(function ($subQuery) use ($query) {
                     $subQuery->where('name_en', 'like', "%{$query}%")

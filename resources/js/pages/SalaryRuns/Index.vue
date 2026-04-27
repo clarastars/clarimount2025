@@ -10,7 +10,7 @@
             {{ t('salary_runs.create_salary_run') }}
           </p>
         </div>
-        <Button @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+        <Button v-if="canManageSalaryRuns" @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
           <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
           {{ t('salary_runs.create_salary_run') }}
         </Button>
@@ -126,14 +126,14 @@
         <p class="text-gray-600 dark:text-gray-400 mb-6">
           {{ t('salary_runs.create_first_salary_run') }}
         </p>
-        <Button @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+        <Button v-if="canManageSalaryRuns" @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
           <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
           {{ t('salary_runs.create_salary_run') }}
         </Button>
       </div>
 
       <!-- Create Salary Run Modal -->
-      <Dialog :open="createModalOpen" @update:open="closeCreateModal">
+      <Dialog v-if="canManageSalaryRuns" :open="createModalOpen" @update:open="closeCreateModal">
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{{ t('salary_runs.create_salary_run') }}</DialogTitle>
@@ -197,6 +197,7 @@ const { t, locale } = useI18n();
 
 interface Props {
   company: Company;
+  canManageSalaryRuns?: boolean;
   salaryRuns: {
     data: any[];
     links: any[];
@@ -205,6 +206,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const canManageSalaryRuns = computed(() => props.canManageSalaryRuns === true);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
   {

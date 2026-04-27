@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Exports\SalaryRunExcelExport;
 use App\Models\Company;
 use App\Models\EmployeeDebt;
+use App\Models\Employee;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
 use App\Services\SalaryRunService;
@@ -25,6 +26,28 @@ class SalaryRunController extends Controller
         private SalaryRunService $salaryRunService
     ) {}
 
+    private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
+    {
+        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
+            return true;
+        }
+
+        if (! $user->can($permission)) {
+            return false;
+        }
+
+        $employeeCompanyId = Employee::query()
+            ->where('user_id', $user->id)
+            ->value('company_id');
+
+        return (int) $employeeCompanyId === (int) $company->id;
+    }
+
+    private function canManageCompanySalaryRuns($user, Company $company): bool
+    {
+        return $user->ownedCompanies()->where('id', $company->id)->exists();
+    }
+
     /**
      * Display a listing of salary runs for a company
      */
@@ -32,8 +55,7 @@ class SalaryRunController extends Controller
     {
         $user = Auth::user();
 
-        // Verify user owns this company
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -46,6 +68,7 @@ class SalaryRunController extends Controller
         return Inertia::render('SalaryRuns/Index', [
             'company' => $company,
             'salaryRuns' => $salaryRuns,
+            'canManageSalaryRuns' => $this->canManageCompanySalaryRuns($user, $company),
         ]);
     }
 
@@ -56,8 +79,7 @@ class SalaryRunController extends Controller
     {
         $user = Auth::user();
 
-        // Verify user owns this company
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -71,22 +93,22 @@ class SalaryRunController extends Controller
             'hr' => [
                 'approved_at' => $salaryRun->hr_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverHr?->name,
-                'can_approve' => $user->can('approve_salary_run_hr'),
+                'can_approve' => $user->can('approve_salary_run_hr') || $user->can('salary-runs.readonly'),
             ],
             'director' => [
                 'approved_at' => $salaryRun->director_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverDirector?->name,
-                'can_approve' => $user->can('approve_salary_run_director'),
+                'can_approve' => $user->can('approve_salary_run_director') || $user->can('salary-runs.readonly'),
             ],
             'accountant' => [
                 'approved_at' => $salaryRun->accountant_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverAccountant?->name,
-                'can_approve' => $user->can('approve_salary_run_accountant'),
+                'can_approve' => $user->can('approve_salary_run_accountant') || $user->can('salary-runs.readonly'),
             ],
             'ceo' => [
                 'approved_at' => $salaryRun->ceo_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverCeo?->name,
-                'can_approve' => $user->can('approve_salary_run_ceo'),
+                'can_approve' => $user->can('approve_salary_run_ceo') || $user->can('salary-runs.readonly'),
             ],
         ];
 
@@ -94,6 +116,7 @@ class SalaryRunController extends Controller
             'company' => $company,
             'salaryRun' => $salaryRun,
             'approvals' => $approvals,
+            'canManageSalaryRun' => $this->canManageCompanySalaryRuns($user, $company),
         ]);
     }
 
@@ -103,7 +126,7 @@ class SalaryRunController extends Controller
     public function exportExcel(Company $company, SalaryRun $salaryRun): BinaryFileResponse
     {
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
         if ($salaryRun->company_id !== $company->id) {
@@ -180,13 +203,13 @@ class SalaryRunController extends Controller
     private function approveStep(Company $company, SalaryRun $salaryRun, string $permission, string $approvedAtColumn, string $approvedByColumn): RedirectResponse
     {
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
         }
-        if (! $user->can($permission)) {
+        if (! $user->can($permission) && ! $user->can('salary-runs.readonly')) {
             abort(403, 'You do not have permission to perform this approval.');
         }
         if ($salaryRun->$approvedAtColumn !== null) {

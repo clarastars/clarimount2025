@@ -23,6 +23,10 @@ class TeamPermissionController extends Controller
     private const MANAGED_PERMISSIONS = [
         ['name' => 'asset-inventory.access', 'label' => 'جرد الأصول'],
         ['name' => 'settings.access', 'label' => 'الإعدادات'],
+        ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
+        ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
+        ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
+        ['name' => 'salary-runs.readonly', 'label' => 'الاطلاع على مسير الرواتب (قراءة فقط)'],
     ];
 
     public function index(): Response

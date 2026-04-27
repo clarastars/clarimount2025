@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText } from 'lucide-vue-next';
@@ -27,10 +27,16 @@ interface Props {
         fingerprint_report_name?: string;
     };
     totalAssetsCount: number;
+    isReadOnly?: boolean;
 }
 
 const props = defineProps<Props>();
 const { t, locale } = useI18n();
+const auth = usePage().props.auth as {
+    can_view_employees_readonly?: boolean;
+    can_view_attendance_readonly?: boolean;
+    can_view_salary_runs_readonly?: boolean;
+};
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     {
@@ -86,25 +92,25 @@ const formatLastSync = (lastSync: string | null) => {
                     <Badge :variant="company.is_active ? 'default' : 'secondary'">
                         {{ company.is_active ? t('companies.active') : t('companies.inactive') }}
                     </Badge>
-                    <Button variant="outline" as-child>
+                    <Button v-if="auth?.can_view_employees_readonly" variant="outline" as-child>
                         <Link :href="route('employees.index', { company_id: company.id })">
                             <Users class="mr-2 h-4 w-4" />
                             {{ t('nav.employees') }}
                         </Link>
                     </Button>
-                    <Button variant="outline" as-child>
+                    <Button v-if="auth?.can_view_attendance_readonly" variant="outline" as-child>
                         <Link :href="route('attendance.index', company.id)">
                             <FileText class="mr-2 h-4 w-4" />
                             {{ t('nav.attendance') }}
                         </Link>
                     </Button>
-                    <Button variant="outline" as-child>
+                    <Button v-if="auth?.can_view_salary_runs_readonly" variant="outline" as-child>
                         <Link :href="route('salary-runs.index', company.id)">
                             <FileText class="mr-2 h-4 w-4" />
                             {{ t('salary_runs.title') }}
                         </Link>
                     </Button>
-                    <Button variant="outline" as-child>
+                    <Button v-if="!props.isReadOnly" variant="outline" as-child>
                         <Link :href="route('companies.edit', company.id)">
                             <Edit class="mr-2 h-4 w-4" />
                             {{ t('companies.edit') }}

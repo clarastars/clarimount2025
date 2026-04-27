@@ -57,6 +57,42 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('company.readonly')) {
+            $allowed = array_merge($allowed, [
+                'companies.index',
+                'companies.show',
+                'api.companies.search',
+            ]);
+        }
+
+        if ($user->can('employees.readonly')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'api.employees.search',
+            ]);
+        }
+
+        if ($user->can('attendance.readonly')) {
+            $allowed = array_merge($allowed, [
+                'attendance.index',
+                'attendance.late',
+                'attendance.show',
+            ]);
+        }
+
+        if ($user->can('salary-runs.readonly')) {
+            $allowed = array_merge($allowed, [
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.export-excel',
+                'salary-runs.approve-hr',
+                'salary-runs.approve-director',
+                'salary-runs.approve-accountant',
+                'salary-runs.approve-ceo',
+            ]);
+        }
+
         if ($request->routeIs($allowed)) {
             return $next($request);
         }

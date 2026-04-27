@@ -19,6 +19,7 @@ interface Props {
         per_page: number;
         total: number;
     };
+    isReadOnly?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -58,7 +59,7 @@ const getCompanyDescription = (company: Company) => {
         <div class="space-y-6">
             <div class="flex items-center justify-between">
                                         <Heading :title="t('companies.my_companies')" />
-                <Button as-child class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                <Button v-if="!props.isReadOnly" as-child class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     <Link :href="route('companies.create')">
                         <Plus class="mr-2 h-4 w-4" />
                         {{ t('companies.create_company') }}
@@ -71,11 +72,9 @@ const getCompanyDescription = (company: Company) => {
                 <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {{ t('companies.no_companies') }}
                 </h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ t('companies.create_first_company') }}
-                </p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('companies.create_first_company') }}</p>
                 <div class="mt-6">
-                    <Button as-child>
+                    <Button v-if="!props.isReadOnly" as-child>
                         <Link :href="route('companies.create')">
                             <Plus class="mr-2 h-4 w-4" />
                             {{ t('companies.create_company') }}
@@ -122,13 +121,13 @@ const getCompanyDescription = (company: Company) => {
                                     {{ t('companies.view') }}
                                 </Link>
                             </Button>
-                            <Button variant="outline" size="sm" as-child>
+                            <Button v-if="!props.isReadOnly" variant="outline" size="sm" as-child>
                                 <Link :href="route('companies.edit', company.id)">
                                     <Edit class="mr-1 h-3 w-3" />
                                     {{ t('companies.edit') }}
                                 </Link>
                             </Button>
-                            <Button variant="destructive" size="sm" @click="deleteCompany(company)">
+                            <Button v-if="!props.isReadOnly" variant="destructive" size="sm" @click="deleteCompany(company)">
                                 <Trash2 class="mr-1 h-3 w-3" />
                                 {{ t('companies.delete') }}
                             </Button>

@@ -28,12 +28,28 @@ class AttendanceController extends Controller
         private OperationalMonthService $operationalMonthService,
     ) {}
 
+    private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
+    {
+        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
+            return true;
+        }
+
+        if (! $user->can($permission)) {
+            return false;
+        }
+
+        $employeeCompanyId = Employee::query()
+            ->where('user_id', $user->id)
+            ->value('company_id');
+
+        return (int) $employeeCompanyId === (int) $company->id;
+    }
+
     public function index(Request $request, Company $company): Response
     {
         $user = Auth::user();
         
-        // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
         
@@ -200,8 +216,7 @@ class AttendanceController extends Controller
     {
         $user = Auth::user();
         
-        // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -422,8 +437,7 @@ class AttendanceController extends Controller
     {
         $user = Auth::user();
         
-        // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
         

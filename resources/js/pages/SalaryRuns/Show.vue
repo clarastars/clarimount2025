@@ -25,7 +25,7 @@
             {{ t('salary_runs.export_excel') }}
           </Button>
           <Button
-            v-if="salaryRun.status === 'draft'"
+            v-if="salaryRun.status === 'draft' && canManageSalaryRun"
             @click="finalizeSalaryRun"
             :disabled="finalizing"
             class="bg-green-600 hover:bg-green-700 text-white font-semibold"
@@ -257,7 +257,7 @@
                       {{ formatCurrency(getDebtDeductionsTotal(item)) }}
                     </div>
                     <Button
-                      v-if="salaryRun.status === 'draft' && item.employee?.debts && item.employee.debts.length > 0"
+                      v-if="salaryRun.status === 'draft' && canManageSalaryRun && item.employee?.debts && item.employee.debts.length > 0"
                       variant="ghost"
                       size="sm"
                       @click="openDebtDeductionsModal(item)"
@@ -307,7 +307,7 @@
               class="flex justify-between items-start gap-2 p-3 border rounded-lg"
             >
               <Button
-                v-if="salaryRun.status === 'draft' && getBreakdownLineMeta(penalty)"
+                v-if="salaryRun.status === 'draft' && canManageSalaryRun && getBreakdownLineMeta(penalty)"
                 type="button"
                 variant="ghost"
                 size="sm"
@@ -482,6 +482,7 @@ interface ApprovalState {
 
 interface Props {
   company: Company;
+  canManageSalaryRun?: boolean;
   salaryRun: {
     id: number;
     year: number;
@@ -543,6 +544,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const canManageSalaryRun = computed(() => props.canManageSalaryRun === true);
 
 function getEmployeeFullName(employee?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
   if (!employee) return '';
