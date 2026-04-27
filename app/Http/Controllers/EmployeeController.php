@@ -388,6 +388,7 @@ class EmployeeController extends Controller
             'company',
             'nationality',
             'residenceCountry',
+            'user.team',
             'shift',
             'assets.assetCategory',
             'assetAssignments.asset.assetCategory',
@@ -400,6 +401,11 @@ class EmployeeController extends Controller
 
         return Inertia::render('Employees/Show', [
             'employee' => $employee,
+            'portalAccount' => [
+                'exists' => (bool) $employee->user_id,
+                'email' => $employee->work_email ?: $employee->user?->email,
+            ],
+            'assignedTeamName' => $employee->user?->team?->name,
         ]);
     }
 

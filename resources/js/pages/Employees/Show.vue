@@ -25,6 +25,20 @@
                 </Card>
 
                 <Card class="border-border/60 shadow-sm">
+                    <CardHeader><CardTitle>{{ t('settings.permissions_teams') }}</CardTitle></CardHeader>
+                    <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('employees.employee_account') }}</Label>
+                            <p>{{ props.portalAccount?.exists ? displayValue(props.portalAccount?.email) : '-' }}</p>
+                        </div>
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('settings.assign_employee_team') }}</Label>
+                            <p>{{ displayValue(props.assignedTeamName, t('settings.no_team')) }}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('employees.general_information') }}</CardTitle></CardHeader>
                     <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.employee_id') }}</Label><p>{{ displayValue(employee.employee_id) }}</p></div>
@@ -162,6 +176,11 @@ import type { BreadcrumbItem } from '@/types';
 
 interface Props {
     employee: Employee;
+    portalAccount?: {
+        exists: boolean;
+        email?: string | null;
+    };
+    assignedTeamName?: string | null;
 }
 
 const props = defineProps<Props>();
