@@ -6,18 +6,18 @@ namespace App\Exports;
 
 use App\Models\SalaryRun;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\RegistersEventListeners;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithEvents;
-use Maatwebsite\Excel\Concerns\RegistersEventListeners;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping, WithStyles, WithEvents, ShouldAutoSize
+class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents, WithHeadings, WithMapping, WithStyles
 {
     use RegistersEventListeners;
 
@@ -79,7 +79,9 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         $personalCar = $employee && $employee->allowance_personal_car !== null ? (float) $employee->allowance_personal_car : 0;
         $itemAllowances = $item->allowances !== null ? (float) $item->allowances : 0;
         $detailedSum = $housing + $transport + $other + $food + $personalCar;
-        $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : '';
+        $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : 0.0;
+        $manualAdditions = $this->sumManualAdditionsForExport($item);
+        $additionalAllowances = round($additionalAllowances + $manualAdditions, 2);
         [
             $penaltiesColumnTotal,
             $trafficViolationTotal,
@@ -96,7 +98,7 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
             $other ?: '',
             $food ?: '',
             $personalCar ?: '',
-            $additionalAllowances,
+            $additionalAllowances > 0 ? $additionalAllowances : '',
             $item->unpaid_leave_total !== null ? (float) $item->unpaid_leave_total : '',
             $debtTotal > 0 ? $debtTotal : '',
             $trafficViolationTotal > 0 ? $trafficViolationTotal : '',
@@ -121,6 +123,10 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
 
         foreach ($breakdown as $line) {
             if (! is_array($line)) {
+                continue;
+            }
+
+            if (($line['source'] ?? null) === 'manual_addition') {
                 continue;
             }
 
@@ -171,6 +177,24 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         ];
     }
 
+    private function sumManualAdditionsForExport(object $item): float
+    {
+        $total = 0.0;
+        $breakdown = is_array($item->breakdown ?? null) ? $item->breakdown : [];
+        foreach ($breakdown as $line) {
+            if (! is_array($line) || ($line['source'] ?? null) !== 'manual_addition') {
+                continue;
+            }
+
+            $amount = (float) ($line['amount'] ?? 0);
+            if ($amount > 0) {
+                $total += $amount;
+            }
+        }
+
+        return round($total, 2);
+    }
+
     public function styles(Worksheet $sheet)
     {
         return [
@@ -191,7 +215,7 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
         if ($highestRow > 0 && $highestColumn) {
-            $range = 'A1:' . $highestColumn . $highestRow;
+            $range = 'A1:'.$highestColumn.$highestRow;
             $sheet->getStyle($range)->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_CENTER)
                 ->setVertical(Alignment::VERTICAL_CENTER);
@@ -200,16 +224,16 @@ class SalaryRunExcelExport implements FromCollection, WithHeadings, WithMapping,
         // Add totals row for all amount columns.
         if ($highestRow >= 2) {
             $totalRow = $highestRow + 1;
-            $sheet->setCellValue('A' . $totalRow, 'الإجمالي');
+            $sheet->setCellValue('A'.$totalRow, 'الإجمالي');
 
             foreach (range('B', 'Q') as $column) {
                 $sheet->setCellValue(
-                    $column . $totalRow,
+                    $column.$totalRow,
                     sprintf('=SUM(%s2:%s%d)', $column, $column, $highestRow)
                 );
             }
 
-            $totalRange = 'A' . $totalRow . ':Q' . $totalRow;
+            $totalRange = 'A'.$totalRow.':Q'.$totalRow;
             $sheet->getStyle($totalRange)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [

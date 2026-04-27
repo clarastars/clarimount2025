@@ -33,7 +33,7 @@ class SalaryRunController extends Controller
         $user = Auth::user();
 
         // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -57,7 +57,7 @@ class SalaryRunController extends Controller
         $user = Auth::user();
 
         // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -128,7 +128,7 @@ class SalaryRunController extends Controller
         $user = Auth::user();
 
         // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -156,7 +156,7 @@ class SalaryRunController extends Controller
         $user = Auth::user();
 
         // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -229,7 +229,7 @@ class SalaryRunController extends Controller
         $user = Auth::user();
 
         // Verify user owns this company
-        if (!$user->ownedCompanies()->where('id', $company->id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -266,7 +266,7 @@ class SalaryRunController extends Controller
         foreach ($validated['debt_deductions'] as $deduction) {
             $debt = EmployeeDebt::find($deduction['debt_id']);
 
-            if (!$debt || $debt->employee_id !== $validated['employee_id']) {
+            if (! $debt || $debt->employee_id !== $validated['employee_id']) {
                 continue;
             }
 
@@ -296,7 +296,8 @@ class SalaryRunController extends Controller
         $penaltiesTotal = $item->penalties_total;
         $unpaidLeaveTotal = (float) $item->unpaid_leave_total;
         $socialInsuranceDeductionTotal = (float) $item->social_insurance_deduction_total;
-        $netSalary = $grossSalary - $penaltiesTotal - $unpaidLeaveTotal - $socialInsuranceDeductionTotal - $totalDeduction;
+        $additionsTotal = (float) $item->additions_total;
+        $netSalary = $grossSalary + $additionsTotal - $penaltiesTotal - $unpaidLeaveTotal - $socialInsuranceDeductionTotal - $totalDeduction;
 
         $item->update([
             'debt_deductions' => $debtDeductions,
@@ -327,7 +328,7 @@ class SalaryRunController extends Controller
 
         $validated = $request->validate([
             'salary_run_item_id' => 'required|exists:salary_run_items,id',
-            'line_type' => 'required|in:attendance_penalty,employee_deduction,unpaid_leave',
+            'line_type' => 'required|in:attendance_penalty,employee_deduction,employee_addition,unpaid_leave',
             'line_id' => 'required|integer|min:1',
         ]);
 
@@ -350,6 +351,7 @@ class SalaryRunController extends Controller
             $match = match ($validated['line_type']) {
                 'attendance_penalty' => (int) ($row['attendance_penalty_id'] ?? 0) === $validated['line_id'],
                 'employee_deduction' => (int) ($row['employee_deduction_id'] ?? 0) === $validated['line_id'],
+                'employee_addition' => (int) ($row['employee_addition_id'] ?? 0) === $validated['line_id'],
                 'unpaid_leave' => (int) ($row['leave_id'] ?? 0) === $validated['line_id'],
             };
 
@@ -373,15 +375,18 @@ class SalaryRunController extends Controller
             'id' => $validated['line_id'],
         ];
         $exclusions = collect($exclusions)
-            ->unique(fn (array $e): string => ($e['type'] ?? '') . ':' . (string) ($e['id'] ?? ''))
+            ->unique(fn (array $e): string => ($e['type'] ?? '').':'.(string) ($e['id'] ?? ''))
             ->values()
             ->all();
 
         $penaltiesTotal = (float) $item->penalties_total;
+        $additionsTotal = (float) $item->additions_total;
         $unpaidLeaveTotal = (float) $item->unpaid_leave_total;
 
         if ($validated['line_type'] === 'unpaid_leave') {
             $unpaidLeaveTotal = round(max(0, $unpaidLeaveTotal - $removedAmount), 2);
+        } elseif ($validated['line_type'] === 'employee_addition') {
+            $additionsTotal = round(max(0, $additionsTotal - $removedAmount), 2);
         } else {
             $penaltiesTotal = round(max(0, $penaltiesTotal - $removedAmount), 2);
         }
@@ -395,7 +400,7 @@ class SalaryRunController extends Controller
         }
 
         $netSalary = round(
-            (float) $item->gross_salary - $penaltiesTotal - (float) $item->social_insurance_deduction_total - $unpaidLeaveTotal - $debtTotal,
+            (float) $item->gross_salary + $additionsTotal - $penaltiesTotal - (float) $item->social_insurance_deduction_total - $unpaidLeaveTotal - $debtTotal,
             2
         );
 
@@ -403,6 +408,7 @@ class SalaryRunController extends Controller
             'breakdown' => $newBreakdown,
             'breakdown_exclusions' => $exclusions,
             'penalties_total' => $penaltiesTotal,
+            'additions_total' => $additionsTotal,
             'unpaid_leave_total' => $unpaidLeaveTotal,
             'net_salary' => $netSalary,
         ]);

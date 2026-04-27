@@ -13,10 +13,22 @@
             </p>
           </div>
           <div class="flex gap-2">
-            <Button @click="router.visit(route('attendance.deductions', props.company.id))" class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700">
-              <Banknote class="w-4 h-4" />
-              {{ $t('attendance.deductions') }}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700">
+                  <Banknote class="w-4 h-4" />
+                  {{ $t('attendance.actions') }}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem @click="router.visit(route('attendance.deductions', props.company.id))">
+                  {{ $t('attendance.deductions') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="router.visit(route('attendance.additions', props.company.id))">
+                  {{ $t('attendance.additions') }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button @click="router.visit(route('attendance.late', props.company.id))" variant="destructive" class="gap-2 cursor-pointer">
               <AlertTriangle class="w-4 h-4" />
               {{ $t('attendance.view_late') }}

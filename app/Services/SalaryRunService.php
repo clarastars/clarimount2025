@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AttendancePenalty;
 use App\Models\Employee;
+use App\Models\EmployeeAddition;
 use App\Models\EmployeeDebt;
 use App\Models\EmployeeDeduction;
 use App\Models\Leave;
@@ -68,7 +69,7 @@ class SalaryRunService
                     ->where('approval_status', 'approved')
                     ->whereBetween('attendance_date', [
                         $startDate->format('Y-m-d'),
-                        $endDate->format('Y-m-d')
+                        $endDate->format('Y-m-d'),
                     ])
                     ->get();
 
@@ -131,6 +132,35 @@ class SalaryRunService
                     ];
                 }
 
+                // Manual additions (employee_additions) for this month
+                $manualAdditions = EmployeeAddition::where('employee_id', $employee->id)
+                    ->whereBetween('addition_date', [
+                        $startDate->format('Y-m-d'),
+                        $endDate->format('Y-m-d'),
+                    ])
+                    ->orderBy('addition_date')
+                    ->get();
+
+                $additionsTotal = 0.0;
+                foreach ($manualAdditions as $addition) {
+                    if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_addition', $addition->id)) {
+                        continue;
+                    }
+
+                    $amount = (float) $addition->amount;
+                    $additionsTotal += $amount;
+                    $breakdown[] = [
+                        'date' => \Carbon\Carbon::parse((string) $addition->addition_date)->format('Y-m-d'),
+                        'action_type' => 'manual_addition',
+                        'addition_type' => (string) $addition->addition_type,
+                        'action_value' => null,
+                        'action_text' => $addition->reason,
+                        'amount' => $amount,
+                        'employee_addition_id' => $addition->id,
+                        'source' => 'manual_addition',
+                    ];
+                }
+
                 $debtDeductions = $existingItem?->debt_deductions ?? [];
                 $debtDeductionsTotal = 0;
 
@@ -159,8 +189,8 @@ class SalaryRunService
                     $unpaidLeaveTotal += $amount;
                     $breakdown[] = [
                         'date' => \Carbon\Carbon::parse((string) $leave->start_date)->format('Y-m-d')
-                            . ' / '
-                            . \Carbon\Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
+                            .' / '
+                            .\Carbon\Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
                         'action_type' => 'unpaid_leave',
                         'action_value' => $daysInOperationalRange,
                         'action_text' => 'Unpaid leave',
@@ -171,6 +201,7 @@ class SalaryRunService
                 }
 
                 $netSalary = $grossSalary
+                    + $additionsTotal
                     - $penaltiesTotal
                     - (float) $unpaidLeaveTotal
                     - $debtDeductionsTotal
@@ -187,6 +218,7 @@ class SalaryRunService
                         'allowances' => $employee->allowances ?? 0,
                         'gross_salary' => $grossSalary,
                         'penalties_total' => $penaltiesTotal,
+                        'additions_total' => $additionsTotal,
                         'social_insurance_deduction_total' => $socialInsuranceDeductionTotal,
                         'unpaid_leave_total' => $unpaidLeaveTotal,
                         'net_salary' => $netSalary,
@@ -203,12 +235,6 @@ class SalaryRunService
 
     /**
      * Calculate penalty amount based on action type
-     *
-     * @param AttendancePenalty $penalty
-     * @param float $grossSalary
-     * @param float $dailyWage
-     * @param float|null $basicSalary
-     * @return float
      */
     public function calculatePenaltyAmount(AttendancePenalty $penalty, float $grossSalary, float $dailyWage, ?float $basicSalary = null): float
     {
@@ -231,36 +257,37 @@ class SalaryRunService
                 // Check if we have separate gross and basic days
                 if ($penalty->action_value_gross_days !== null || $penalty->action_value_basic_days !== null) {
                     $deduction = 0;
-                    
+
                     // Deduct from gross salary
                     if ($penalty->action_value_gross_days !== null && $penalty->action_value_gross_days > 0) {
                         $deduction += $penalty->action_value_gross_days * $dailyWage;
                     }
-                    
+
                     // Deduct from basic salary
                     if ($penalty->action_value_basic_days !== null && $penalty->action_value_basic_days > 0 && $basicSalary !== null) {
                         $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
                         $deduction += $penalty->action_value_basic_days * $basicDailyWage;
                     }
-                    
+
                     return $deduction;
                 }
-                
+
                 // Fallback to old behavior (action_value)
                 $days = $penalty->action_value ?? 0;
+
                 return $days * $dailyWage;
 
             case 'absent_deduction':
                 // Absence penalty: deduct one day from gross salary + one day from basic salary for next day
                 // For the absence day: deduct full day from gross salary
                 $deduction = $dailyWage;
-                
+
                 // For the next day: deduct one day from basic salary
                 if ($basicSalary !== null) {
                     $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
                     $deduction += $basicDailyWage;
                 }
-                
+
                 return $deduction;
 
             case 'termination':
@@ -314,7 +341,7 @@ class SalaryRunService
             foreach ($items as $item) {
                 $debtDeductions = $item->debt_deductions ?? [];
 
-                if (!is_array($debtDeductions) || empty($debtDeductions)) {
+                if (! is_array($debtDeductions) || empty($debtDeductions)) {
                     continue;
                 }
 
@@ -322,13 +349,13 @@ class SalaryRunService
                     $debtId = $deduction['debt_id'] ?? null;
                     $deductedAmount = $deduction['amount'] ?? 0;
 
-                    if (!$debtId || $deductedAmount <= 0) {
+                    if (! $debtId || $deductedAmount <= 0) {
                         continue;
                     }
 
                     $debt = EmployeeDebt::find($debtId);
 
-                    if (!$debt || $debt->employee_id !== $item->employee_id) {
+                    if (! $debt || $debt->employee_id !== $item->employee_id) {
                         continue;
                     }
 

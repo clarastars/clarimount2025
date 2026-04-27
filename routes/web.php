@@ -1,35 +1,36 @@
 <?php
 
-use App\Http\Controllers\TeamController;
-use App\Http\Controllers\CompanyController;
-use App\Http\Controllers\CustodyController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\LaborLawRuleController;
-use App\Http\Controllers\ShiftController;
-use App\Http\Controllers\LocationController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\EmployeeDebtController;
-use App\Http\Controllers\LeaveController;
-use App\Http\Controllers\EmployeeImportController;
-use App\Http\Controllers\FingerprintDeviceEmployeeController;
+use App\Http\Controllers\AdditionsController;
+use App\Http\Controllers\Admin\AdminTeamController;
 use App\Http\Controllers\AssetCategoryController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\AssetTemplateController;
-use App\Http\Controllers\PrintJobController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendancePenaltyApprovalController;
-use App\Http\Controllers\DeductionsController;
 use App\Http\Controllers\BayzatConfigController;
-use App\Http\Controllers\SalaryRunController;
-use App\Http\Controllers\ZKTekoWebhookController;
-use App\Http\Controllers\ZKTekoDebugController;
-use App\Http\Controllers\ZkTecoController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CustodyController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Admin\AdminTeamController;
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+use App\Http\Controllers\DeductionsController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeDebtController;
+use App\Http\Controllers\EmployeeImportController;
+use App\Http\Controllers\FingerprintDeviceEmployeeController;
+use App\Http\Controllers\LaborLawRuleController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LocationController;
+use App\Http\Controllers\PrintJobController;
+use App\Http\Controllers\SalaryRunController;
+use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\TeamController;
+use App\Http\Controllers\ZkTecoController;
+use App\Http\Controllers\ZKTekoDebugController;
+use App\Http\Controllers\ZKTekoWebhookController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // ZKTeco Device Data Routes (no authentication required, CSRF exempt)
 // This route must be BEFORE any middleware groups to ensure it's accessible
@@ -37,15 +38,15 @@ Route::match(['GET', 'POST'], '/iclock/cdata', function (\Illuminate\Http\Reques
     // Log at route level to confirm request reached Laravel
     try {
         Log::channel('single')->info('=== ZKTeco ROUTE HIT ===');
-        Log::channel('single')->info('Route Time: ' . now()->toDateTimeString());
-        Log::channel('single')->info('Route Method: ' . $request->method());
-        Log::channel('single')->info('Route URL: ' . $request->fullUrl());
-        Log::channel('single')->info('Route IP: ' . $request->ip());
-        Log::channel('single')->info('Route Query: ' . json_encode($request->query()));
+        Log::channel('single')->info('Route Time: '.now()->toDateTimeString());
+        Log::channel('single')->info('Route Method: '.$request->method());
+        Log::channel('single')->info('Route URL: '.$request->fullUrl());
+        Log::channel('single')->info('Route IP: '.$request->ip());
+        Log::channel('single')->info('Route Query: '.json_encode($request->query()));
     } catch (\Exception $e) {
-        Log::channel('single')->error('Route Log Error: ' . $e->getMessage());
+        Log::channel('single')->error('Route Log Error: '.$e->getMessage());
     }
-    
+
     // Call the controller
     return app(ZkTecoController::class)->cdata($request);
 })->name('zkteco.cdata');
@@ -66,7 +67,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('dashboard');
     }
-    
+
     // Show landing page for non-authenticated users
     return view('landing.index');
 })->name('home');
@@ -80,7 +81,7 @@ Route::middleware(['auth', 'verified', 'super-admin'])->prefix('admin')->name('a
     Route::get('/dashboard', function () {
         return Inertia::render('Admin/Dashboard');
     })->name('dashboard');
-    
+
     // Team management
     Route::resource('teams', AdminTeamController::class);
     Route::post('teams/{team}/suspend', [AdminTeamController::class, 'suspend'])->name('teams.suspend');
@@ -94,7 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/teams/create', [TeamController::class, 'create'])->name('teams.create');
     Route::post('/teams', [TeamController::class, 'store'])->name('teams.store');
     Route::post('/teams/{team}/switch', [TeamController::class, 'switch'])->name('teams.switch');
-    
+
     // Routes that require team access
     Route::middleware(['team.access'])->group(function () {
         Route::get('/teams/{team}', [TeamController::class, 'show'])->name('teams.show');
@@ -102,13 +103,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/teams/{team}/invite', [TeamController::class, 'inviteUser'])->name('teams.invite');
         Route::delete('/teams/{team}/users/{user}', [TeamController::class, 'removeUser'])->name('teams.remove-user');
     });
-    
+
     // Placeholder routes for team features
     Route::middleware(['team.access'])->group(function () {
         Route::get('/teams/{team}/billing', function () {
             return Inertia::render('Teams/Billing');
         })->name('teams.billing');
-        
+
         Route::get('/teams/{team}/analytics', function () {
             return Inertia::render('Teams/Analytics');
         })->name('teams.analytics')->middleware('permission:view analytics');
@@ -141,7 +142,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/debug/employee-create', function () {
         $user = Auth::user();
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
-        
+
         return response()->json([
             'user_id' => $user->id,
             'owned_companies_count' => $user->ownedCompanies()->count(),
@@ -149,10 +150,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'current_company' => $user->currentCompany()?->id,
         ]);
     });
-    
+
     // Locations management
     Route::resource('locations', LocationController::class);
-    
+
     // Employee Import routes (must come before resource routes)
     Route::get('employees/import', [EmployeeImportController::class, 'instructions'])->name('employees.import');
     Route::get('employees/import/upload', [EmployeeImportController::class, 'upload'])->name('employees.import.upload');
@@ -179,32 +180,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{debt}', [EmployeeDebtController::class, 'update'])->name('update');
         Route::delete('/{debt}', [EmployeeDebtController::class, 'destroy'])->name('destroy');
     });
-    
+
     // Custody management routes
     Route::get('employees/{employee}/custody', [CustodyController::class, 'show'])->name('employees.custody.show');
     Route::post('employees/{employee}/custody', [CustodyController::class, 'store'])->name('employees.custody.store');
     Route::get('custody-changes/{custodyChange}/document', [CustodyController::class, 'generateDocument'])->name('custody.document');
     Route::post('custody-changes/{custodyChange}/upload', [CustodyController::class, 'uploadDocument'])->name('custody.upload');
     Route::get('api/custody/available-assets', [CustodyController::class, 'getAvailableAssets'])->name('api.custody.available-assets');
-    
+
     // Asset Categories management
     Route::resource('asset-categories', AssetCategoryController::class);
-    
+
     // Assets management
     Route::get('assets/export-by-category', [AssetController::class, 'exportByCategory'])->name('assets.export-by-category');
     Route::resource('assets', AssetController::class);
     Route::get('api/assets/bulk-created', [AssetController::class, 'getBulkCreatedAssets'])->name('api.assets.bulk-created');
     Route::delete('api/assets/bulk-created', [AssetController::class, 'clearBulkCreatedAssets'])->name('api.assets.clear-bulk-created');
-    
+
     // Asset Assignment tracking
     Route::get('api/assets/{asset}/assignments', [AssetController::class, 'getAssignments'])->name('api.assets.assignments');
     Route::post('api/assets/{asset}/assignments/{assignment}/print-document', [AssetController::class, 'printAssignmentDocument'])->name('api.assets.assignments.print-document');
     Route::post('api/assets/{asset}/assignments/{assignment}/upload-document', [AssetController::class, 'uploadSignedDocument'])->name('api.assets.assignments.upload-document');
     Route::get('api/assets/{asset}/assignments/{assignment}/download-document', [AssetController::class, 'downloadSignedDocument'])->name('api.assets.assignments.download-document');
-    
+
     // Asset Templates management
     Route::resource('asset-templates', AssetTemplateController::class);
-    
+
     // Print Jobs management
     Route::get('/print-available', [PrintJobController::class, 'printStation'])->name('print-station');
     Route::post('api/print-jobs', [PrintJobController::class, 'create'])->name('api.print-jobs.create');
@@ -213,7 +214,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/print-jobs/statistics', [PrintJobController::class, 'statistics'])->name('api.print-jobs.statistics');
     Route::patch('api/print-jobs/{printJob}/status', [PrintJobController::class, 'updateStatus'])->name('api.print-jobs.update-status');
     Route::delete('api/print-jobs/{printJob}', [PrintJobController::class, 'cancel'])->name('api.print-jobs.cancel');
-    
+
     // Attendance Management routes
     Route::get('companies/{company}/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
     Route::get('companies/{company}/attendance/late', [AttendanceController::class, 'late'])->name('attendance.late');
@@ -221,17 +222,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('attendance/deductions', [DeductionsController::class, 'store'])->name('attendance.deductions.store');
     Route::put('attendance/deductions/{deduction}', [DeductionsController::class, 'update'])->name('attendance.deductions.update');
     Route::delete('attendance/deductions/{deduction}', [DeductionsController::class, 'destroy'])->name('attendance.deductions.destroy');
+    Route::get('companies/{company}/attendance/additions', [AdditionsController::class, 'index'])->name('attendance.additions');
+    Route::post('attendance/additions', [AdditionsController::class, 'store'])->name('attendance.additions.store');
+    Route::put('attendance/additions/{addition}', [AdditionsController::class, 'update'])->name('attendance.additions.update');
+    Route::delete('attendance/additions/{addition}', [AdditionsController::class, 'destroy'])->name('attendance.additions.destroy');
     Route::get('companies/{company}/attendance/create', [AttendanceController::class, 'create'])->name('attendance.create');
     Route::post('companies/{company}/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
     Route::get('companies/{company}/attendance/{import}', [AttendanceController::class, 'show'])->name('attendance.show');
     Route::post('companies/{company}/attendance/{import}/retry', [AttendanceController::class, 'retrySync'])->name('attendance.retry');
     Route::post('companies/{company}/attendance/batches/{batch}/retry', [AttendanceController::class, 'retrySyncBatch'])->name('attendance.batch.retry');
     Route::get('companies/{company}/attendance/template/download', [AttendanceController::class, 'downloadTemplate'])->name('attendance.template');
-    
+
     // Attendance Penalty Approval routes
     Route::post('attendance-penalties/{penalty}/approve', [AttendancePenaltyApprovalController::class, 'approve'])->name('attendance-penalties.approve');
     Route::post('attendance-penalties/{penalty}/reject', [AttendancePenaltyApprovalController::class, 'reject'])->name('attendance-penalties.reject');
-    
+
     // Salary Runs routes
     Route::get('companies/{company}/salary-runs', [SalaryRunController::class, 'index'])->name('salary-runs.index');
     Route::get('companies/{company}/salary-runs/export-excel/{salaryRun}', [SalaryRunController::class, 'exportExcel'])->name('salary-runs.export-excel');
@@ -244,7 +249,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-ceo', [SalaryRunController::class, 'approveCeo'])->name('salary-runs.approve-ceo');
     Route::post('companies/{company}/salary-runs/{salaryRun}/update-debt-deductions', [SalaryRunController::class, 'updateDebtDeductions'])->name('salary-runs.update-debt-deductions');
     Route::post('companies/{company}/salary-runs/{salaryRun}/remove-breakdown-line', [SalaryRunController::class, 'removeBreakdownLine'])->name('salary-runs.remove-breakdown-line');
-    
+
     // Bayzat Configuration routes
     Route::get('bayzat-configs', [BayzatConfigController::class, 'index'])->name('bayzat-configs.index');
     Route::get('companies/{company}/bayzat-config', [BayzatConfigController::class, 'show'])->name('bayzat-configs.show');

@@ -118,6 +118,17 @@
         </Card>
         <Card>
           <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">{{ t('salary_runs.additions_total') }}</CardTitle>
+            <Icon name="Plus" class="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold text-green-600">
+              {{ formatCurrency(totalAdditions) }}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle class="text-sm font-medium">{{ t('salary_runs.social_insurance_deduction') }}</CardTitle>
             <Icon name="Shield" class="h-4 w-4 text-rose-600" />
           </CardHeader>
@@ -174,6 +185,9 @@
                     {{ t('salary_runs.penalties_total') }}
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {{ t('salary_runs.additions_total') }}
+                  </th>
+                  <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('salary_runs.social_insurance_deduction') }}
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -218,6 +232,11 @@
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-orange-600 dark:text-orange-400">
                       {{ formatCurrency(item.penalties_total) }}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-green-700 dark:text-green-400">
+                      {{ formatCurrency(item.additions_total || 0) }}
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
@@ -323,6 +342,9 @@
                 </div>
                 <div v-if="penalty.source === 'manual_deduction'" class="text-xs text-blue-600 dark:text-blue-400 mb-0.5">
                   {{ manualDeductionTypeLabel(penalty) }}
+                </div>
+                <div v-if="penalty.source === 'manual_addition'" class="text-xs text-green-700 dark:text-green-400 mb-0.5">
+                  {{ manualAdditionTypeLabel(penalty) }}
                 </div>
                 <div v-if="penalty.source === 'unpaid_leave'" class="text-xs text-purple-600 dark:text-purple-400 mb-0.5">
                   {{ t('salary_runs.unpaid_leave_label') }}
@@ -483,6 +505,7 @@ interface Props {
       allowances: number;
       gross_salary: number;
       penalties_total: number;
+      additions_total: number;
       social_insurance_deduction_total: number;
       net_salary: number;
       debt_deductions?: Array<{
@@ -502,10 +525,12 @@ interface Props {
         penalty_amount?: number;
         late_minutes_deduction_amount?: number;
         deduction_type?: 'penalties' | 'absence' | 'traffic_violation' | 'attestations';
+        addition_type?: 'monthly_entitlement' | 'overtime';
         attendance_penalty_id?: number;
         employee_deduction_id?: number;
+        employee_addition_id?: number;
         leave_id?: number;
-        source?: 'penalty' | 'manual_deduction' | 'unpaid_leave';
+        source?: 'penalty' | 'manual_deduction' | 'manual_addition' | 'unpaid_leave';
       }>;
     }>;
   };
@@ -612,6 +637,10 @@ const totalPenalties = computed(() => {
   return props.salaryRun.items?.reduce((sum, item) => sum + parseFloat(item.penalties_total || 0), 0) || 0;
 });
 
+const totalAdditions = computed(() => {
+  return props.salaryRun.items?.reduce((sum, item) => sum + parseFloat(item.additions_total || 0), 0) || 0;
+});
+
 const totalDebtDeductions = computed(() => {
   return props.salaryRun.items?.reduce((sum, item) => sum + getDebtDeductionsTotal(item), 0) || 0;
 });
@@ -636,6 +665,10 @@ function getBreakdownLineMeta(line: Record<string, unknown>): { line_type: strin
   const ed = line.employee_deduction_id;
   if (ed != null && Number(ed) > 0) {
     return { line_type: 'employee_deduction', line_id: Number(ed) };
+  }
+  const ea = line.employee_addition_id;
+  if (ea != null && Number(ea) > 0) {
+    return { line_type: 'employee_addition', line_id: Number(ea) };
   }
   const lv = line.leave_id;
   if (lv != null && Number(lv) > 0) {
@@ -676,6 +709,16 @@ function manualDeductionTypeLabel(line: Record<string, unknown>): string {
   }
 
   return map[type] ?? t('attendance.deduction_type_manual')
+}
+
+function manualAdditionTypeLabel(line: Record<string, unknown>): string {
+  const type = String(line.addition_type || '')
+  const map: Record<string, string> = {
+    monthly_entitlement: t('attendance.addition_type_monthly_entitlement'),
+    overtime: t('attendance.addition_type_overtime'),
+  }
+
+  return map[type] ?? t('attendance.addition_type')
 }
 
 function removeBreakdownLine(line: Record<string, unknown>) {
