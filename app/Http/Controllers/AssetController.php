@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\Company;
+use App\Models\Employee;
 use App\Models\Location;
 use App\Exports\AssetsByCategoryExport;
 use Illuminate\Http\Request;
@@ -17,22 +19,54 @@ use Inertia\Response;
 
 class AssetController extends Controller
 {
+    private function accessibleCompanyIds($user)
+    {
+        $ids = $user->ownedCompanies()->pluck('id');
+
+        if ($ids->isEmpty()) {
+            $employeeCompanyId = Employee::query()
+                ->where('user_id', $user->id)
+                ->value('company_id');
+
+            if ($employeeCompanyId) {
+                $ids = collect([$employeeCompanyId]);
+            }
+        }
+
+        return $ids;
+    }
+
+    private function accessibleCompanies($user)
+    {
+        return Company::query()
+            ->whereIn('id', $this->accessibleCompanyIds($user))
+            ->orderBy('name_en')
+            ->get();
+    }
+
+    private function currentAccessibleCompany($user): ?Company
+    {
+        $company = $user->currentCompany();
+        if ($company) {
+            return $company;
+        }
+
+        return Company::query()->whereIn('id', $this->accessibleCompanyIds($user))->first();
+    }
+
     /**
      * Display a listing of the assets.
      */
     public function index(Request $request): Response|RedirectResponse
     {
         $user = Auth::user();
-        $ownedCompanies = $user->ownedCompanies();
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // If user doesn't have any companies, redirect to create one
-        if ($ownedCompanies->count() === 0) {
+        if ($ownedCompanyIds->isEmpty()) {
             return redirect()->route('companies.create')
                 ->with('info', 'Please create a company first to manage assets.');
         }
-
-        // Get company IDs that the user owns
-        $ownedCompanyIds = $ownedCompanies->pluck('id');
 
         // Only show assets from companies the user owns
         $query = Asset::with(['category', 'location', 'assignments', 'company', 'assetTemplate'])
@@ -104,7 +138,7 @@ class AssetController extends Controller
     public function create(): Response|RedirectResponse
     {
         $user = Auth::user();
-        $companies = $user->ownedCompanies()->get();
+        $companies = $this->accessibleCompanies($user);
 
         // If user doesn't have any companies, redirect to create one
         if ($companies->isEmpty()) {
@@ -112,7 +146,7 @@ class AssetController extends Controller
                 ->with('info', 'Please create a company first to manage assets.');
         }
 
-        $currentCompany = $user->currentCompany();
+        $currentCompany = $this->currentAccessibleCompany($user);
 
         // Get categories and locations for current company (for initial load)
         $categories = $currentCompany ?
@@ -140,7 +174,7 @@ class AssetController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->currentAccessibleCompany($user);
 
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -192,8 +226,7 @@ class AssetController extends Controller
         $targetCompanyId = $validated['company_id'] ?? $company->id;
 
         // Verify user owns the target company
-        $targetCompany = $user->ownedCompanies()->find($targetCompanyId);
-        if (!$targetCompany) {
+        if (! $this->accessibleCompanyIds($user)->contains((int) $targetCompanyId)) {
             return back()->withErrors(['company_id' => 'Invalid company selection.']);
         }
 
@@ -218,11 +251,10 @@ class AssetController extends Controller
 
             // Use workstation company if specified
             if (!empty($validated['workstation_company_id'])) {
-                $workstationCompany = $user->ownedCompanies()->find($validated['workstation_company_id']);
-                if (!$workstationCompany) {
+                if (! $this->accessibleCompanyIds($user)->contains((int) $validated['workstation_company_id'])) {
                     return back()->withErrors(['workstation_company_id' => 'Invalid workstation company selection.']);
                 }
-                $workstationCompanyId = $workstationCompany->id;
+                $workstationCompanyId = (int) $validated['workstation_company_id'];
             } else {
                 $workstationCompanyId = $targetCompanyId;
             }
@@ -370,7 +402,7 @@ class AssetController extends Controller
     public function show(Asset $asset): Response|RedirectResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // If user doesn't have any companies, redirect to create one
         if ($ownedCompanyIds->isEmpty()) {
@@ -396,7 +428,7 @@ class AssetController extends Controller
     public function edit(Asset $asset): Response|RedirectResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // If user doesn't have any companies, redirect to create one
         if ($ownedCompanyIds->isEmpty()) {
@@ -418,7 +450,7 @@ class AssetController extends Controller
             ->get();
 
         // Get user's owned companies for company selection
-        $companies = $user->ownedCompanies()->orderBy('name_en')->get();
+        $companies = $this->accessibleCompanies($user);
 
         return Inertia::render('Assets/Edit', [
             'asset' => $asset,
@@ -434,7 +466,7 @@ class AssetController extends Controller
     public function update(Request $request, Asset $asset): RedirectResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // If user doesn't have any companies, redirect to create one
         if ($ownedCompanyIds->isEmpty()) {
@@ -556,7 +588,7 @@ class AssetController extends Controller
             return response()->json(['error' => 'No bulk created assets found'], 404);
         }
 
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         $assets = Asset::whereIn('id', $assetIds)
             ->whereIn('company_id', $ownedCompanyIds)
@@ -625,7 +657,7 @@ class AssetController extends Controller
     public function destroy(Asset $asset): RedirectResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // If user doesn't have any companies, redirect to create one
         if ($ownedCompanyIds->isEmpty()) {
@@ -656,7 +688,7 @@ class AssetController extends Controller
     public function getAssignments(Asset $asset)
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // Check if user has access to this asset
         if (!$ownedCompanyIds->contains($asset->company_id)) {
@@ -700,7 +732,7 @@ class AssetController extends Controller
     public function printAssignmentDocument(Asset $asset, \App\Models\AssetAssignment $assignment)
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // Check if user has access to this asset
         if (!$ownedCompanyIds->contains($asset->company_id)) {
@@ -726,7 +758,7 @@ class AssetController extends Controller
     public function uploadSignedDocument(Asset $asset, \App\Models\AssetAssignment $assignment, Request $request)
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // Check if user has access to this asset
         if (!$ownedCompanyIds->contains($asset->company_id)) {
@@ -767,7 +799,7 @@ class AssetController extends Controller
     public function downloadSignedDocument(Asset $asset, \App\Models\AssetAssignment $assignment)
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         // Check if user has access to this asset
         if (!$ownedCompanyIds->contains($asset->company_id)) {
@@ -1020,7 +1052,7 @@ class AssetController extends Controller
     public function exportByCategory(Request $request)
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $ownedCompanyIds = $this->accessibleCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             return redirect()->route('assets.index')

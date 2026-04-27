@@ -5,6 +5,7 @@ use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\TeamPermissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -22,15 +23,23 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('settings/Appearance');
     })->name('appearance');
 
-    Route::get('settings/employee-reference-data', [EmployeeReferenceDataController::class, 'index'])->name('settings.employee-reference-data.index');
-    Route::post('settings/employee-reference-data/nationalities', [EmployeeReferenceDataController::class, 'storeNationality'])->name('settings.employee-reference-data.nationalities.store');
-    Route::put('settings/employee-reference-data/nationalities/{nationality}', [EmployeeReferenceDataController::class, 'updateNationality'])->name('settings.employee-reference-data.nationalities.update');
-    Route::post('settings/employee-reference-data/countries', [EmployeeReferenceDataController::class, 'storeCountry'])->name('settings.employee-reference-data.countries.store');
-    Route::put('settings/employee-reference-data/countries/{country}', [EmployeeReferenceDataController::class, 'updateCountry'])->name('settings.employee-reference-data.countries.update');
+    Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {
+        Route::get('settings/permissions-teams', [TeamPermissionController::class, 'index'])->name('settings.permissions-teams.index');
+        Route::post('settings/permissions-teams/teams', [TeamPermissionController::class, 'storeTeam'])->name('settings.permissions-teams.store-team');
+        Route::post('settings/permissions-teams/teams/{team}/permissions', [TeamPermissionController::class, 'syncTeamPermissions'])->name('settings.permissions-teams.sync-permissions');
+    });
 
-    Route::get('settings/email-test', [EmailTestController::class, 'index'])->name('settings.email-test.index');
-    Route::post('settings/email-test', [EmailTestController::class, 'send'])->name('settings.email-test.send');
+    Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {
+        Route::get('settings/employee-reference-data', [EmployeeReferenceDataController::class, 'index'])->name('settings.employee-reference-data.index');
+        Route::post('settings/employee-reference-data/nationalities', [EmployeeReferenceDataController::class, 'storeNationality'])->name('settings.employee-reference-data.nationalities.store');
+        Route::put('settings/employee-reference-data/nationalities/{nationality}', [EmployeeReferenceDataController::class, 'updateNationality'])->name('settings.employee-reference-data.nationalities.update');
+        Route::post('settings/employee-reference-data/countries', [EmployeeReferenceDataController::class, 'storeCountry'])->name('settings.employee-reference-data.countries.store');
+        Route::put('settings/employee-reference-data/countries/{country}', [EmployeeReferenceDataController::class, 'updateCountry'])->name('settings.employee-reference-data.countries.update');
 
-    Route::get('settings/operational-month', [OperationalMonthSettingsController::class, 'edit'])->name('settings.operational-month.edit');
-    Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
+        Route::get('settings/email-test', [EmailTestController::class, 'index'])->name('settings.email-test.index');
+        Route::post('settings/email-test', [EmailTestController::class, 'send'])->name('settings.email-test.send');
+
+        Route::get('settings/operational-month', [OperationalMonthSettingsController::class, 'edit'])->name('settings.operational-month.edit');
+        Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
+    });
 });

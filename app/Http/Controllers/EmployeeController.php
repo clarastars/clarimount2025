@@ -6,6 +6,7 @@ use App\Models\Country;
 use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
+use App\Models\Team;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeePortalUserService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Models\Role;
 
 class EmployeeController extends Controller
 {
@@ -440,6 +443,14 @@ class EmployeeController extends Controller
                 'exists' => (bool) $employee->user_id,
                 'email' => $employee->work_email ?: $employee->user?->email,
             ],
+            'availableTeams' => Team::query()
+                ->where('owner_id', $user->id)
+                ->orWhere('id', $user->team_id)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->unique('id')
+                ->values(),
+            'assignedTeamId' => $employee->user?->team_id,
         ]);
     }
 
@@ -550,6 +561,7 @@ class EmployeeController extends Controller
             'annual_leave_balance' => 'nullable|integer|min:0',
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
+            'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')],
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'personal_email.unique' => __('employees.email_already_used'),
@@ -590,6 +602,42 @@ class EmployeeController extends Controller
             $isSuperAdmin ? ($validated['portal_password'] ?? null) : null,
             $isSuperAdmin && (bool) ($validated['portal_password_reset'] ?? false)
         );
+
+        $employee->refresh()->load('user');
+
+        if ($employee->user) {
+            $selectedTeamId = isset($validated['team_id']) ? (int) $validated['team_id'] : null;
+            $selectedTeam = $selectedTeamId ? Team::query()->where('id', $selectedTeamId)->first() : null;
+
+            if ($selectedTeamId && ! $selectedTeam) {
+                return back()->withErrors(['team_id' => 'Selected team does not exist.']);
+            }
+
+            if ($selectedTeam && ! ($selectedTeam->owner_id === $user->id || $selectedTeam->id === $user->team_id)) {
+                return back()->withErrors(['team_id' => 'You are not allowed to assign this team.']);
+            }
+
+            $employee->user->update([
+                'team_id' => $selectedTeam?->id,
+                'joined_team_at' => $selectedTeam ? now() : null,
+            ]);
+
+            $employee->user->roles()
+                ->where('name', 'team-member')
+                ->detach();
+
+            if ($selectedTeam) {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($selectedTeam->id);
+
+                $teamMemberRole = Role::query()->firstOrCreate([
+                    'name' => 'team-member',
+                    'guard_name' => 'web',
+                    'team_id' => $selectedTeam->id,
+                ]);
+
+                $employee->user->assignRole($teamMemberRole);
+            }
+        }
 
         return redirect()->route('employees.show', $employee)
             ->with('success', 'Employee updated successfully.');

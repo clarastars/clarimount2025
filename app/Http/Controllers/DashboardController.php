@@ -52,7 +52,8 @@ class DashboardController extends Controller
         if (! $user) {
             return false;
         }
-        return $user->roles()->where('name', 'employee')->wherePivotNull('team_id')->exists();
+
+        return $user->roles()->where('name', 'employee')->exists() || $user->employee()->exists();
     }
 }
 

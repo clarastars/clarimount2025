@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Spatie\Permission\PermissionRegistrar;
 use Tighten\Ziggy\Ziggy;
 
 class HandleInertiaRequests extends Middleware
@@ -39,14 +40,24 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
         $userLanguage = $request->user()?->language ?? 'ar';
+        $user = $request->user();
+        if ($user?->team_id) {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
+        }
+
+        $isSuperAdmin = $user?->hasRole('super-admin') ?? false;
+        $permissionNames = $user?->getAllPermissions()->pluck('name')->values()->all() ?? [];
         
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
-                'is_employee' => $request->user()?->roles()->where('name', 'employee')->wherePivotNull('team_id')->exists() ?? false,
+                'user' => $user,
+                'is_employee' => ($user?->roles()->where('name', 'employee')->exists() ?? false) || ($user?->employee()->exists() ?? false),
+                'permissions' => $permissionNames,
+                'can_access_settings' => $isSuperAdmin || in_array('settings.access', $permissionNames, true),
+                'can_access_asset_inventory' => $isSuperAdmin || in_array('asset-inventory.access', $permissionNames, true),
             ],
             'locale' => $userLanguage,
             'translations' => $this->getTranslations($userLanguage),

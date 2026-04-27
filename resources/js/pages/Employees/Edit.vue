@@ -271,6 +271,31 @@
                     </CardContent>
                 </Card>
 
+                <Card v-if="props.portalAccount?.exists">
+                    <CardHeader class="cursor-pointer hover:bg-gray-50">
+                        <div class="flex items-center gap-3">
+                            <Icon name="Users" class="h-5 w-5 text-emerald-600" />
+                            <CardTitle class="text-xl">{{ t('settings.permissions_teams') }}</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <div>
+                            <Label for="team_id" class="mb-2">{{ t('settings.assign_employee_team') }}</Label>
+                            <select
+                                id="team_id"
+                                v-model="form.team_id"
+                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                <option :value="null">{{ t('settings.no_team') }}</option>
+                                <option v-for="team in (props.availableTeams || [])" :key="team.id" :value="team.id">
+                                    {{ team.name }}
+                                </option>
+                            </select>
+                            <div v-if="form.errors.team_id" class="text-red-500 text-sm mt-1">{{ form.errors.team_id }}</div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <!-- Work Details Section -->
                 <Card>
                     <Collapsible v-model:open="sectionWork">
@@ -1049,6 +1074,8 @@ interface Props {
         exists: boolean;
         email?: string | null;
     };
+    availableTeams?: Array<{ id: number; name: string }>;
+    assignedTeamId?: number | null;
 }
 
 const props = defineProps<Props>();
@@ -1151,6 +1178,7 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
+    team_id: props.assignedTeamId ?? null as number | null,
 })
 
 // Auto-calculate total allowances from allowance details

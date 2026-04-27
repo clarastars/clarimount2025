@@ -12,7 +12,10 @@ import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
 const page = usePage();
-const isEmployee = computed(() => (page.props.auth as { is_employee?: boolean })?.is_employee ?? false);
+const authProps = computed(() => (page.props.auth as { is_employee?: boolean; can_access_settings?: boolean; can_access_asset_inventory?: boolean }) ?? {});
+const isEmployee = computed(() => authProps.value.is_employee ?? false);
+const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
+const canAccessAssetInventory = computed(() => authProps.value.can_access_asset_inventory ?? false);
 
 const mainNavItems = computed((): NavItem[] => [
     {
@@ -81,6 +84,11 @@ const settingsNavItems = computed((): NavItem[] => [
         href: '/settings/operational-month',
         icon: Clock,
     },
+    {
+        title: t('settings.permissions_teams'),
+        href: '/settings/permissions-teams',
+        icon: Users,
+    },
 ]);
 
 const footerNavItems = computed((): NavItem[] => [
@@ -112,12 +120,9 @@ const footerNavItems = computed((): NavItem[] => [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain v-if="isEmployee" :items="mainNavItems.filter((item) => item.href === '/dashboard')" />
-            <template v-else>
-                <NavMain :items="mainNavItems" />
-                <NavMain :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
-                <NavMain :items="settingsNavItems" :label="t('nav.settings')" />
-            </template>
+            <NavMain :items="isEmployee ? mainNavItems.filter((item) => item.href === '/dashboard') : mainNavItems" />
+            <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
+            <NavMain v-if="canAccessSettings" :items="settingsNavItems" :label="t('nav.settings')" />
         </SidebarContent>
 
         <SidebarFooter>

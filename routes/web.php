@@ -152,7 +152,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Locations management
-    Route::resource('locations', LocationController::class);
+    Route::middleware('role_or_permission:super-admin|asset-inventory.access')->group(function () {
+        Route::resource('locations', LocationController::class);
+
+        // Asset Categories management
+        Route::resource('asset-categories', AssetCategoryController::class);
+
+        // Assets management
+        Route::get('assets/export-by-category', [AssetController::class, 'exportByCategory'])->name('assets.export-by-category');
+        Route::resource('assets', AssetController::class);
+        Route::get('api/assets/bulk-created', [AssetController::class, 'getBulkCreatedAssets'])->name('api.assets.bulk-created');
+        Route::delete('api/assets/bulk-created', [AssetController::class, 'clearBulkCreatedAssets'])->name('api.assets.clear-bulk-created');
+
+        // Asset Assignment tracking
+        Route::get('api/assets/{asset}/assignments', [AssetController::class, 'getAssignments'])->name('api.assets.assignments');
+        Route::post('api/assets/{asset}/assignments/{assignment}/print-document', [AssetController::class, 'printAssignmentDocument'])->name('api.assets.assignments.print-document');
+        Route::post('api/assets/{asset}/assignments/{assignment}/upload-document', [AssetController::class, 'uploadSignedDocument'])->name('api.assets.assignments.upload-document');
+        Route::get('api/assets/{asset}/assignments/{assignment}/download-document', [AssetController::class, 'downloadSignedDocument'])->name('api.assets.assignments.download-document');
+
+        // Asset Templates management
+        Route::resource('asset-templates', AssetTemplateController::class);
+
+        // API endpoints for async searches (asset inventory scope)
+        Route::get('api/locations/search', [LocationController::class, 'search'])->name('api.locations.search');
+        Route::get('api/asset-templates/search', [AssetTemplateController::class, 'search'])->name('api.asset-templates.search');
+        Route::get('api/asset-templates/by-category', [AssetTemplateController::class, 'byCategory'])->name('api.asset-templates.by-category');
+    });
 
     // Employee Import routes (must come before resource routes)
     Route::get('employees/import', [EmployeeImportController::class, 'instructions'])->name('employees.import');
@@ -187,24 +212,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('custody-changes/{custodyChange}/document', [CustodyController::class, 'generateDocument'])->name('custody.document');
     Route::post('custody-changes/{custodyChange}/upload', [CustodyController::class, 'uploadDocument'])->name('custody.upload');
     Route::get('api/custody/available-assets', [CustodyController::class, 'getAvailableAssets'])->name('api.custody.available-assets');
-
-    // Asset Categories management
-    Route::resource('asset-categories', AssetCategoryController::class);
-
-    // Assets management
-    Route::get('assets/export-by-category', [AssetController::class, 'exportByCategory'])->name('assets.export-by-category');
-    Route::resource('assets', AssetController::class);
-    Route::get('api/assets/bulk-created', [AssetController::class, 'getBulkCreatedAssets'])->name('api.assets.bulk-created');
-    Route::delete('api/assets/bulk-created', [AssetController::class, 'clearBulkCreatedAssets'])->name('api.assets.clear-bulk-created');
-
-    // Asset Assignment tracking
-    Route::get('api/assets/{asset}/assignments', [AssetController::class, 'getAssignments'])->name('api.assets.assignments');
-    Route::post('api/assets/{asset}/assignments/{assignment}/print-document', [AssetController::class, 'printAssignmentDocument'])->name('api.assets.assignments.print-document');
-    Route::post('api/assets/{asset}/assignments/{assignment}/upload-document', [AssetController::class, 'uploadSignedDocument'])->name('api.assets.assignments.upload-document');
-    Route::get('api/assets/{asset}/assignments/{assignment}/download-document', [AssetController::class, 'downloadSignedDocument'])->name('api.assets.assignments.download-document');
-
-    // Asset Templates management
-    Route::resource('asset-templates', AssetTemplateController::class);
 
     // Print Jobs management
     Route::get('/print-available', [PrintJobController::class, 'printStation'])->name('print-station');
@@ -272,9 +279,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // API endpoints for async searches
-    Route::get('api/locations/search', [LocationController::class, 'search'])->name('api.locations.search');
-    Route::get('api/asset-templates/search', [AssetTemplateController::class, 'search'])->name('api.asset-templates.search');
-    Route::get('api/asset-templates/by-category', [AssetTemplateController::class, 'byCategory'])->name('api.asset-templates.by-category');
     Route::get('api/companies/search', [CompanyController::class, 'search'])->name('api.companies.search');
     Route::get('api/departments/search', [DepartmentController::class, 'search'])->name('api.departments.search');
     Route::get('api/employees/search', [EmployeeController::class, 'search'])->name('api.employees.search');

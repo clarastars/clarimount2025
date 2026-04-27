@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetCategory;
+use App\Models\Company;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -11,13 +13,31 @@ use Inertia\Response;
 
 class AssetCategoryController extends Controller
 {
+    private function accessibleCompany($user): ?Company
+    {
+        $company = $user->currentCompany();
+        if ($company) {
+            return $company;
+        }
+
+        $employeeCompanyId = Employee::query()
+            ->where('user_id', $user->id)
+            ->value('company_id');
+
+        if (! $employeeCompanyId) {
+            return null;
+        }
+
+        return Company::query()->find($employeeCompanyId);
+    }
+
     /**
      * Display a listing of the asset categories.
      */
     public function index(): Response|RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -42,7 +62,7 @@ class AssetCategoryController extends Controller
     public function create(): Response|RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -67,7 +87,7 @@ class AssetCategoryController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -114,7 +134,7 @@ class AssetCategoryController extends Controller
     public function show(AssetCategory $assetCategory): Response|RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -167,7 +187,7 @@ class AssetCategoryController extends Controller
     public function edit(AssetCategory $assetCategory): Response|RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -200,7 +220,7 @@ class AssetCategoryController extends Controller
     public function update(Request $request, AssetCategory $assetCategory): RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {
@@ -261,7 +281,7 @@ class AssetCategoryController extends Controller
     public function destroy(AssetCategory $assetCategory): RedirectResponse
     {
         $user = Auth::user();
-        $company = $user->currentCompany();
+        $company = $this->accessibleCompany($user);
         
         // If user doesn't have a company, redirect to create one
         if (!$company) {

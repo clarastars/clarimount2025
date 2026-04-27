@@ -8,6 +8,8 @@ import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 
 const { t } = useI18n();
+const page = usePage();
+const canAccessSettings = computed(() => ((page.props.auth as { can_access_settings?: boolean })?.can_access_settings ?? false));
 
 const sidebarNavItems = computed((): NavItem[] => [
     {
@@ -30,9 +32,15 @@ const sidebarNavItems = computed((): NavItem[] => [
         title: t('settings.operational_month'),
         href: '/settings/operational-month',
     },
+    ...(canAccessSettings.value
+        ? [
+              {
+                  title: t('settings.permissions_teams'),
+                  href: '/settings/permissions-teams',
+              },
+          ]
+        : []),
 ]);
-
-const page = usePage();
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
 </script>
