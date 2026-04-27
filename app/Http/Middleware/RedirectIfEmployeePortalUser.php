@@ -65,6 +65,21 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('companies-salary-runs.global-read-approve')) {
+            $allowed = array_merge($allowed, [
+                'companies.index',
+                'companies.show',
+                'api.companies.search',
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.export-excel',
+                'salary-runs.approve-hr',
+                'salary-runs.approve-director',
+                'salary-runs.approve-accountant',
+                'salary-runs.approve-ceo',
+            ]);
+        }
+
         if ($user->can('employees.readonly')) {
             $allowed = array_merge($allowed, [
                 'employees.index',

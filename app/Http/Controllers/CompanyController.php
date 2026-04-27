@@ -26,6 +26,11 @@ class CompanyController extends Controller
         return Auth::user()?->can('company.readonly') ?? false;
     }
 
+    private function canViewAllCompanies(): bool
+    {
+        return Auth::user()?->can('companies-salary-runs.global-read-approve') ?? false;
+    }
+
     private function canManageCompany(Company $company): bool
     {
         $user = Auth::user();
@@ -44,6 +49,8 @@ class CompanyController extends Controller
         $user = Auth::user();
 
         if ($user->hasRole('super-admin')) {
+            $companies = Company::query()->latest()->paginate(10);
+        } elseif ($this->canViewAllCompanies()) {
             $companies = Company::query()->latest()->paginate(10);
         } else {
             $ownedCompanies = Company::where('owner_id', $user->id);
@@ -124,7 +131,11 @@ class CompanyController extends Controller
     {
         $canManage = $this->canManageCompany($company);
         if (! $canManage) {
-            abort_unless($this->canViewCompanyReadOnly() && (int) $this->employeeCompanyId() === (int) $company->id, 403);
+            abort_unless(
+                $this->canViewAllCompanies()
+                || ($this->canViewCompanyReadOnly() && (int) $this->employeeCompanyId() === (int) $company->id),
+                403
+            );
         }
 
         // Load the company with owner and Bayzat configuration
@@ -227,6 +238,8 @@ class CompanyController extends Controller
 
         $companyQuery = Company::query();
         if ($user->hasRole('super-admin')) {
+            // no extra filter
+        } elseif ($this->canViewAllCompanies()) {
             // no extra filter
         } elseif (Company::where('owner_id', $user->id)->exists()) {
             $companyQuery->where('owner_id', $user->id);

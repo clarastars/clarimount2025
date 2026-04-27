@@ -32,6 +32,10 @@ class SalaryRunController extends Controller
             return true;
         }
 
+        if ($user->can('companies-salary-runs.global-read-approve')) {
+            return true;
+        }
+
         if (! $user->can($permission)) {
             return false;
         }
@@ -93,22 +97,30 @@ class SalaryRunController extends Controller
             'hr' => [
                 'approved_at' => $salaryRun->hr_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverHr?->name,
-                'can_approve' => $user->can('approve_salary_run_hr') || $user->can('salary-runs.readonly'),
+                'can_approve' => $user->can('approve_salary_run_hr')
+                    || $user->can('salary-runs.readonly')
+                    || $user->can('companies-salary-runs.global-read-approve'),
             ],
             'director' => [
                 'approved_at' => $salaryRun->director_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverDirector?->name,
-                'can_approve' => $user->can('approve_salary_run_director') || $user->can('salary-runs.readonly'),
+                'can_approve' => $user->can('approve_salary_run_director')
+                    || $user->can('salary-runs.readonly')
+                    || $user->can('companies-salary-runs.global-read-approve'),
             ],
             'accountant' => [
                 'approved_at' => $salaryRun->accountant_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverAccountant?->name,
-                'can_approve' => $user->can('approve_salary_run_accountant') || $user->can('salary-runs.readonly'),
+                'can_approve' => $user->can('approve_salary_run_accountant')
+                    || $user->can('salary-runs.readonly')
+                    || $user->can('companies-salary-runs.global-read-approve'),
             ],
             'ceo' => [
                 'approved_at' => $salaryRun->ceo_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverCeo?->name,
-                'can_approve' => $user->can('approve_salary_run_ceo') || $user->can('salary-runs.readonly'),
+                'can_approve' => $user->can('approve_salary_run_ceo')
+                    || $user->can('salary-runs.readonly')
+                    || $user->can('companies-salary-runs.global-read-approve'),
             ],
         ];
 
@@ -209,7 +221,9 @@ class SalaryRunController extends Controller
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
         }
-        if (! $user->can($permission) && ! $user->can('salary-runs.readonly')) {
+        if (! $user->can($permission)
+            && ! $user->can('salary-runs.readonly')
+            && ! $user->can('companies-salary-runs.global-read-approve')) {
             abort(403, 'You do not have permission to perform this approval.');
         }
         if ($salaryRun->$approvedAtColumn !== null) {

@@ -23,6 +23,7 @@ class TeamPermissionController extends Controller
     private const MANAGED_PERMISSIONS = [
         ['name' => 'asset-inventory.access', 'label' => 'جرد الأصول'],
         ['name' => 'settings.access', 'label' => 'الإعدادات'],
+        ['name' => 'companies-salary-runs.global-read-approve', 'label' => 'عرض كل الشركات وكل مسيرات الرواتب مع الاعتماد'],
         ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
         ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
