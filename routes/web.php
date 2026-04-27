@@ -249,6 +249,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('companies/{company}/salary-runs/export-excel/{salaryRun}', [SalaryRunController::class, 'exportExcel'])->name('salary-runs.export-excel');
     Route::get('companies/{company}/salary-runs/{year}/{month}', [SalaryRunController::class, 'show'])->name('salary-runs.show');
     Route::post('companies/{company}/salary-runs', [SalaryRunController::class, 'store'])->name('salary-runs.store');
+    Route::delete('companies/{company}/salary-runs/{salaryRun}', [SalaryRunController::class, 'destroy'])->name('salary-runs.destroy');
     Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-hr', [SalaryRunController::class, 'approveHr'])->name('salary-runs.approve-hr');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-director', [SalaryRunController::class, 'approveDirector'])->name('salary-runs.approve-director');

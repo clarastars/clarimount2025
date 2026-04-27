@@ -1626,6 +1626,8 @@ return [
         'breakdown' => 'تفاصيل الخصومات',
         'finalize' => 'إقرار',
         'finalize_confirmation' => 'هل أنت متأكد من إقرار مسير الرواتب؟',
+        'delete_confirmation' => 'هل تريد حذف مسير الرواتب لشهر {month} {year}؟ لا يمكن التراجع عن هذا الإجراء.',
+        'deleted_successfully' => 'تم حذف مسير الرواتب بنجاح.',
         'finalized_successfully' => 'تم إقرار مسير الرواتب بنجاح',
         'created_successfully' => 'تم إنشاء مسير الرواتب بنجاح',
         'no_salary_runs' => 'لا توجد مسيرات رواتب',

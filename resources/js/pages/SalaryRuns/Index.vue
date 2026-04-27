@@ -71,12 +71,24 @@
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-right rtl:text-left">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link :href="route('salary-runs.show', [company.id, salaryRun.year, salaryRun.month])">
-                        <Icon name="Eye" class="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
-                        {{ t('salary_runs.view_details') }}
-                      </Link>
-                    </Button>
+                    <div class="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link :href="route('salary-runs.show', [company.id, salaryRun.year, salaryRun.month])">
+                          <Icon name="Eye" class="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
+                          {{ t('salary_runs.view_details') }}
+                        </Link>
+                      </Button>
+                      <Button
+                        v-if="canManageSalaryRuns"
+                        variant="ghost"
+                        size="sm"
+                        class="text-red-600 hover:text-red-700"
+                        @click="deleteSalaryRun(salaryRun)"
+                      >
+                        <Icon name="Trash2" class="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
+                        {{ t('common.delete') }}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -272,5 +284,15 @@ const getMonthName = (month: number) => {
 
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString();
+};
+
+const deleteSalaryRun = (salaryRun: { id: number; year: number; month: number }) => {
+  if (!confirm(t('salary_runs.delete_confirmation', { month: getMonthName(salaryRun.month), year: salaryRun.year }))) {
+    return;
+  }
+
+  router.delete(route('salary-runs.destroy', [props.company.id, salaryRun.id]), {
+    preserveScroll: true,
+  });
 };
 </script>

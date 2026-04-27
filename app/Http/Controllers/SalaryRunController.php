@@ -184,6 +184,28 @@ class SalaryRunController extends Controller
     }
 
     /**
+     * Delete a salary run.
+     */
+    public function destroy(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
+            abort(403, 'You do not have access to this company.');
+        }
+
+        if ($salaryRun->company_id !== $company->id) {
+            abort(403, 'Salary run does not belong to this company.');
+        }
+
+        $salaryRun->delete();
+
+        return redirect()
+            ->route('salary-runs.index', $company->id)
+            ->with('success', __('messages.salary_runs.deleted_successfully'));
+    }
+
+    /**
      * Finalize a salary run
      */
     public function finalize(Company $company, SalaryRun $salaryRun): RedirectResponse
