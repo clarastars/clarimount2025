@@ -271,7 +271,7 @@
                     </CardContent>
                 </Card>
 
-                <Card v-if="props.portalAccount?.exists">
+                <Card v-if="props.canManagePortalAccount">
                     <CardHeader class="cursor-pointer hover:bg-gray-50">
                         <div class="flex items-center gap-3">
                             <Icon name="Users" class="h-5 w-5 text-emerald-600" />
@@ -279,6 +279,18 @@
                         </div>
                     </CardHeader>
                     <CardContent class="space-y-4">
+                        <div
+                            v-if="!props.portalAccount?.exists"
+                            class="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
+                        >
+                            <template v-if="form.work_email || form.personal_email">
+                                لا يوجد حساب بوابة حاليًا لهذا الموظف. سيتم إنشاء الحساب تلقائيًا عند الحفظ.
+                            </template>
+                            <template v-else>
+                                لإتاحة إنشاء حساب بوابة للموظف، أدخل بريد العمل أو البريد الشخصي أولًا ثم احفظ.
+                            </template>
+                        </div>
+
                         <div>
                             <Label for="team_id" class="mb-2">{{ t('settings.assign_employee_team') }}</Label>
                             <select
