@@ -99,6 +99,7 @@ class Company extends Model
         return $this->hasMany(Department::class);
     }
 
+
     /**
      * Get all assets for this company.
      */

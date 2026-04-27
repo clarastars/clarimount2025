@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Permission\Traits\HasRoles;
@@ -77,6 +78,15 @@ class User extends Authenticatable
     public function ownedCompanies(): HasMany
     {
         return $this->hasMany(Company::class, 'owner_id');
+    }
+
+    /**
+     * Companies this user can access through assigned role scope.
+     */
+    public function accessibleCompanies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class, 'company_user_access')
+            ->withTimestamps();
     }
 
     /**

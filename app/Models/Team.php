@@ -64,6 +64,7 @@ class Team extends Model
         return $this->hasMany(User::class);
     }
 
+
     /**
      * Get active users in this team.
      */

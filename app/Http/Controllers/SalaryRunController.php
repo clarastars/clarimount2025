@@ -26,13 +26,31 @@ class SalaryRunController extends Controller
         private SalaryRunService $salaryRunService
     ) {}
 
+    private function userAccessibleCompanyIds($user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return $user->accessibleCompanies()
+            ->pluck('companies.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
     {
         if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
             return true;
         }
 
+        $teamCompanyIds = $this->userAccessibleCompanyIds($user);
+
         if ($user->can('companies-salary-runs.global-read-approve')) {
+            return in_array((int) $company->id, $teamCompanyIds, true);
+        }
+
+        if ($user->can($permission) && in_array((int) $company->id, $teamCompanyIds, true)) {
             return true;
         }
 

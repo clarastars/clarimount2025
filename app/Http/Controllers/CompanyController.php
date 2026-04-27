@@ -14,6 +14,19 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    private function userAccessibleCompanyIds(): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+
+        return $user->accessibleCompanies()
+            ->pluck('companies.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     private function employeeCompanyId(): ?int
     {
         return Employee::query()
@@ -29,6 +42,11 @@ class CompanyController extends Controller
     private function canViewAllCompanies(): bool
     {
         return Auth::user()?->can('companies-salary-runs.global-read-approve') ?? false;
+    }
+
+    private function canViewCompanyByTeamScope(Company $company): bool
+    {
+        return in_array((int) $company->id, $this->userAccessibleCompanyIds(), true);
     }
 
     private function canManageCompany(Company $company): bool
@@ -51,7 +69,15 @@ class CompanyController extends Controller
         if ($user->hasRole('super-admin')) {
             $companies = Company::query()->latest()->paginate(10);
         } elseif ($this->canViewAllCompanies()) {
-            $companies = Company::query()->latest()->paginate(10);
+            $allowedCompanyIds = $this->userAccessibleCompanyIds();
+            $companies = Company::query()
+                ->when(
+                    ! empty($allowedCompanyIds),
+                    fn ($q) => $q->whereIn('id', $allowedCompanyIds),
+                    fn ($q) => $q->whereRaw('1 = 0')
+                )
+                ->latest()
+                ->paginate(10);
         } else {
             $ownedCompanies = Company::where('owner_id', $user->id);
 
@@ -59,8 +85,16 @@ class CompanyController extends Controller
                 $companies = $ownedCompanies->latest()->paginate(10);
             } elseif ($this->canViewCompanyReadOnly()) {
                 $employeeCompanyId = $this->employeeCompanyId();
+                $allowedCompanyIds = array_values(array_unique(array_filter([
+                    ...$this->userAccessibleCompanyIds(),
+                    $employeeCompanyId,
+                ])));
                 $companies = Company::query()
-                    ->when($employeeCompanyId, fn ($q) => $q->where('id', $employeeCompanyId), fn ($q) => $q->whereRaw('1 = 0'))
+                    ->when(
+                        ! empty($allowedCompanyIds),
+                        fn ($q) => $q->whereIn('id', $allowedCompanyIds),
+                        fn ($q) => $q->whereRaw('1 = 0')
+                    )
                     ->latest()
                     ->paginate(10);
             } else {
@@ -132,8 +166,9 @@ class CompanyController extends Controller
         $canManage = $this->canManageCompany($company);
         if (! $canManage) {
             abort_unless(
-                $this->canViewAllCompanies()
-                || ($this->canViewCompanyReadOnly() && (int) $this->employeeCompanyId() === (int) $company->id),
+                ($this->canViewAllCompanies() && $this->canViewCompanyByTeamScope($company))
+                || ($this->canViewCompanyReadOnly()
+                    && ((int) $this->employeeCompanyId() === (int) $company->id || $this->canViewCompanyByTeamScope($company))),
                 403
             );
         }
@@ -240,12 +275,25 @@ class CompanyController extends Controller
         if ($user->hasRole('super-admin')) {
             // no extra filter
         } elseif ($this->canViewAllCompanies()) {
-            // no extra filter
+            $allowedCompanyIds = $this->userAccessibleCompanyIds();
+            $companyQuery->when(
+                ! empty($allowedCompanyIds),
+                fn ($q) => $q->whereIn('id', $allowedCompanyIds),
+                fn ($q) => $q->whereRaw('1 = 0')
+            );
         } elseif (Company::where('owner_id', $user->id)->exists()) {
             $companyQuery->where('owner_id', $user->id);
         } elseif ($this->canViewCompanyReadOnly()) {
             $employeeCompanyId = $this->employeeCompanyId();
-            $companyQuery->when($employeeCompanyId, fn ($q) => $q->where('id', $employeeCompanyId), fn ($q) => $q->whereRaw('1 = 0'));
+            $allowedCompanyIds = array_values(array_unique(array_filter([
+                ...$this->userAccessibleCompanyIds(),
+                $employeeCompanyId,
+            ])));
+            $companyQuery->when(
+                ! empty($allowedCompanyIds),
+                fn ($q) => $q->whereIn('id', $allowedCompanyIds),
+                fn ($q) => $q->whereRaw('1 = 0')
+            );
         } else {
             $companyQuery->whereRaw('1 = 0');
         }

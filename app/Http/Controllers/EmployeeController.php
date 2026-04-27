@@ -457,6 +457,16 @@ class EmployeeController extends Controller
                 ->unique('id')
                 ->values(),
             'assignedTeamId' => $employee->user?->team_id,
+            'roleCompanies' => \App\Models\Company::query()
+                ->orderBy('name_en')
+                ->orderBy('name_ar')
+                ->get(['id', 'name_en', 'name_ar'])
+                ->map(fn (\App\Models\Company $company) => [
+                    'id' => $company->id,
+                    'name' => trim(($company->name_en ?? '').' '.($company->name_ar ?? '')) ?: (string) $company->id,
+                ])
+                ->values(),
+            'assignedRoleCompanyIds' => $employee->user?->accessibleCompanies()->pluck('companies.id')->values() ?? [],
         ]);
     }
 
@@ -568,6 +578,8 @@ class EmployeeController extends Controller
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
             'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')],
+            'role_company_ids' => ['array'],
+            'role_company_ids.*' => ['integer', Rule::exists('companies', 'id')],
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'personal_email.unique' => __('employees.email_already_used'),
@@ -643,6 +655,8 @@ class EmployeeController extends Controller
 
                 $employee->user->assignRole($teamMemberRole);
             }
+
+            $employee->user->accessibleCompanies()->sync($validated['role_company_ids'] ?? []);
         }
 
         return redirect()->route('employees.show', $employee)
