@@ -75,6 +75,7 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.export-excel',
                 'salary-runs.approve-hr',
                 'salary-runs.approve-director',
+                'salary-runs.approve-financial-manager',
                 'salary-runs.approve-accountant',
                 'salary-runs.approve-ceo',
             ]);
@@ -103,6 +104,7 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.export-excel',
                 'salary-runs.approve-hr',
                 'salary-runs.approve-director',
+                'salary-runs.approve-financial-manager',
                 'salary-runs.approve-accountant',
                 'salary-runs.approve-ceo',
             ]);

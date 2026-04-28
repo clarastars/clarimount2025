@@ -108,7 +108,7 @@ class SalaryRunController extends Controller
         $salaryRun = SalaryRun::where('company_id', $company->id)
             ->where('year', $year)
             ->where('month', $month)
-            ->with(['items.employee.debts', 'creator', 'approverHr', 'approverDirector', 'approverAccountant', 'approverCeo'])
+            ->with(['items.employee.debts', 'creator', 'approverHr', 'approverDirector', 'approverFinancialManager', 'approverAccountant', 'approverCeo'])
             ->firstOrFail();
 
         $approvals = [
@@ -123,6 +123,13 @@ class SalaryRunController extends Controller
                 'approved_at' => $salaryRun->director_approved_at?->toIso8601String(),
                 'approver_name' => $salaryRun->approverDirector?->name,
                 'can_approve' => $user->can('approve_salary_run_director')
+                    || $user->can('salary-runs.readonly')
+                    || $user->can('companies-salary-runs.global-read-approve'),
+            ],
+            'financial_manager' => [
+                'approved_at' => $salaryRun->financial_manager_approved_at?->toIso8601String(),
+                'approver_name' => $salaryRun->approverFinancialManager?->name,
+                'can_approve' => $user->can('approve_salary_run_financial_manager')
                     || $user->can('salary-runs.readonly')
                     || $user->can('companies-salary-runs.global-read-approve'),
             ],
@@ -291,6 +298,17 @@ class SalaryRunController extends Controller
     public function approveAccountant(Company $company, SalaryRun $salaryRun): RedirectResponse
     {
         return $this->approveStep($company, $salaryRun, 'approve_salary_run_accountant', 'accountant_approved_at', 'accountant_approved_by');
+    }
+
+    public function approveFinancialManager(Company $company, SalaryRun $salaryRun): RedirectResponse
+    {
+        return $this->approveStep(
+            $company,
+            $salaryRun,
+            'approve_salary_run_financial_manager',
+            'financial_manager_approved_at',
+            'financial_manager_approved_by'
+        );
     }
 
     public function approveCeo(Company $company, SalaryRun $salaryRun): RedirectResponse

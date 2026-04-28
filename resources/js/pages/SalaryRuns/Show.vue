@@ -36,13 +36,13 @@
         </div>
       </div>
 
-      <!-- Approvals (4 steps) -->
+      <!-- Approvals (5 steps) -->
       <Card>
         <CardHeader>
           <CardTitle class="text-base">{{ t('salary_runs.approvals_section') }}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div
               v-for="(approval, key) in approvalList"
               :key="key"
@@ -538,6 +538,7 @@ interface Props {
   approvals?: {
     hr: ApprovalState;
     director: ApprovalState;
+    financial_manager: ApprovalState;
     accountant: ApprovalState;
     ceo: ApprovalState;
   };
@@ -556,11 +557,12 @@ function getEmployeeFullName(employee?: { first_name?: string | null; father_nam
 
 const defaultApproval = { approved_at: null, approver_name: null, can_approve: false };
 const approvalList = computed(() => {
-  const a = props.approvals ?? { hr: defaultApproval, director: defaultApproval, accountant: defaultApproval, ceo: defaultApproval };
+  const a = props.approvals ?? { hr: defaultApproval, director: defaultApproval, financial_manager: defaultApproval, accountant: defaultApproval, ceo: defaultApproval };
   return [
     { key: 'hr', label: t('salary_runs.approval_hr'), ...a.hr },
-    { key: 'accountant', label: t('salary_runs.approval_accountant'), ...a.accountant },
     { key: 'director', label: t('salary_runs.approval_director'), ...a.director },
+    { key: 'financial-manager', label: t('salary_runs.approval_financial_manager'), ...a.financial_manager },
+    { key: 'accountant', label: t('salary_runs.approval_accountant'), ...a.accountant },
     { key: 'ceo', label: t('salary_runs.approval_ceo'), ...a.ceo },
   ].map((item) => ({ ...item, approved_at: item.approved_at ?? null, approver_name: item.approver_name ?? null, can_approve: item.can_approve ?? false }));
 });
@@ -598,7 +600,7 @@ function formatApprovalTime(iso: string) {
 }
 
 function submitApproval(stepKey: string) {
-  const routeName = `salary-runs.approve-${stepKey}` as 'salary-runs.approve-hr' | 'salary-runs.approve-director' | 'salary-runs.approve-accountant' | 'salary-runs.approve-ceo';
+  const routeName = `salary-runs.approve-${stepKey}` as 'salary-runs.approve-hr' | 'salary-runs.approve-director' | 'salary-runs.approve-financial-manager' | 'salary-runs.approve-accountant' | 'salary-runs.approve-ceo';
   approvingStep.value = stepKey;
   router.post(route(routeName, [props.company.id, props.salaryRun.id]), {}, {
     preserveScroll: true,

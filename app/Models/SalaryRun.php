@@ -23,6 +23,8 @@ class SalaryRun extends Model
         'hr_approved_by',
         'director_approved_at',
         'director_approved_by',
+        'financial_manager_approved_at',
+        'financial_manager_approved_by',
         'accountant_approved_at',
         'accountant_approved_by',
         'ceo_approved_at',
@@ -34,6 +36,7 @@ class SalaryRun extends Model
         'month' => 'integer',
         'hr_approved_at' => 'datetime',
         'director_approved_at' => 'datetime',
+        'financial_manager_approved_at' => 'datetime',
         'accountant_approved_at' => 'datetime',
         'ceo_approved_at' => 'datetime',
     ];
@@ -67,6 +70,11 @@ class SalaryRun extends Model
     public function approverAccountant(): BelongsTo
     {
         return $this->belongsTo(User::class, 'accountant_approved_by');
+    }
+
+    public function approverFinancialManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'financial_manager_approved_by');
     }
 
     public function approverCeo(): BelongsTo

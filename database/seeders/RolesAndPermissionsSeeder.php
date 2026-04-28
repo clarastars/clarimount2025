@@ -60,6 +60,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Salary run approvals (4-step workflow)
             'approve_salary_run_hr',
             'approve_salary_run_director',
+            'approve_salary_run_financial_manager',
             'approve_salary_run_accountant',
             'approve_salary_run_ceo',
         ];
@@ -83,7 +84,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view admin panel', 'manage billing', 'view analytics', 'export data',
             'view departments', 'create departments', 'edit departments', 'delete departments',
             'edit own profile', 'view own profile',
-            'approve_salary_run_hr', 'approve_salary_run_director', 'approve_salary_run_accountant', 'approve_salary_run_ceo',
+            'approve_salary_run_hr', 'approve_salary_run_director', 'approve_salary_run_financial_manager', 'approve_salary_run_accountant', 'approve_salary_run_ceo',
         ];
 
         $teamAdminPermissions = [

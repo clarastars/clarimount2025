@@ -253,6 +253,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-hr', [SalaryRunController::class, 'approveHr'])->name('salary-runs.approve-hr');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-director', [SalaryRunController::class, 'approveDirector'])->name('salary-runs.approve-director');
+    Route::post('companies/{company}/salary-runs/{salaryRun}/approve-financial-manager', [SalaryRunController::class, 'approveFinancialManager'])->name('salary-runs.approve-financial-manager');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-accountant', [SalaryRunController::class, 'approveAccountant'])->name('salary-runs.approve-accountant');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approve-ceo', [SalaryRunController::class, 'approveCeo'])->name('salary-runs.approve-ceo');
     Route::post('companies/{company}/salary-runs/{salaryRun}/update-debt-deductions', [SalaryRunController::class, 'updateDebtDeductions'])->name('salary-runs.update-debt-deductions');
