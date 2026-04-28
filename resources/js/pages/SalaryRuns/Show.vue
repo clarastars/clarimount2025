@@ -561,8 +561,8 @@ const approvalList = computed(() => {
   return [
     { key: 'hr', label: t('salary_runs.approval_hr'), ...a.hr },
     { key: 'director', label: t('salary_runs.approval_director'), ...a.director },
-    { key: 'financial-manager', label: t('salary_runs.approval_financial_manager'), ...a.financial_manager },
     { key: 'accountant', label: t('salary_runs.approval_accountant'), ...a.accountant },
+    { key: 'financial-manager', label: t('salary_runs.approval_financial_manager'), ...a.financial_manager },
     { key: 'ceo', label: t('salary_runs.approval_ceo'), ...a.ceo },
   ].map((item) => ({ ...item, approved_at: item.approved_at ?? null, approver_name: item.approver_name ?? null, can_approve: item.can_approve ?? false }));
 });

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AssetCategory;
 use App\Models\Company;
-use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -13,22 +12,27 @@ use Inertia\Response;
 
 class AssetCategoryController extends Controller
 {
+    private function accessibleCompanyIds($user)
+    {
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
+            ->values();
+    }
+
     private function accessibleCompany($user): ?Company
     {
         $company = $user->currentCompany();
-        if ($company) {
+        if ($company && $this->accessibleCompanyIds($user)->contains((int) $company->id)) {
             return $company;
         }
 
-        $employeeCompanyId = Employee::query()
-            ->where('user_id', $user->id)
-            ->value('company_id');
-
-        if (! $employeeCompanyId) {
-            return null;
-        }
-
-        return Company::query()->find($employeeCompanyId);
+        return Company::query()
+            ->whereIn('id', $this->accessibleCompanyIds($user))
+            ->first();
     }
 
     /**

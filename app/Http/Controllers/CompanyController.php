@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -21,17 +20,15 @@ class CompanyController extends Controller
             return [];
         }
 
-        return $user->accessibleCompanies()
-            ->pluck('companies.id')
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
             ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
-    }
-
-    private function employeeCompanyId(): ?int
-    {
-        return Employee::query()
-            ->where('user_id', Auth::id())
-            ->value('company_id');
     }
 
     private function canViewCompanyReadOnly(): bool
@@ -84,11 +81,7 @@ class CompanyController extends Controller
             if ($ownedCompanies->exists()) {
                 $companies = $ownedCompanies->latest()->paginate(10);
             } elseif ($this->canViewCompanyReadOnly()) {
-                $employeeCompanyId = $this->employeeCompanyId();
-                $allowedCompanyIds = array_values(array_unique(array_filter([
-                    ...$this->userAccessibleCompanyIds(),
-                    $employeeCompanyId,
-                ])));
+                $allowedCompanyIds = $this->userAccessibleCompanyIds();
                 $companies = Company::query()
                     ->when(
                         ! empty($allowedCompanyIds),
@@ -167,8 +160,7 @@ class CompanyController extends Controller
         if (! $canManage) {
             abort_unless(
                 ($this->canViewAllCompanies() && $this->canViewCompanyByTeamScope($company))
-                || ($this->canViewCompanyReadOnly()
-                    && ((int) $this->employeeCompanyId() === (int) $company->id || $this->canViewCompanyByTeamScope($company))),
+                || ($this->canViewCompanyReadOnly() && $this->canViewCompanyByTeamScope($company)),
                 403
             );
         }
@@ -284,11 +276,7 @@ class CompanyController extends Controller
         } elseif (Company::where('owner_id', $user->id)->exists()) {
             $companyQuery->where('owner_id', $user->id);
         } elseif ($this->canViewCompanyReadOnly()) {
-            $employeeCompanyId = $this->employeeCompanyId();
-            $allowedCompanyIds = array_values(array_unique(array_filter([
-                ...$this->userAccessibleCompanyIds(),
-                $employeeCompanyId,
-            ])));
+            $allowedCompanyIds = $this->userAccessibleCompanyIds();
             $companyQuery->when(
                 ! empty($allowedCompanyIds),
                 fn ($q) => $q->whereIn('id', $allowedCompanyIds),

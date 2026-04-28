@@ -28,21 +28,32 @@ class AttendanceController extends Controller
         private OperationalMonthService $operationalMonthService,
     ) {}
 
+    private function userAccessibleCompanyIds($user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
     private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
     {
         if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
             return true;
         }
 
-        if (! $user->can($permission)) {
-            return false;
-        }
+        $allowedCompanyIds = $this->userAccessibleCompanyIds($user);
 
-        $employeeCompanyId = Employee::query()
-            ->where('user_id', $user->id)
-            ->value('company_id');
-
-        return (int) $employeeCompanyId === (int) $company->id;
+        return $user->can($permission) && in_array((int) $company->id, $allowedCompanyIds, true);
     }
 
     public function index(Request $request, Company $company): Response

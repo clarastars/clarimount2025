@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Company;
-use App\Models\Employee;
 use App\Models\Location;
 use App\Exports\AssetsByCategoryExport;
 use Illuminate\Http\Request;
@@ -21,19 +20,13 @@ class AssetController extends Controller
 {
     private function accessibleCompanyIds($user)
     {
-        $ids = $user->ownedCompanies()->pluck('id');
-
-        if ($ids->isEmpty()) {
-            $employeeCompanyId = Employee::query()
-                ->where('user_id', $user->id)
-                ->value('company_id');
-
-            if ($employeeCompanyId) {
-                $ids = collect([$employeeCompanyId]);
-            }
-        }
-
-        return $ids;
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
+            ->values();
     }
 
     private function accessibleCompanies($user)

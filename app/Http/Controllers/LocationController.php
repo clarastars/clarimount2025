@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Location;
 use App\Models\Company;
-use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -16,19 +15,13 @@ class LocationController extends Controller
 {
     private function accessibleCompanyIds($user)
     {
-        $ids = $user->ownedCompanies()->pluck('id');
-
-        if ($ids->isEmpty()) {
-            $employeeCompanyId = Employee::query()
-                ->where('user_id', $user->id)
-                ->value('company_id');
-
-            if ($employeeCompanyId) {
-                $ids = collect([$employeeCompanyId]);
-            }
-        }
-
-        return $ids;
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
+            ->values();
     }
 
     private function accessibleCompanies($user)

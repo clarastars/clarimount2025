@@ -7,7 +7,6 @@ namespace App\Http\Controllers;
 use App\Exports\SalaryRunExcelExport;
 use App\Models\Company;
 use App\Models\EmployeeDebt;
-use App\Models\Employee;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
 use App\Services\SalaryRunService;
@@ -32,9 +31,14 @@ class SalaryRunController extends Controller
             return [];
         }
 
-        return $user->accessibleCompanies()
-            ->pluck('companies.id')
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
             ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
     }
 
@@ -54,15 +58,7 @@ class SalaryRunController extends Controller
             return true;
         }
 
-        if (! $user->can($permission)) {
-            return false;
-        }
-
-        $employeeCompanyId = Employee::query()
-            ->where('user_id', $user->id)
-            ->value('company_id');
-
-        return (int) $employeeCompanyId === (int) $company->id;
+        return false;
     }
 
     private function canManageCompanySalaryRuns($user, Company $company): bool
