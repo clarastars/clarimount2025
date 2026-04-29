@@ -27,6 +27,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {
         Route::get('settings/permissions-teams', [TeamPermissionController::class, 'index'])->name('settings.permissions-teams.index');
         Route::post('settings/permissions-teams/teams', [TeamPermissionController::class, 'storeTeam'])->name('settings.permissions-teams.store-team');
+        Route::put('settings/permissions-teams/teams/{team}', [TeamPermissionController::class, 'updateTeam'])->name('settings.permissions-teams.update-team');
+        Route::delete('settings/permissions-teams/teams/{team}', [TeamPermissionController::class, 'deleteTeam'])->name('settings.permissions-teams.delete-team');
         Route::post('settings/permissions-teams/teams/{team}/permissions', [TeamPermissionController::class, 'syncTeamPermissions'])->name('settings.permissions-teams.sync-permissions');
     });
 

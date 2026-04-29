@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -48,6 +48,49 @@ const createTeamForm = useForm({
 const permissionForm = useForm({
     permissions: [] as string[],
 });
+
+const editingTeamId = ref<number | null>(null);
+const editTeamForm = useForm({
+    name: '',
+    description: '',
+});
+
+const startEditTeam = (team: TeamItem) => {
+    editingTeamId.value = team.id;
+    editTeamForm.name = team.name;
+    editTeamForm.description = team.description ?? '';
+};
+
+const cancelEditTeam = () => {
+    editingTeamId.value = null;
+    editTeamForm.reset();
+};
+
+const updateTeam = (teamId: number) => {
+    editTeamForm.put(route('settings.permissions-teams.update-team', teamId), {
+        preserveScroll: true,
+        onSuccess: () => {
+            editingTeamId.value = null;
+            editTeamForm.reset();
+            router.reload({ preserveScroll: true });
+        },
+    });
+};
+
+const deleteTeam = (teamId: number) => {
+    // Confirm deletion to prevent accidental team removal.
+    // (Keep message simple because translations may vary.)
+    if (!confirm('هل أنت متأكد من حذف هذا الفريق؟')) {
+        return;
+    }
+
+    router.delete(route('settings.permissions-teams.delete-team', teamId), {
+        preserveScroll: true,
+        onSuccess: () => {
+            router.reload({ preserveScroll: true });
+        },
+    });
+};
 
 const createTeam = () => {
     createTeamForm.post(route('settings.permissions-teams.store-team'), {
@@ -102,9 +145,56 @@ const saveTeamPermissions = (team: TeamItem) => {
                 </Card>
 
                 <Card v-for="team in props.teams" :key="team.id">
-                    <CardHeader>
-                        <CardTitle>{{ team.name }}</CardTitle>
-                        <p v-if="team.description" class="text-sm text-muted-foreground">{{ team.description }}</p>
+                    <CardHeader class="flex items-start justify-between gap-4">
+                        <div class="min-w-0">
+                            <CardTitle>
+                                <template v-if="editingTeamId === team.id">
+                                    <Input v-model="editTeamForm.name" />
+                                </template>
+                                <template v-else>
+                                    {{ team.name }}
+                                </template>
+                            </CardTitle>
+                            <p v-if="editingTeamId === team.id" class="mt-2">
+                                <Input v-model="editTeamForm.description" />
+                            </p>
+                            <p v-else-if="team.description" class="text-sm text-muted-foreground">
+                                {{ team.description }}
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2 shrink-0">
+                            <Button
+                                v-if="editingTeamId !== team.id"
+                                variant="outline"
+                                size="sm"
+                                @click="startEditTeam(team)"
+                            >
+                                {{ t('common.edit') }}
+                            </Button>
+
+                            <template v-else>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="editTeamForm.processing"
+                                    @click="updateTeam(team.id)"
+                                >
+                                    {{ t('common.save') }}
+                                </Button>
+                                <Button variant="ghost" size="sm" @click="cancelEditTeam">
+                                    {{ t('common.cancel') }}
+                                </Button>
+                            </template>
+
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                @click="deleteTeam(team.id)"
+                            >
+                                {{ t('common.delete') }}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

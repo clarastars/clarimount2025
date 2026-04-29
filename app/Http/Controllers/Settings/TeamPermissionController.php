@@ -35,7 +35,8 @@ class TeamPermissionController extends Controller
         $user = Auth::user();
 
         $this->ensureManagedPermissionsExist();
-        $this->ensureDefaultTeamsExist();
+        // Do not auto-recreate default teams on every page load,
+        // so user deletions stay persistent.
 
         $managedPermissionNames = collect(self::MANAGED_PERMISSIONS)->pluck('name');
         $permissions = Permission::query()
@@ -133,6 +134,48 @@ class TeamPermissionController extends Controller
         $role->syncPermissions($requestedPermissions->all());
 
         return back()->with('success', 'تم تحديث صلاحيات الفريق.');
+    }
+
+    public function updateTeam(Request $request, Team $team): RedirectResponse
+    {
+        $user = Auth::user();
+        $canManageTeam = $team->owner_id === $user->id
+            || (int) $user->team_id === (int) $team->id
+            || $user->hasRole('super-admin');
+
+        abort_unless($canManageTeam, 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $team->update([
+            'name' => $validated['name'],
+            'slug' => $this->buildUniqueTeamSlug($validated['name']),
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        return back()->with('success', 'تم تحديث بيانات الفريق.');
+    }
+
+    public function deleteTeam(Request $request, Team $team): RedirectResponse
+    {
+        $user = Auth::user();
+        $canManageTeam = $team->owner_id === $user->id
+            || (int) $user->team_id === (int) $team->id
+            || $user->hasRole('super-admin');
+
+        abort_unless($canManageTeam, 403);
+
+        // Cleanup spatie roles for this team to avoid dangling permissions.
+        Role::query()
+            ->where('team_id', $team->id)
+            ->delete();
+
+        $team->delete();
+
+        return back()->with('success', 'تم حذف الفريق بنجاح.');
     }
 
     private function ensureManagedPermissionsExist(): void
