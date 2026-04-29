@@ -10,7 +10,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const className = computed(() => cn(props.class));
-const sidebarClassName = computed(() => cn('p-4 md:p-6', props.class));
+const sidebarClassName = computed(() => cn('px-4 pb-6 pt-4 md:px-6 md:pb-6 md:pt-4', props.class));
 </script>
 
 <template>
