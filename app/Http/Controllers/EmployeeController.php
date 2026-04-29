@@ -22,6 +22,72 @@ use Spatie\Permission\Models\Role;
 class EmployeeController extends Controller
 {
     /**
+     * Normalize Arabic alef variants to improve search matching.
+     */
+    private function normalizeSearchTerm(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        return str_replace(['أ', 'إ', 'آ', 'ٱ'], 'ا', $value);
+    }
+
+    /**
+     * Apply robust search across employee fields with Arabic normalization.
+     */
+    private function applyEmployeeSearch($query, string $rawSearch): void
+    {
+        $normalizedSearch = $this->normalizeSearchTerm($rawSearch);
+        if ($normalizedSearch === '') {
+            return;
+        }
+
+        $tokens = array_values(array_filter(
+            preg_split('/\s+/u', $normalizedSearch) ?: [],
+            static fn (string $token): bool => $token !== ''
+        ));
+
+        $normalizeSql = static fn (string $column): string => "REPLACE(REPLACE(REPLACE(REPLACE(COALESCE({$column}, ''), 'أ', 'ا'), 'إ', 'ا'), 'آ', 'ا'), 'ٱ', 'ا')";
+        $fullNameSql = "CONCAT_WS(' ', employees.first_name, employees.father_name, employees.last_name)";
+        $normalizedFullNameSql = "REPLACE(REPLACE(REPLACE(REPLACE(COALESCE({$fullNameSql}, ''), 'أ', 'ا'), 'إ', 'ا'), 'آ', 'ا'), 'ٱ', 'ا')";
+
+        $query->where(function ($outerQuery) use ($tokens, $rawSearch, $normalizeSql, $normalizedFullNameSql) {
+            foreach ($tokens as $token) {
+                $outerQuery->where(function ($tokenQuery) use ($token, $normalizeSql, $normalizedFullNameSql) {
+                    $like = '%'.$token.'%';
+
+                    $tokenQuery
+                        ->orWhereRaw("{$normalizeSql('employees.first_name')} LIKE ?", [$like])
+                        ->orWhereRaw("{$normalizeSql('employees.father_name')} LIKE ?", [$like])
+                        ->orWhereRaw("{$normalizeSql('employees.last_name')} LIKE ?", [$like])
+                        ->orWhereRaw("{$normalizedFullNameSql} LIKE ?", [$like])
+                        ->orWhereRaw("{$normalizeSql('employees.job_title')} LIKE ?", [$like])
+                        ->orWhereRaw("{$normalizeSql('employees.department')} LIKE ?", [$like])
+                        ->orWhere('employees.employee_id', 'like', $like)
+                        ->orWhere('employees.work_email', 'like', $like)
+                        ->orWhere('employees.personal_email', 'like', $like)
+                        ->orWhere('employees.work_phone', 'like', $like)
+                        ->orWhere('employees.personal_phone', 'like', $like);
+                });
+            }
+
+            // Fallback using raw input for non-Arabic patterns.
+            $outerQuery
+                ->orWhere('employees.first_name', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.father_name', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.last_name', 'like', "%{$rawSearch}%")
+                ->orWhereRaw("CONCAT_WS(' ', employees.first_name, employees.father_name, employees.last_name) LIKE ?", ["%{$rawSearch}%"])
+                ->orWhere('employees.employee_id', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.work_email', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.personal_email', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.job_title', 'like', "%{$rawSearch}%")
+                ->orWhere('employees.department', 'like', "%{$rawSearch}%");
+        });
+    }
+
+    /**
      * Display a listing of the employees.
      */
     public function index(Request $request): Response|RedirectResponse
@@ -50,16 +116,7 @@ class EmployeeController extends Controller
 
         // Apply search filter
         if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('employee_id', 'like', "%{$search}%")
-                    ->orWhere('work_email', 'like', "%{$search}%")
-                    ->orWhere('personal_email', 'like', "%{$search}%")
-                    ->orWhere('job_title', 'like', "%{$search}%")
-                    ->orWhere('department', 'like', "%{$search}%");
-            });
+            $this->applyEmployeeSearch($query, (string) $request->input('search'));
         }
 
         // Apply status filter
@@ -755,14 +812,7 @@ class EmployeeController extends Controller
                 return $q->where('department', $departmentId);
             })
             ->when($query, function ($q) use ($query) {
-                return $q->where(function ($subQuery) use ($query) {
-                    $subQuery->where('first_name', 'like', "%{$query}%")
-                        ->orWhere('last_name', 'like', "%{$query}%")
-                        ->orWhere('employee_id', 'like', "%{$query}%")
-                        ->orWhere('work_email', 'like', "%{$query}%")
-                        ->orWhere('personal_email', 'like', "%{$query}%")
-                        ->orWhere('job_title', 'like', "%{$query}%");
-                });
+                $this->applyEmployeeSearch($q, (string) $query);
             })
             ->where('employment_status', 'active') // Only active employees
             ->with('company')
