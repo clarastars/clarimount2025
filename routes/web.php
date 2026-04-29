@@ -284,6 +284,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/companies/search', [CompanyController::class, 'search'])->name('api.companies.search');
     Route::get('api/departments/search', [DepartmentController::class, 'search'])->name('api.departments.search');
     Route::get('api/employees/search', [EmployeeController::class, 'search'])->name('api.employees.search');
+    Route::get('api/employees/global-search', [EmployeeController::class, 'globalSearch'])->name('api.employees.global-search');
 });
 
 require __DIR__.'/auth.php';

@@ -32,6 +32,10 @@ const sidebarNavItems = computed((): NavItem[] => [
         title: t('settings.operational_month'),
         href: '/settings/operational-month',
     },
+    {
+        title: t('settings.employee_global_search'),
+        href: '/settings/employee-global-search',
+    },
     ...(canAccessSettings.value
         ? [
               {

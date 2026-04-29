@@ -86,6 +86,11 @@ const settingsNavItems = computed((): NavItem[] => [
         icon: Clock,
     },
     {
+        title: t('settings.employee_global_search'),
+        href: '/settings/employee-global-search',
+        icon: Users,
+    },
+    {
         title: t('settings.permissions_teams'),
         href: '/settings/permissions-teams',
         icon: Users,

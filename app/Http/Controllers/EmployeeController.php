@@ -22,6 +22,28 @@ use Spatie\Permission\Models\Role;
 class EmployeeController extends Controller
 {
     /**
+     * Resolve companies the current user can search employees in.
+     *
+     * @return array<int>|null null means all companies (super-admin)
+     */
+    private function searchableCompanyIdsForUser($user): ?array
+    {
+        if ($user->hasRole('super-admin')) {
+            return null;
+        }
+
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge(
+                $user->accessibleCompanies()->pluck('companies.id')
+            )
+            ->unique()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Normalize Arabic alef variants to improve search matching.
      */
     private function normalizeSearchTerm(string $value): string
@@ -839,6 +861,54 @@ class EmployeeController extends Controller
                         " ({$employee->company->name_en})",
                 ];
             });
+
+        return response()->json($employees);
+    }
+
+    /**
+     * Global employee search used by the fixed top search bar.
+     */
+    public function globalSearch(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        $query = trim((string) $request->get('q', ''));
+        $companyIds = $this->searchableCompanyIdsForUser($user);
+
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        if (is_array($companyIds) && empty($companyIds)) {
+            return response()->json([]);
+        }
+
+        $employees = Employee::query()
+            ->when(is_array($companyIds), fn ($q) => $q->whereIn('company_id', $companyIds))
+            ->with('company')
+            ->when($query, function ($q) use ($query) {
+                $this->applyEmployeeSearch($q, $query);
+            })
+            ->orderBy('first_name')
+            ->orderBy('father_name')
+            ->orderBy('last_name')
+            ->limit(10)
+            ->get()
+            ->map(function (Employee $employee): array {
+                $fullName = trim(implode(' ', array_filter([
+                    $employee->first_name,
+                    $employee->father_name,
+                    $employee->last_name,
+                ])));
+
+                return [
+                    'id' => $employee->id,
+                    'full_name' => $fullName !== '' ? $fullName : (string) $employee->id,
+                    'employee_id' => $employee->employee_id,
+                    'company_name' => $employee->company?->name_en ?: $employee->company?->name_ar,
+                    'employment_status' => $employee->employment_status,
+                ];
+            })
+            ->values();
 
         return response()->json($employees);
     }

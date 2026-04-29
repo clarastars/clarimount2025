@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,6 +49,7 @@ class HandleInertiaRequests extends Middleware
         $isSuperAdmin = $user?->hasRole('super-admin') ?? false;
         $permissionNames = $user?->getAllPermissions()->pluck('name')->values()->all() ?? [];
         $canViewAllCompaniesAndSalaryRuns = in_array('companies-salary-runs.global-read-approve', $permissionNames, true);
+        $globalEmployeeSearchEnabled = $this->isEmployeeGlobalSearchEnabled();
         
         return [
             ...parent::share($request),
@@ -71,6 +73,9 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'ui' => [
+                'show_employee_global_search' => $globalEmployeeSearchEnabled,
+            ],
         ];
     }
 
@@ -87,5 +92,18 @@ class HandleInertiaRequests extends Middleware
         
         // Fallback to English if the language file doesn't exist
         return require resource_path('lang/en/messages.php');
+    }
+
+    private function isEmployeeGlobalSearchEnabled(): bool
+    {
+        $value = SystemSetting::query()
+            ->where('key', 'employee_global_search_enabled')
+            ->value('value');
+
+        if ($value === null) {
+            return true;
+        }
+
+        return in_array((string) $value, ['1', 'true', 'yes', 'on'], true);
     }
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
+use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TeamPermissionController;
@@ -41,5 +42,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('settings/operational-month', [OperationalMonthSettingsController::class, 'edit'])->name('settings.operational-month.edit');
         Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
+        Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
+        Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
     });
 });
