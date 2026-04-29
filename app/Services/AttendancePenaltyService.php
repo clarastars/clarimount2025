@@ -392,30 +392,22 @@ class AttendancePenaltyService
         }
 
         $shift = $employee->shift;
-        $start = $shift->start_time;
-        $end = $shift->end_time;
-        if (! $start || ! $end) {
-            return null;
-        }
 
-        // Work minutes per day (same-day shift; if end < start assume next day)
-        $startMinutes = $start->hour * 60 + $start->minute;
-        $endMinutes = $end->hour * 60 + $end->minute;
-        $workMinutesPerDay = $endMinutes > $startMinutes
-            ? $endMinutes - $startMinutes
-            : (24 * 60 - $startMinutes) + $endMinutes;
-        if ($workMinutesPerDay <= 0) {
-            return null;
-        }
-
-        // Work days per month: count weekdays where is_workday = true, then scale to month
+        // Fair minute-rate: use effective work minutes per configured workday
+        // (including per-weekday overrides), not only the base shift start/end.
         $workDaysPerWeek = $shift->workdays()->where('is_workday', true)->count();
         if ($workDaysPerWeek <= 0) {
             return null;
         }
-        $workDaysPerMonth = $workDaysPerWeek * (30 / 7);
 
-        $minuteRate = $basicSalary / ($workDaysPerMonth * $workMinutesPerDay);
+        $averageWorkMinutesPerDay = $shift->averageWorkMinutesPerWorkday();
+        if ($averageWorkMinutesPerDay === null || $averageWorkMinutesPerDay <= 0) {
+            return null;
+        }
+
+        // Keep current monthly scaling convention (30/7), but with accurate per-day minutes.
+        $workDaysPerMonth = $workDaysPerWeek * (30 / 7);
+        $minuteRate = $basicSalary / ($workDaysPerMonth * $averageWorkMinutesPerDay);
         $amount = round($lateMinutes * $minuteRate, 2);
 
         return $amount > 0 ? $amount : null;
