@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import PayrollMonthFilter from '@/components/attendance/PayrollMonthFilter.vue'
 import { Banknote, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import axios from 'axios'
 
@@ -55,6 +56,8 @@ const props = defineProps<{
   companies: Company[]
   employees: EmployeeOption[]
   month: string
+  monthPeriodStart: string
+  monthPeriodEnd: string
   employeeId: number | null
   manualAdditions: ManualAddition[]
 }>()
@@ -264,8 +267,14 @@ function confirmDelete(row: ManualAddition) {
   router.delete(route('attendance.additions.destroy', row.id), { preserveScroll: true })
 }
 
-const monthValue = ref(props.month)
 const employeeFilter = ref<number | ''>(props.employeeId ?? '')
+
+watch(
+  () => props.employeeId,
+  (id) => {
+    employeeFilter.value = id ?? ''
+  }
+)
 
 function applyFilters(params: { month?: string; employee_id?: number | '' }) {
   const q: Record<string, string | number | undefined> = {}
@@ -273,11 +282,18 @@ function applyFilters(params: { month?: string; employee_id?: number | '' }) {
   if (params.employee_id !== undefined && params.employee_id !== '') q.employee_id = params.employee_id
   router.get(route('attendance.additions', props.company.id), q, { preserveState: true, preserveScroll: true })
 }
-watch(monthValue, (v) => applyFilters({ month: v, employee_id: employeeFilter.value }))
-watch(employeeFilter, (v) => applyFilters({ month: monthValue.value, employee_id: v }))
+
+function onPayrollMonthChange(ym: string) {
+  applyFilters({ month: ym, employee_id: employeeFilter.value })
+}
+
+watch(employeeFilter, (v) => applyFilters({ month: props.month, employee_id: v }))
 
 function goToCompany(companyId: number) {
-  router.get(route('attendance.additions', companyId), { month: monthValue.value, employee_id: employeeFilter.value || undefined })
+  router.get(route('attendance.additions', companyId), {
+    month: props.month,
+    employee_id: employeeFilter.value || undefined,
+  })
 }
 
 function onFilterCompanyChange(event: Event) {
@@ -337,21 +353,28 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
         <Card class="mb-6">
           <CardHeader><CardTitle>{{ t('common.filters') }}</CardTitle></CardHeader>
           <CardContent>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label for="filter-company">{{ t('attendance.filter_company') }}</Label>
-                <select id="filter-company" :value="company.id" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" @change="onFilterCompanyChange">
-                  <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name_ar || c.name_en }}</option>
-                </select>
+            <div class="flex flex-col gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label for="filter-company">{{ t('attendance.filter_company') }}</Label>
+                  <select id="filter-company" :value="company.id" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" @change="onFilterCompanyChange">
+                    <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name_ar || c.name_en }}</option>
+                  </select>
+                </div>
+                <div>
+                  <Label for="filter-employee">{{ t('attendance.filter_employee') }}</Label>
+                  <select id="filter-employee" v-model="employeeFilter" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">{{ t('attendance.all_employees') }}</option>
+                    <option v-for="emp in employees" :key="emp.id" :value="emp.id">{{ emp.first_name }} {{ emp.last_name }}<template v-if="emp.employee_id"> ({{ emp.employee_id }})</template></option>
+                  </select>
+                </div>
               </div>
-              <div><Label for="filter-month">{{ t('attendance.filter_month') }}</Label><Input id="filter-month" v-model="monthValue" type="month" class="mt-1" /></div>
-              <div>
-                <Label for="filter-employee">{{ t('attendance.filter_employee') }}</Label>
-                <select id="filter-employee" v-model="employeeFilter" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">{{ t('attendance.all_employees') }}</option>
-                  <option v-for="emp in employees" :key="emp.id" :value="emp.id">{{ emp.first_name }} {{ emp.last_name }}<template v-if="emp.employee_id"> ({{ emp.employee_id }})</template></option>
-                </select>
-              </div>
+              <PayrollMonthFilter
+                :month="month"
+                :period-start="monthPeriodStart"
+                :period-end="monthPeriodEnd"
+                @update:month="onPayrollMonthChange"
+              />
             </div>
           </CardContent>
         </Card>

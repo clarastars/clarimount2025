@@ -503,7 +503,7 @@ return [
         'delete_failed' => 'فشل حذف الموظف. راجع السجلات.',
         'created_successfully' => 'تم إضافة الموظف بنجاح.',
         'updated_successfully' => 'تم تحديث الموظف بنجاح.',
-        
+
         // New sectional translations for comprehensive employee form
         'general_information' => 'المعلومات العامة',
         'father_name' => 'اسم الأب',
@@ -526,7 +526,7 @@ return [
         'portal_password_reset' => 'إعادة تعيين كلمة مرور المنصة إلى الافتراضية',
         'show_password' => 'إظهار',
         'hide_password' => 'إخفاء',
-        
+
         'work_details' => 'تفاصيل العمل',
         'company' => 'الشركة',
         'select_company' => 'اختر الشركة',
@@ -537,7 +537,7 @@ return [
         'shift' => 'الشيفت',
         'shift_placeholder' => 'اختر الشيفت',
         'work_address' => 'عنوان العمل',
-        
+
         'legal_information' => 'المعلومات القانونية',
         'id_number' => 'رقم الهوية',
         'residence_expiry_date' => 'تاريخ انتهاء الإقامة',
@@ -545,25 +545,25 @@ return [
         'exit_reentry_visa_expiry' => 'تاريخ انتهاء تأشيرة الخروج والعودة',
         'passport_number' => 'رقم جواز السفر',
         'passport_expiry_date' => 'تاريخ انتهاء جواز السفر',
-        
+
         'insurance' => 'التأمين',
         'insurance_policy' => 'بوليصة التأمين',
         'insurance_expiry_date' => 'تاريخ انتهاء التأمين',
-        
+
         'departure_date' => 'تاريخ المغادرة',
         'departure_reason' => 'سبب المغادرة',
-        
+
         'managers_workflow' => 'المديرين / سير العمل',
         'direct_manager' => 'المدير المباشر',
         'additional_approver_2' => 'المعتمد الإضافي الثاني',
         'additional_approver_3' => 'المعتمد الإضافي الثالث',
-        
+
         'emergency_contact' => 'جهة الاتصال في حالات الطوارئ',
         'emergency_contact_name' => 'اسم جهة الاتصال في حالات الطوارئ',
         'emergency_contact_phone' => 'هاتف جهة الاتصال في حالات الطوارئ',
         'emergency_contact_email' => 'بريد جهة الاتصال في حالات الطوارئ',
         'emergency_contact_address' => 'عنوان جهة الاتصال في حالات الطوارئ',
-        
+
         'location' => 'الموقع',
 
         // Expiry widget
@@ -593,7 +593,7 @@ return [
             'insurance_expiry_date' => 'انتهاء التأمين',
         ],
         'select_location' => 'اختر موقعاً',
-        
+
         // Enhanced index page translations
         'manage_workforce' => 'إدارة القوى العاملة بكفاءة',
         'total_employees' => 'إجمالي الموظفين',
@@ -615,7 +615,7 @@ return [
         'active' => 'نشط',
         'needing_attention' => 'تحتاج إلى انتباه',
         'documents_expiring' => 'الوثائق قريبة الانتهاء',
-        
+
         // Import/Export translations
         'import_csv' => 'استيراد CSV',
         'fingerprint_device_employees' => 'موظفين جهاز البصمة',
@@ -976,7 +976,7 @@ return [
         'workstation_creation_notice' => 'إنشاء نطاق محطات العمل',
         'workstation_creation_description' => 'إنشاء {count} أصول لمحطات العمل {prefix}{start} إلى {prefix}{end}. كل محطة عمل ستحصل على موقعها وأصلها الخاص.',
         'asset' => 'أصل',
-        
+
         // Template browser
         'choose_template' => 'اختر قالب',
         'browse_templates_by_category' => 'تصفح واختر قالب أصل مرتب حسب الفئة',
@@ -1108,18 +1108,18 @@ return [
         'select_document_to_upload' => 'يرجى اختيار وثيقة للتحميل.',
         'print_document' => 'طباعة الوثيقة',
         'view_document' => 'عرض الوثيقة',
-        
+
         // Status translations
         'status_pending' => 'معلق',
         'status_approved' => 'موافق عليه',
         'status_signed' => 'موقع',
         'status_completed' => 'مكتمل',
-        
+
         // Auto-generated summary translations
         'added_assets' => 'تمت إضافة أصل واحد|تمت إضافة :count أصول',
         'removed_assets' => 'تم إزالة أصل واحد|تم إزالة :count أصول',
         'modified_asset_assignments' => 'تم تعديل تخصيصات الأصول',
-        
+
         // Document translations
         'document_title' => 'وثيقة تغيير العهدة',
         'document_id' => 'رقم الوثيقة',
@@ -1148,7 +1148,7 @@ return [
         'document_generated_on' => 'تم إنشاء هذه الوثيقة تلقائياً في {date}',
         'back' => 'رجوع',
         'print' => 'طباعة',
-        
+
         // Additional document strings
         'change_summary' => 'ملخص التغيير',
         'previous_custody' => 'العهدة السابقة',
@@ -1319,6 +1319,9 @@ return [
         'filter_company' => 'الشركة',
         'filter_employee' => 'الموظف',
         'filter_month' => 'الشهر',
+        'prev_payroll_month' => 'الشهر السابق',
+        'next_payroll_month' => 'الشهر التالي',
+        'payroll_period_date_range' => 'التواريخ المعروضة: من {from} إلى {to}',
         'all_employees' => 'جميع الموظفين',
         'approved_by_label' => 'اعتمد بواسطة',
         'created_by_label' => 'أنشئ بواسطة',

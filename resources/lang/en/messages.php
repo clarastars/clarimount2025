@@ -506,7 +506,7 @@ return [
         'delete_failed' => 'Failed to delete employee. Check logs.',
         'created_successfully' => 'Employee created successfully.',
         'updated_successfully' => 'Employee updated successfully.',
-        
+
         // New sectional translations for comprehensive employee form
         'general_information' => 'General Information',
         'father_name' => 'Father\'s Name',
@@ -529,7 +529,7 @@ return [
         'portal_password_reset' => 'Reset portal password to default',
         'show_password' => 'Show',
         'hide_password' => 'Hide',
-        
+
         'work_details' => 'Work Details',
         'company' => 'Company',
         'select_company' => 'Select company',
@@ -540,7 +540,7 @@ return [
         'shift' => 'Shift',
         'shift_placeholder' => 'Select Shift',
         'work_address' => 'Work Address',
-        
+
         'legal_information' => 'Legal Information',
         'id_number' => 'ID Number',
         'residence_expiry_date' => 'Residence Expiry Date',
@@ -548,25 +548,25 @@ return [
         'exit_reentry_visa_expiry' => 'Exit Re-entry Visa Expiry',
         'passport_number' => 'Passport Number',
         'passport_expiry_date' => 'Passport Expiry Date',
-        
+
         'insurance' => 'Insurance',
         'insurance_policy' => 'Insurance Policy',
         'insurance_expiry_date' => 'Insurance Expiry Date',
-        
+
         'departure_date' => 'Departure Date',
         'departure_reason' => 'Departure Reason',
-        
+
         'managers_workflow' => 'Managers / Workflow',
         'direct_manager' => 'Direct Manager',
         'additional_approver_2' => 'Additional Approver 2',
         'additional_approver_3' => 'Additional Approver 3',
-        
+
         'emergency_contact' => 'Emergency Contact',
         'emergency_contact_name' => 'Emergency Contact Name',
         'emergency_contact_phone' => 'Emergency Contact Phone',
         'emergency_contact_email' => 'Emergency Contact Email',
         'emergency_contact_address' => 'Emergency Contact Address',
-        
+
         'location' => 'Location',
 
         // Expiry widget
@@ -596,7 +596,7 @@ return [
             'insurance_expiry_date' => 'Insurance expiry date',
         ],
         'select_location' => 'Select a location',
-        
+
         // Enhanced index page translations
         'manage_workforce' => 'Manage your workforce efficiently',
         'total_employees' => 'Total Employees',
@@ -618,7 +618,7 @@ return [
         'active' => 'Active',
         'needing_attention' => 'Needing Attention',
         'documents_expiring' => 'Documents expiring soon',
-        
+
         // Import/Export translations
         'import_csv' => 'Import CSV',
         'fingerprint_device_employees' => 'Fingerprint Device Employees',
@@ -979,7 +979,7 @@ return [
         'workstation_creation_notice' => 'Workstation Range Creation',
         'workstation_creation_description' => 'Creating {count} assets for workstations {prefix}{start} to {prefix}{end}. Each workstation will get its own location and asset.',
         'asset' => 'asset',
-        
+
         // Template browser
         'choose_template' => 'Choose Template',
         'browse_templates_by_category' => 'Browse and select an asset template organized by category',
@@ -1097,18 +1097,18 @@ return [
         'select_document_to_upload' => 'Please select a document to upload.',
         'print_document' => 'Print Document',
         'view_document' => 'View Document',
-        
+
         // Status translations
         'status_pending' => 'Pending',
         'status_approved' => 'Approved',
         'status_signed' => 'Signed',
         'status_completed' => 'Completed',
-        
+
         // Auto-generated summary translations
         'added_assets' => 'Added :count asset|Added :count assets',
         'removed_assets' => 'Removed :count asset|Removed :count assets',
         'modified_asset_assignments' => 'Modified asset assignments',
-        
+
         // Document translations
         'document_title' => 'Custody Change Document',
         'document_id' => 'Document ID',
@@ -1137,7 +1137,7 @@ return [
         'document_generated_on' => 'This document was generated automatically on :date',
         'back' => 'Back',
         'print' => 'Print',
-        
+
         // Additional document strings
         'change_summary' => 'Change Summary',
         'previous_custody' => 'Previous Custody',
@@ -1307,6 +1307,9 @@ return [
         'filter_company' => 'Company',
         'filter_employee' => 'Employee',
         'filter_month' => 'Month',
+        'prev_payroll_month' => 'Previous month',
+        'next_payroll_month' => 'Next month',
+        'payroll_period_date_range' => 'Dates in list: {from} — {to}',
         'all_employees' => 'All employees',
         'approved_by_label' => 'Approved by',
         'created_by_label' => 'Created by',

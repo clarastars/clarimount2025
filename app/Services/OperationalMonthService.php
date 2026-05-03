@@ -52,6 +52,43 @@ class OperationalMonthService
         );
     }
 
+    /**
+     * Normalize ?month=YYYY-MM into payroll year/month and canonical string (Asia/Riyadh).
+     *
+     * @return array{year: int, month: int, ym: string}
+     */
+    public function parseCanonicalPayrollYm(?string $ym): array
+    {
+        $now = Carbon::now(self::TZ);
+        $defaultYear = (int) $now->format('Y');
+        $defaultMonth = (int) $now->format('n');
+
+        if ($ym === null || trim($ym) === '') {
+            return [
+                'year' => $defaultYear,
+                'month' => $defaultMonth,
+                'ym' => sprintf('%04d-%02d', $defaultYear, $defaultMonth),
+            ];
+        }
+
+        $parts = explode('-', trim($ym), 2);
+        $year = (int) ($parts[0] ?? $defaultYear);
+        $month = (int) ($parts[1] ?? $defaultMonth);
+
+        if ($year < 1970 || $year > 2100) {
+            $year = $defaultYear;
+        }
+        if ($month < 1 || $month > 12) {
+            $month = $defaultMonth;
+        }
+
+        return [
+            'year' => $year,
+            'month' => $month,
+            'ym' => sprintf('%04d-%02d', $year, $month),
+        ];
+    }
+
     public function resolveRangeForPayrollMonth(int $year, int $month): array
     {
         $baseMonth = CarbonImmutable::create($year, $month, 1, 0, 0, 0, self::TZ);

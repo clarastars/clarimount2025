@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeAddition;
 use App\Services\ManualDeductionAmountService;
+use App\Services\OperationalMonthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,8 @@ use Inertia\Response;
 class AdditionsController extends Controller
 {
     public function __construct(
-        private readonly ManualDeductionAmountService $manualDeductionAmountService
+        private readonly ManualDeductionAmountService $manualDeductionAmountService,
+        private readonly OperationalMonthService $operationalMonthService,
     ) {}
 
     public function index(Request $request, Company $company): Response
@@ -28,10 +30,22 @@ class AdditionsController extends Controller
             abort(403, 'You do not have access to this company.');
         }
 
-        $month = $request->query('month', now()->format('Y-m'));
+        $monthInput = $request->query('month');
+        if ($monthInput === null || $monthInput === '') {
+            $currentPayroll = $this->operationalMonthService->resolvePayrollMonthForDate(\Carbon\Carbon::now('Asia/Riyadh'));
+            $canonical = [
+                'year' => $currentPayroll['year'],
+                'month' => $currentPayroll['month'],
+                'ym' => sprintf('%04d-%02d', $currentPayroll['year'], $currentPayroll['month']),
+            ];
+        } else {
+            $canonical = $this->operationalMonthService->parseCanonicalPayrollYm((string) $monthInput);
+        }
+        $month = $canonical['ym'];
         $employeeId = $request->query('employee_id');
-        $start = \Carbon\Carbon::parse($month.'-01')->startOfMonth();
-        $end = $start->copy()->endOfMonth();
+        $range = $this->operationalMonthService->resolveRangeForPayrollMonth($canonical['year'], $canonical['month']);
+        $start = $range['start'];
+        $end = $range['end'];
 
         $employees = Employee::query()
             ->where('company_id', $company->id)
@@ -56,6 +70,8 @@ class AdditionsController extends Controller
             'companies' => $companies,
             'employees' => $employees,
             'month' => $month,
+            'monthPeriodStart' => $start->format('Y-m-d'),
+            'monthPeriodEnd' => $end->format('Y-m-d'),
             'employeeId' => $employeeId,
             'manualAdditions' => $manualAdditions->map(fn (EmployeeAddition $a) => [
                 'id' => $a->id,
