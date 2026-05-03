@@ -14,13 +14,14 @@ use Illuminate\Support\Facades\Log;
 
 class AttendancePenaltyService
 {
+    public function __construct(
+        private OperationalMonthService $operationalMonthService
+    ) {}
+
     /**
      * Calculate and create penalty for an attendance record
      *
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @param int $lateMinutes
-     * @return AttendancePenalty|null
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     public function calculatePenalty(int $employeeId, string $attendanceDate, int $lateMinutes): ?AttendancePenalty
     {
@@ -31,23 +32,24 @@ class AttendancePenaltyService
 
         // Determine violation type based on late minutes
         $violationType = $this->determineViolationType($lateMinutes);
-        if (!$violationType) {
+        if (! $violationType) {
             return null;
         }
 
-        // Calculate repeat number for this violation type in the same calendar year
+        // Repeat number within payroll period (operational month when configured)
         $repeatNumber = $this->calculateRepeatNumber($employeeId, $violationType, $attendanceDate);
-        
+
         // Get the rule for this violation type and repeat number
         $rule = LaborLawRule::byViolationType($violationType)
             ->byRepeatNumber($repeatNumber)
             ->first();
 
-        if (!$rule) {
+        if (! $rule) {
             Log::warning('No labor law rule found', [
                 'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
             ]);
+
             return null;
         }
 
@@ -90,8 +92,7 @@ class AttendancePenaltyService
      * Calculate and create penalty for a daily attendance record (e.g. from iClock API or device ingest).
      * Uses employee shift to compute late minutes and then create/update penalty.
      *
-     * @param ZkDailyAttendance $attendance
-     * @param string $attDate Date in Y-m-d format
+     * @param  string  $attDate  Date in Y-m-d format
      * @return int|null Late minutes (when a penalty is created/updated), otherwise null
      */
     public function calculatePenaltyForDailyAttendance(ZkDailyAttendance $attendance, string $attDate): ?int
@@ -115,7 +116,7 @@ class AttendancePenaltyService
         }
 
         $expectedStartTime = $employee->shift->effectiveStartTimeStringForWeekday($weekday);
-        $expectedStart = Carbon::parse($attDate . ' ' . $expectedStartTime, 'Asia/Riyadh');
+        $expectedStart = Carbon::parse($attDate.' '.$expectedStartTime, 'Asia/Riyadh');
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
         $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
         $graceMinutes = (int) ($employee->shift->grace_minutes ?? 0);
@@ -123,6 +124,7 @@ class AttendancePenaltyService
 
         if ($lateMinutes > 0) {
             $this->calculatePenalty($employee->id, $attDate, $lateMinutes);
+
             return $lateMinutes;
         }
 
@@ -132,9 +134,7 @@ class AttendancePenaltyService
     /**
      * Get penalty for a specific attendance record
      *
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @return AttendancePenalty|null
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     public function getPenaltyForAttendance(int $employeeId, string $attendanceDate): ?AttendancePenalty
     {
@@ -145,9 +145,6 @@ class AttendancePenaltyService
 
     /**
      * Determine violation type based on late minutes
-     *
-     * @param int $lateMinutes
-     * @return string|null
      */
     private function determineViolationType(int $lateMinutes): ?string
     {
@@ -165,24 +162,21 @@ class AttendancePenaltyService
     }
 
     /**
-     * Calculate repeat number for a violation type in the same calendar year
+     * Calculate repeat number for a violation type within the same payroll period:
+     * custom operational month boundaries when configured; otherwise calendar month.
      *
-     * @param int $employeeId
-     * @param string $violationType
-     * @param string $attendanceDate Date in Y-m-d format
-     * @return int
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     private function calculateRepeatNumber(int $employeeId, string $violationType, string $attendanceDate): int
     {
-        $date = Carbon::parse($attendanceDate);
-        $year = (int) $date->year;
-        $month = (int) $date->month;
+        $range = $this->operationalMonthService->resolveOperationalMonthRangeContainingDate($attendanceDate);
+        $periodStart = $range['start']->format('Y-m-d');
+        $periodEnd = $range['end']->format('Y-m-d');
 
-        // Count only previous penalties (strictly before this date) in the same calendar month.
-        // This keeps month start reset behavior stable even when rebuilds are re-run.
+        // Count only previous penalties (strictly before this date) in the same payroll period.
         $count = AttendancePenalty::forEmployee($employeeId)
             ->byViolationType($violationType)
-            ->forMonthYear($year, $month)
+            ->whereBetween('attendance_date', [$periodStart, $periodEnd])
             ->whereDate('attendance_date', '<', $attendanceDate)
             ->where('approval_status', '!=', 'rejected')
             ->count();
@@ -199,22 +193,28 @@ class AttendancePenaltyService
     }
 
     /**
-     * Re-sequence repeat_number for one employee/violation_type/month after state changes
+     * Re-sequence repeat_number for one employee/violation_type/payroll period after state changes
      * (e.g. when one penalty is rejected) so later rows shift correctly.
      * Rejected rows are excluded from the counting sequence.
+     * Payroll period follows custom operational month when configured.
+     *
+     * @param  string  $anchorAttendanceDateYmd  Any Y-m-d inside the period to re-sequence (e.g. rejected penalty date)
      */
     public function resequenceMonthlyPenaltiesAfterRejection(
         int $employeeId,
         string $violationType,
-        int $year,
-        int $month
+        string $anchorAttendanceDateYmd
     ): void {
-        DB::transaction(function () use ($employeeId, $violationType, $year, $month): void {
+        $range = $this->operationalMonthService->resolveOperationalMonthRangeContainingDate($anchorAttendanceDateYmd);
+        $periodStart = $range['start']->format('Y-m-d');
+        $periodEnd = $range['end']->format('Y-m-d');
+
+        DB::transaction(function () use ($employeeId, $violationType, $periodStart, $periodEnd): void {
             /** @var \Illuminate\Database\Eloquent\Collection<int, AttendancePenalty> $activePenalties */
             $activePenalties = AttendancePenalty::query()
                 ->forEmployee($employeeId)
                 ->byViolationType($violationType)
-                ->forMonthYear($year, $month)
+                ->whereBetween('attendance_date', [$periodStart, $periodEnd])
                 ->where('approval_status', '!=', 'rejected')
                 ->orderBy('attendance_date')
                 ->orderBy('id')
@@ -262,11 +262,10 @@ class AttendancePenaltyService
 
     /**
      * Calculate and create penalty for absence without permission
-     * 
+     *
      * @deprecated Use calculateAbsenceWithoutExcusePenalty instead
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @return AttendancePenalty|null
+     *
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     public function calculateAbsencePenalty(int $employeeId, string $attendanceDate): ?AttendancePenalty
     {
@@ -277,27 +276,22 @@ class AttendancePenaltyService
     /**
      * Calculate and create penalty for absence without excuse
      *
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @return AttendancePenalty|null
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     public function calculateAbsenceWithoutExcusePenalty(int $employeeId, string $attendanceDate): ?AttendancePenalty
     {
         $violationType = 'absent_without_excuse';
 
-        // Calculate repeat number for this violation type in the same calendar year
+        // Repeat number within payroll period (operational month when configured)
         $repeatNumber = $this->calculateRepeatNumber($employeeId, $violationType, $attendanceDate);
-        
+
         return $this->createAbsencePenaltyWithRepeatNumber($employeeId, $attendanceDate, $repeatNumber);
     }
 
     /**
      * Calculate and create penalty for absence without excuse with specific repeat number
      *
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @param int $repeatNumber
-     * @return AttendancePenalty|null
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     public function calculateAbsenceWithoutExcusePenaltyWithRepeatNumber(int $employeeId, string $attendanceDate, int $repeatNumber): ?AttendancePenalty
     {
@@ -307,10 +301,7 @@ class AttendancePenaltyService
     /**
      * Create absence penalty with specific repeat number
      *
-     * @param int $employeeId
-     * @param string $attendanceDate Date in Y-m-d format
-     * @param int $repeatNumber
-     * @return AttendancePenalty|null
+     * @param  string  $attendanceDate  Date in Y-m-d format
      */
     private function createAbsencePenaltyWithRepeatNumber(int $employeeId, string $attendanceDate, int $repeatNumber): ?AttendancePenalty
     {
@@ -322,23 +313,24 @@ class AttendancePenaltyService
 
         // If repeat exceeds the maximum defined, cycle back from 1 (e.g. 1,2,1,2,1,2…)
         $repeatNumber = (int) ((($repeatNumber - 1) % $maxDefinedRepeat) + 1);
-        
+
         // Get the rule for this violation type and repeat number
         $rule = LaborLawRule::byViolationType($violationType)
             ->byRepeatNumber($repeatNumber)
             ->first();
 
-        if (!$rule) {
+        if (! $rule) {
             Log::warning('No labor law rule found for absence without excuse', [
                 'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
             ]);
+
             return null;
         }
 
         // Generate action text
         $actionText = $this->generateActionText(
-            $rule->action_type, 
+            $rule->action_type,
             $rule->action_value,
             $rule->action_value_gross_days,
             $rule->action_value_basic_days
@@ -371,8 +363,6 @@ class AttendancePenaltyService
      * Minute rate = basic_salary / (work_days_per_month × work_minutes_per_day).
      * Work minutes per day = shift end_time - start_time. Work days per month from shift workdays.
      *
-     * @param int $employeeId
-     * @param int $lateMinutes
      * @return float|null Amount in currency, or null if not calculable
      */
     private function calculateLateMinutesDeductionAmount(int $employeeId, int $lateMinutes): ?float
@@ -415,20 +405,13 @@ class AttendancePenaltyService
 
     /**
      * Generate action text based on action type and value
-     *
-     * @param string $actionType
-     * @param int|null $actionValue
-     * @param int|null $actionValueGrossDays
-     * @param int|null $actionValueBasicDays
-     * @return string
      */
     private function generateActionText(
-        string $actionType, 
+        string $actionType,
         ?int $actionValue = null,
         ?int $actionValueGrossDays = null,
         ?int $actionValueBasicDays = null
-    ): string
-    {
+    ): string {
         return match ($actionType) {
             'warning' => 'إنذار كتابي',
             'deduction_percentage' => "خصم {$actionValue}% من الأجر اليومي",
@@ -441,11 +424,6 @@ class AttendancePenaltyService
 
     /**
      * Generate text for deduction_days action type
-     *
-     * @param int|null $actionValue
-     * @param int|null $actionValueGrossDays
-     * @param int|null $actionValueBasicDays
-     * @return string
      */
     private function generateDeductionDaysText(?int $actionValue, ?int $actionValueGrossDays, ?int $actionValueBasicDays): string
     {
@@ -458,14 +436,15 @@ class AttendancePenaltyService
             if ($actionValueBasicDays !== null && $actionValueBasicDays > 0) {
                 $parts[] = "خصم {$actionValueBasicDays} يوم من الراتب الأساسي";
             }
-            return !empty($parts) ? implode(' + ', $parts) : 'خصم أجر يوم';
+
+            return ! empty($parts) ? implode(' + ', $parts) : 'خصم أجر يوم';
         }
-        
+
         // Fallback to old behavior
         if ($actionValue !== null && $actionValue > 0) {
             return "خصم {$actionValue} يوم من الراتب";
         }
-        
+
         return 'خصم أجر يوم';
     }
 }

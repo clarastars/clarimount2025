@@ -6,9 +6,8 @@ namespace App\Services;
 
 use App\Models\AttendancePenalty;
 use App\Models\Employee;
-use App\Models\ZkDevice;
 use App\Models\ZkDailyAttendance;
-use App\Services\AttendancePenaltyService;
+use App\Models\ZkDevice;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -64,7 +63,7 @@ class FingerprintIclockAttendanceService
         $current = $startOfMonth->copy();
         while ($current->lte($today)) {
             if ($this->progressEnabled) {
-                Log::channel('stderr')->info('[FingerprintIclock] Sync day: ' . $current->format('Y-m-d'));
+                Log::channel('stderr')->info('[FingerprintIclock] Sync day: '.$current->format('Y-m-d'));
             }
             $this->syncForDate($current, $companyId);
             $current->addDay();
@@ -126,10 +125,10 @@ class FingerprintIclockAttendanceService
                 }
                 if ($this->progressEnabled) {
                     $pin = $employee->fingerprint_device_id;
-                    $msg = '[FingerprintIclock] Employee pin ' . $pin . ' on ' . $attDate;
+                    $msg = '[FingerprintIclock] Employee pin '.$pin.' on '.$attDate;
                     if ($result['stored']) {
                         $msg .= $result['late_minutes'] !== null
-                            ? ' lateMinutes=' . $result['late_minutes']
+                            ? ' lateMinutes='.$result['late_minutes']
                             : ' stored, no late penalty';
                     } else {
                         $msg .= ' no transactions / no row saved';
@@ -146,8 +145,8 @@ class FingerprintIclockAttendanceService
                 ]);
                 if ($this->progressEnabled) {
                     Log::channel('stderr')->error(
-                        '[FingerprintIclock] Error syncing employee pin ' . $employee->fingerprint_device_id . ' on ' . $attDate .
-                        ': ' . $e->getMessage()
+                        '[FingerprintIclock] Error syncing employee pin '.$employee->fingerprint_device_id.' on '.$attDate.
+                        ': '.$e->getMessage()
                     );
                 }
             }
@@ -175,7 +174,7 @@ class FingerprintIclockAttendanceService
         $current = $startOfMonth->copy();
         while ($current->lte($today)) {
             if ($this->progressEnabled) {
-                Log::channel('stderr')->info('[FingerprintIclock] Sync day for employeeId=' . $employeeId . ' : ' . $current->format('Y-m-d'));
+                Log::channel('stderr')->info('[FingerprintIclock] Sync day for employeeId='.$employeeId.' : '.$current->format('Y-m-d'));
             }
             $this->syncForEmployeeIdAndDate($employeeId, $current);
             $current->addDay();
@@ -190,8 +189,9 @@ class FingerprintIclockAttendanceService
         if (empty($this->baseUrl) || empty($this->token)) {
             Log::channel('daily')->info('[FingerprintIclock] Sync skipped: base_url or token not configured');
             if ($this->progressEnabled) {
-                Log::channel('stderr')->error('[FingerprintIclock] Sync skipped (employeeId=' . $employeeId . '): base_url or token not configured');
+                Log::channel('stderr')->error('[FingerprintIclock] Sync skipped (employeeId='.$employeeId.'): base_url or token not configured');
             }
+
             return;
         }
 
@@ -200,6 +200,7 @@ class FingerprintIclockAttendanceService
             Log::channel('daily')->warning('[FingerprintIclock] Employee not found', [
                 'employee_id' => $employeeId,
             ]);
+
             return;
         }
 
@@ -208,6 +209,7 @@ class FingerprintIclockAttendanceService
             Log::channel('daily')->info('[FingerprintIclock] Sync skipped: employee has no fingerprint_device_id', [
                 'employee_id' => $employeeId,
             ]);
+
             return;
         }
 
@@ -265,8 +267,7 @@ class FingerprintIclockAttendanceService
         }
 
         // Calculate late penalty so "الإجراء المتخذ / سبب الإجراء / اعتماد الجزاء" appear in UI
-        $penaltyService = new AttendancePenaltyService();
-        $lateMinutes = $penaltyService->calculatePenaltyForDailyAttendance($attendance, $attDate);
+        $lateMinutes = app(AttendancePenaltyService::class)->calculatePenaltyForDailyAttendance($attendance, $attDate);
 
         return ['stored' => true, 'late_minutes' => $lateMinutes];
     }
@@ -278,7 +279,7 @@ class FingerprintIclockAttendanceService
      */
     public function fetchTransactions(string $empCode, string $startTime, string $endTime): array
     {
-        $url = $this->baseUrl . '/iclock/api/transactions/';
+        $url = $this->baseUrl.'/iclock/api/transactions/';
         $params = [
             'emp_code' => $empCode,
             'start_time' => $startTime,
@@ -286,13 +287,13 @@ class FingerprintIclockAttendanceService
         ];
 
         $allPunchTimes = [];
-        $currentUrl = $url . '?' . http_build_query($params);
+        $currentUrl = $url.'?'.http_build_query($params);
 
         do {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
                     'Accept' => 'application/json',
-                    'Authorization' => 'Token ' . $this->token,
+                    'Authorization' => 'Token '.$this->token,
                 ])
                 ->get($currentUrl);
 

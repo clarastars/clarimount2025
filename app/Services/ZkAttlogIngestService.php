@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\ZkDevice;
+use App\Models\AttendancePenalty;
+use App\Models\Employee;
 use App\Models\ZkAttendanceRaw;
 use App\Models\ZkDailyAttendance;
-use App\Models\Employee;
-use App\Models\AttendancePenalty;
+use App\Models\ZkDevice;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Service for ingesting ZKTeco attendance log data from /iclock/cdata endpoint
- * 
+ *
  * Timezone Handling:
  * - Incoming timestamps are assumed to be in Asia/Riyadh timezone
  * - All timestamps are converted to UTC before storage (Laravel best practice)
@@ -25,10 +25,9 @@ class ZkAttlogIngestService
     /**
      * Ingest attendance log data from ZKTeco device
      *
-     * @param string $serialNumber Device serial number from query parameter SN
-     * @param string $rawBody Raw request body containing TAB-separated lines
-     * @param \DateTime $receivedAt Timestamp when the request was received
-     * @return void
+     * @param  string  $serialNumber  Device serial number from query parameter SN
+     * @param  string  $rawBody  Raw request body containing TAB-separated lines
+     * @param  \DateTime  $receivedAt  Timestamp when the request was received
      */
     public function ingest(string $serialNumber, string $rawBody, \DateTime $receivedAt): void
     {
@@ -44,7 +43,7 @@ class ZkAttlogIngestService
         // Split body into lines and filter empty lines
         $lines = array_filter(
             explode("\n", $rawBody),
-            fn($line) => trim($line) !== ''
+            fn ($line) => trim($line) !== ''
         );
 
         // Process each line
@@ -66,10 +65,7 @@ class ZkAttlogIngestService
     /**
      * Process a single attendance log line
      *
-     * @param ZkDevice $device
-     * @param string $line TAB-separated line
-     * @param \DateTime $receivedAt
-     * @return void
+     * @param  string  $line  TAB-separated line
      */
     private function processLine(ZkDevice $device, string $line, \DateTime $receivedAt): void
     {
@@ -84,7 +80,7 @@ class ZkAttlogIngestService
         // Extract data
         $devicePin = trim($columns[0]);
         $punchTimeStr = trim($columns[1]);
-        $verifyMode = isset($columns[3]) && $columns[3] !== '' ? (int)$columns[3] : null;
+        $verifyMode = isset($columns[3]) && $columns[3] !== '' ? (int) $columns[3] : null;
 
         // Parse punch_time from Asia/Riyadh timezone and convert to UTC
         // Format: "2026-01-18 15:31:30"
@@ -173,7 +169,7 @@ class ZkAttlogIngestService
             }
 
             // Calculate penalty if attendance was created or first_punch was updated
-            if ($dailyAttendance->wasRecentlyCreated || 
+            if ($dailyAttendance->wasRecentlyCreated ||
                 ($dailyAttendance->exists && $dailyAttendance->wasChanged('first_punch'))) {
                 try {
                     $this->calculateAttendancePenalty($dailyAttendance, $attDate);
@@ -193,9 +189,7 @@ class ZkAttlogIngestService
     /**
      * Calculate attendance penalty for a daily attendance record
      *
-     * @param ZkDailyAttendance $attendance
-     * @param string $attDate Date in Y-m-d format
-     * @return void
+     * @param  string  $attDate  Date in Y-m-d format
      */
     private function calculateAttendancePenalty(ZkDailyAttendance $attendance, string $attDate): void
     {
@@ -204,7 +198,7 @@ class ZkAttlogIngestService
             ->where('fingerprint_device_id', $attendance->device_pin)
             ->first();
 
-        if (!$employee || !$employee->shift) {
+        if (! $employee || ! $employee->shift) {
             // No employee or no shift assigned, skip penalty calculation
             return;
         }
@@ -212,40 +206,39 @@ class ZkAttlogIngestService
         // Get weekday of attendance date (0=Sunday, 6=Saturday)
         $attDateCarbon = Carbon::parse($attDate, 'Asia/Riyadh');
         $weekday = $attDateCarbon->dayOfWeek;
-        
+
         // Check if it's a workday
         $workdays = $employee->shift->workdays()
             ->where('is_workday', true)
             ->pluck('weekday')
             ->toArray();
 
-        if (!in_array($weekday, $workdays)) {
+        if (! in_array($weekday, $workdays)) {
             // Not a workday, skip penalty calculation
             return;
         }
 
         // No first punch (absent), skip penalty calculation
-        if (!$attendance->first_punch) {
+        if (! $attendance->first_punch) {
             return;
         }
 
         // Calculate late minutes (same logic as AttendanceController; per-weekday start when set)
         $expectedStart = Carbon::parse(
-            $attDate . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
+            $attDate.' '.$employee->shift->effectiveStartTimeStringForWeekday($weekday),
             'Asia/Riyadh'
         );
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
-        
+
         // Calculate signed difference in minutes
         $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
-        
+
         // Apply grace period
         $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);
 
         // Only calculate penalty if late
         if ($lateMinutes > 0) {
-            $penaltyService = new \App\Services\AttendancePenaltyService();
-            $penaltyService->calculatePenalty($employee->id, $attDate, $lateMinutes);
+            app(\App\Services\AttendancePenaltyService::class)->calculatePenalty($employee->id, $attDate, $lateMinutes);
         }
     }
 }

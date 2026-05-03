@@ -13,7 +13,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AttendancePenaltyApprovalController extends Controller
@@ -31,7 +30,7 @@ class AttendancePenaltyApprovalController extends Controller
 
         // Verify user has access to this penalty's employee company
         $user = Auth::user();
-        if (!$user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
             abort(403, 'You do not have access to this penalty.');
         }
 
@@ -42,7 +41,7 @@ class AttendancePenaltyApprovalController extends Controller
         ]);
 
         $employeeEmail = $penalty->employee->work_email ?: $penalty->employee->personal_email;
-        if (!empty($employeeEmail) && filter_var($employeeEmail, FILTER_VALIDATE_EMAIL)) {
+        if (! empty($employeeEmail) && filter_var($employeeEmail, FILTER_VALIDATE_EMAIL)) {
             try {
                 Mail::to($employeeEmail)->send(new AttendancePenaltyApprovedMail($penalty));
             } catch (\Throwable $exception) {
@@ -65,7 +64,7 @@ class AttendancePenaltyApprovalController extends Controller
     {
         // Verify user has access to this penalty's employee company
         $user = Auth::user();
-        if (!$user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
+        if (! $user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
             abort(403, 'You do not have access to this penalty.');
         }
 
@@ -79,21 +78,20 @@ class AttendancePenaltyApprovalController extends Controller
         // Handle file upload if provided
         if ($request->hasFile('rejection_attachment')) {
             $file = $request->file('rejection_attachment');
-            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+            $filename = Str::uuid().'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs('penalty_rejections', $filename, 'public');
             $data['rejection_attachment_path'] = $path;
         }
 
         $penalty->update($data);
 
-        // After rejecting one penalty, re-sequence remaining penalties for same employee/type/month
+        // After rejecting one penalty, re-sequence remaining penalties for same employee/type/payroll period
         // so later occurrences shift down (e.g. third becomes second).
-        $attDate = Carbon::parse($penalty->attendance_date);
+        $attDateYmd = Carbon::parse($penalty->attendance_date)->format('Y-m-d');
         $this->attendancePenaltyService->resequenceMonthlyPenaltiesAfterRejection(
             (int) $penalty->employee_id,
             (string) $penalty->violation_type,
-            (int) $attDate->year,
-            (int) $attDate->month
+            $attDateYmd
         );
 
         return back()->with('success', __('Penalty rejected successfully.'));

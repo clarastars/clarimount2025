@@ -36,17 +36,19 @@ class TestAttendancePenalties extends Command
         $lateMinutes = (int) ($this->option('late-minutes') ?: 10);
 
         // Get employee
-        $employee = $employeeId 
+        $employee = $employeeId
             ? Employee::with('shift')->find($employeeId)
             : Employee::with('shift')->first();
 
-        if (!$employee) {
+        if (! $employee) {
             $this->error('❌ No employee found');
+
             return 1;
         }
 
-        if (!$employee->shift) {
+        if (! $employee->shift) {
             $this->error("❌ Employee {$employee->id} has no shift assigned");
+
             return 1;
         }
 
@@ -58,11 +60,11 @@ class TestAttendancePenalties extends Command
         $this->info("   Late Minutes: {$lateMinutes}\n");
 
         // Calculate penalty
-        $service = new AttendancePenaltyService();
+        $service = app(AttendancePenaltyService::class);
         $penalty = $service->calculatePenalty($employee->id, $date, $lateMinutes);
 
         if ($penalty) {
-            $this->info("✅ Penalty Created:");
+            $this->info('✅ Penalty Created:');
             $this->table(
                 ['Field', 'Value'],
                 [

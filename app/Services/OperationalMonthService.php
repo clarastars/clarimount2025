@@ -11,7 +11,9 @@ use Carbon\CarbonImmutable;
 class OperationalMonthService
 {
     private const TZ = 'Asia/Riyadh';
+
     private const START_DAY_KEY = 'operational_month_start_day';
+
     private const END_DAY_KEY = 'operational_month_end_day';
 
     public function getSettings(): array
@@ -43,6 +45,7 @@ class OperationalMonthService
     public function resolveCurrentOperationalMonthRange(?Carbon $referenceDate = null): array
     {
         $referenceDate = ($referenceDate ?? Carbon::now(self::TZ))->copy()->setTimezone(self::TZ);
+
         return $this->resolveRangeForPayrollMonth(
             (int) $referenceDate->format('Y'),
             (int) $referenceDate->format('n')
@@ -68,6 +71,67 @@ class OperationalMonthService
             'start' => $this->createDateWithClampedDay($baseMonth->subMonthNoOverflow()->startOfMonth(), $startDay)->startOfDay()->toMutable(),
             'end' => $this->createDateWithClampedDay($baseMonth->startOfMonth(), $endDay)->endOfDay()->toMutable(),
         ];
+    }
+
+    /**
+     * Payroll month label (year + month) whose operational range contains $date.
+     * Matches calendar month when custom operational month is disabled.
+     *
+     * @return array{year: int, month: int}
+     */
+    public function resolvePayrollMonthForDate(Carbon|string $date): array
+    {
+        $day = $date instanceof Carbon
+            ? $date->copy()->setTimezone(self::TZ)->startOfDay()
+            : Carbon::parse((string) $date, self::TZ)->startOfDay();
+
+        $settings = $this->getSettings();
+        if (! $settings['is_custom']) {
+            return [
+                'year' => (int) $day->format('Y'),
+                'month' => (int) $day->format('n'),
+            ];
+        }
+
+        $y = (int) $day->format('Y');
+        $m = (int) $day->format('n');
+        $previousMonth = $day->copy()->subMonthNoOverflow();
+        $nextMonth = $day->copy()->addMonthNoOverflow();
+        $candidates = [
+            [$y, $m],
+            [(int) $previousMonth->format('Y'), (int) $previousMonth->format('n')],
+            [(int) $nextMonth->format('Y'), (int) $nextMonth->format('n')],
+        ];
+
+        $seen = [];
+        foreach ($candidates as [$cy, $cm]) {
+            $key = $cy.'-'.$cm;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $range = $this->resolveRangeForPayrollMonth($cy, $cm);
+            $start = $range['start']->copy()->startOfDay();
+            $end = $range['end']->copy()->endOfDay();
+            if ($day->gte($start) && $day->lte($end)) {
+                return ['year' => $cy, 'month' => $cm];
+            }
+        }
+
+        return ['year' => $y, 'month' => $m];
+    }
+
+    /**
+     * Operational [start, end] range that contains $date (custom boundaries when enabled).
+     *
+     * @return array{start: Carbon, end: Carbon}
+     */
+    public function resolveOperationalMonthRangeContainingDate(Carbon|string $date): array
+    {
+        $payroll = $this->resolvePayrollMonthForDate($date);
+
+        return $this->resolveRangeForPayrollMonth($payroll['year'], $payroll['month']);
     }
 
     private function isCustomMonthEnabled(?int $startDay, ?int $endDay): bool
