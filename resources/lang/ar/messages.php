@@ -1275,6 +1275,8 @@ return [
         'rejected' => 'مرفوض',
         'reject_penalty' => 'رفض الجزاء',
         'reject_penalty_description' => 'يرجى إدخال سبب الرفض (اختياري) ورفع ملف إثبات (اختياري)',
+        'reject_penalty_from_deductions_hint' => 'كما في صفحة الحضور: يُرفض الجزاء وتُعاد حساب التكرارات لباقي الجزاءات في نفس الشهر.',
+        'penalty_already_rejected' => 'هذا الجزاء مرفوض مسبقاً.',
         'rejection_reason' => 'سبب الرفض',
         'rejection_reason_placeholder' => 'أدخل سبب رفض الجزاء...',
         'rejection_attachment' => 'ملف الإثبات',

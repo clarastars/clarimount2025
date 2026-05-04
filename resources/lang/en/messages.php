@@ -1263,6 +1263,8 @@ return [
         'rejected' => 'Rejected',
         'reject_penalty' => 'Reject Penalty',
         'reject_penalty_description' => 'Please enter rejection reason (optional) and upload proof file (optional)',
+        'reject_penalty_from_deductions_hint' => 'Same as rejecting from attendance: the penalty is marked rejected and remaining occurrences in the month are recalculated.',
+        'penalty_already_rejected' => 'This penalty is already rejected.',
         'rejection_reason' => 'Rejection Reason',
         'rejection_reason_placeholder' => 'Enter rejection reason...',
         'rejection_attachment' => 'Proof File',

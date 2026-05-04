@@ -62,10 +62,16 @@ class AttendancePenaltyApprovalController extends Controller
      */
     public function reject(RejectPenaltyRequest $request, AttendancePenalty $penalty): RedirectResponse
     {
+        $penalty->loadMissing(['employee.company']);
+
         // Verify user has access to this penalty's employee company
         $user = Auth::user();
         if (! $user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
             abort(403, 'You do not have access to this penalty.');
+        }
+
+        if ($penalty->approval_status === 'rejected') {
+            return back()->with('error', __('messages.attendance.penalty_already_rejected'));
         }
 
         $data = [

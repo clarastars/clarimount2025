@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import PayrollMonthFilter from '@/components/attendance/PayrollMonthFilter.vue'
-import { Banknote, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Banknote, Plus, Pencil, Trash2, X } from 'lucide-vue-next'
 import axios from 'axios'
 
 const { t } = useI18n()
@@ -410,6 +410,59 @@ function isManual(row: DeductionRow): row is ManualDeduction {
   return row.type === 'manual'
 }
 
+function isPenalty(row: DeductionRow): row is ApprovedPenalty {
+  return row.type === 'penalty'
+}
+
+const penaltyRejectModalOpen = ref(false)
+const penaltyToReject = ref<ApprovedPenalty | null>(null)
+const penaltyRejectionReason = ref('')
+const penaltyRejectionAttachment = ref<File | null>(null)
+
+function openPenaltyRejectModal(row: ApprovedPenalty) {
+  penaltyToReject.value = row
+  penaltyRejectionReason.value = ''
+  penaltyRejectionAttachment.value = null
+  penaltyRejectModalOpen.value = true
+}
+
+function closePenaltyRejectModal() {
+  penaltyRejectModalOpen.value = false
+  penaltyToReject.value = null
+  penaltyRejectionReason.value = ''
+  penaltyRejectionAttachment.value = null
+}
+
+function onPenaltyRejectModalOpenChange(open: boolean) {
+  if (!open) {
+    closePenaltyRejectModal()
+  }
+}
+
+function onPenaltyRejectionFileChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  penaltyRejectionAttachment.value = target.files?.[0] ?? null
+}
+
+function submitPenaltyReject() {
+  if (!penaltyToReject.value) return
+
+  const formData = new FormData()
+  if (penaltyRejectionReason.value) {
+    formData.append('rejection_reason', penaltyRejectionReason.value)
+  }
+  if (penaltyRejectionAttachment.value) {
+    formData.append('rejection_attachment', penaltyRejectionAttachment.value)
+  }
+
+  router.post(route('attendance-penalties.reject', penaltyToReject.value.id), formData, {
+    preserveScroll: true,
+    onSuccess: () => {
+      closePenaltyRejectModal()
+    },
+  })
+}
+
 function deductionTypeLabel(type: string) {
   const map: Record<string, string> = {
     penalties: t('attendance.deduction_type_penalties'),
@@ -581,6 +634,18 @@ function deductionTypeLabel(type: string) {
                             <Trash2 class="h-4 w-4" />
                           </Button>
                         </div>
+                      </template>
+                      <template v-else-if="isPenalty(row)">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          class="h-8 gap-1 px-2 text-red-600 hover:text-red-700"
+                          :title="t('attendance.reject')"
+                          @click="openPenaltyRejectModal(row)"
+                        >
+                          <X class="h-4 w-4" />
+                          <span class="text-xs">{{ t('attendance.reject') }}</span>
+                        </Button>
                       </template>
                       <span v-else class="text-muted-foreground">-</span>
                     </td>
@@ -958,6 +1023,52 @@ function deductionTypeLabel(type: string) {
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Reject approved attendance penalty (same backend as attendance page) -->
+    <Dialog :open="penaltyRejectModalOpen" @update:open="onPenaltyRejectModalOpenChange">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ t('attendance.reject_penalty') }}</DialogTitle>
+          <DialogDescription>
+            {{ t('attendance.reject_penalty_description') }}
+          </DialogDescription>
+          <p class="text-sm text-muted-foreground pt-2">
+            {{ t('attendance.reject_penalty_from_deductions_hint') }}
+          </p>
+        </DialogHeader>
+        <div class="space-y-4">
+          <div>
+            <Label for="deductions-rejection-reason">{{ t('attendance.rejection_reason') }} ({{ t('common.optional') }})</Label>
+            <textarea
+              id="deductions-rejection-reason"
+              v-model="penaltyRejectionReason"
+              rows="4"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+              :placeholder="t('attendance.rejection_reason_placeholder')"
+            />
+          </div>
+          <div>
+            <Label for="deductions-rejection-attachment">{{ t('attendance.rejection_attachment') }} ({{ t('common.optional') }})</Label>
+            <Input
+              id="deductions-rejection-attachment"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              class="mt-1"
+              @change="onPenaltyRejectionFileChange"
+            />
+            <p class="text-xs text-muted-foreground mt-1">{{ t('attendance.rejection_attachment_hint') }}</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" @click="closePenaltyRejectModal">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button type="button" variant="destructive" @click="submitPenaltyReject">
+            {{ t('attendance.reject') }}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   </AppLayout>
