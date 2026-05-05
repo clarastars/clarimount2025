@@ -29,6 +29,7 @@ class EmployeeDeduction extends Model
         'amount',
         'amount_input_mode',
         'amount_input_days',
+        'amount_input_hours',
         'amount_input_percent',
         'deduction_date',
         'deduction_type',
@@ -40,6 +41,7 @@ class EmployeeDeduction extends Model
         'amount' => 'decimal:2',
         'deduction_date' => 'date',
         'amount_input_days' => 'decimal:4',
+        'amount_input_hours' => 'decimal:4',
         'amount_input_percent' => 'decimal:4',
     ];
 

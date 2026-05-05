@@ -37,6 +37,7 @@ interface EmployeeOption {
   company_id: number
   basic_salary?: number | string | null
   allowances?: number | string | null
+  basic_hourly_wage?: number | null
 }
 
 interface ApprovedPenalty {
@@ -59,6 +60,7 @@ type AmountInputMode =
   | 'basic_daily_percent'
   | 'gross_days'
   | 'gross_daily_percent'
+  | 'basic_hours'
 
 interface ManualDeduction {
   id: number
@@ -71,6 +73,7 @@ interface ManualDeduction {
   amount: number
   amount_input_mode?: AmountInputMode
   amount_input_days?: number | null
+  amount_input_hours?: number | null
   amount_input_percent?: number | null
   reason: string
   created_at: string
@@ -98,6 +101,7 @@ const createForm = useForm({
   amount_input_mode: 'manual' as AmountInputMode,
   amount: '',
   amount_input_days: '',
+  amount_input_hours: '',
   amount_input_percent: '',
   deduction_date: new Date().toISOString().slice(0, 10),
   deduction_type: 'penalties',
@@ -144,6 +148,7 @@ function openCreateModal() {
   createForm.amount_input_mode = 'manual'
   createForm.amount = ''
   createForm.amount_input_days = ''
+  createForm.amount_input_hours = ''
   createForm.amount_input_percent = ''
   employeesForCreate.value = props.employees
   createModalOpen.value = true
@@ -165,6 +170,7 @@ const editForm = useForm({
   amount_input_mode: 'manual' as AmountInputMode,
   amount: '',
   amount_input_days: '',
+  amount_input_hours: '',
   amount_input_percent: '',
   deduction_date: '',
   deduction_type: 'penalties' as 'penalties' | 'absence' | 'traffic_violation' | 'attestations',
@@ -196,12 +202,23 @@ function grossDailyWageSar(emp: EmployeeOption | undefined): number | null {
   return Math.round((gross / 30) * 1e6) / 1e6
 }
 
+function basicHourlyWageSar(emp: EmployeeOption | undefined): number | null {
+  if (!emp) return null
+  const hourly = emp.basic_hourly_wage
+  if (hourly === null || hourly === undefined) return null
+  const n = Number(hourly)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.round(n * 1e6) / 1e6
+}
+
 function resolvePreviewAmount(
   mode: AmountInputMode,
   basicDaily: number | null,
   grossDaily: number | null,
+  basicHourly: number | null,
   manual: string,
   daysStr: string,
+  hoursStr: string,
   pctStr: string
 ): number | null {
   if (mode === 'manual') {
@@ -232,6 +249,12 @@ function resolvePreviewAmount(
     if (p === null || p <= 0) return null
     return Math.round((p / 100) * grossDaily * 100) / 100
   }
+  if (mode === 'basic_hours') {
+    if (basicHourly == null) return null
+    const h = toNum(hoursStr)
+    if (h === null || h <= 0) return null
+    return Math.round(h * basicHourly * 100) / 100
+  }
   return null
 }
 
@@ -247,8 +270,10 @@ const createAmountPreview = computed(() => {
     createForm.amount_input_mode,
     basicDailyWageSar(emp),
     grossDailyWageSar(emp),
+    basicHourlyWageSar(emp),
     createForm.amount,
     createForm.amount_input_days,
+    createForm.amount_input_hours,
     createForm.amount_input_percent
   )
 })
@@ -265,8 +290,10 @@ const editAmountPreview = computed(() => {
     editForm.amount_input_mode,
     basicDailyWageSar(emp),
     grossDailyWageSar(emp),
+    basicHourlyWageSar(emp),
     editForm.amount,
     editForm.amount_input_days,
+    editForm.amount_input_hours,
     editForm.amount_input_percent
   )
 })
@@ -290,6 +317,10 @@ const needsGrossForEdit = computed(
   () => editForm.amount_input_mode === 'gross_days' || editForm.amount_input_mode === 'gross_daily_percent'
 )
 const hasGrossForEdit = computed(() => grossDailyWageSar(editSelectedEmployee.value) != null)
+const needsHourlyForCreate = computed(() => createForm.amount_input_mode === 'basic_hours')
+const hasHourlyForCreate = computed(() => basicHourlyWageSar(createSelectedEmployee.value) != null)
+const needsHourlyForEdit = computed(() => editForm.amount_input_mode === 'basic_hours')
+const hasHourlyForEdit = computed(() => basicHourlyWageSar(editSelectedEmployee.value) != null)
 
 function openEditModal(row: ManualDeduction) {
   selectedDeduction.value = row
@@ -299,10 +330,17 @@ function openEditModal(row: ManualDeduction) {
   if (mode === 'manual') {
     editForm.amount = String(row.amount)
     editForm.amount_input_days = ''
+    editForm.amount_input_hours = ''
+    editForm.amount_input_percent = ''
+  } else if (mode === 'basic_hours') {
+    editForm.amount = ''
+    editForm.amount_input_days = ''
+    editForm.amount_input_hours = row.amount_input_hours != null ? String(row.amount_input_hours) : ''
     editForm.amount_input_percent = ''
   } else {
     editForm.amount = ''
     editForm.amount_input_days = row.amount_input_days != null ? String(row.amount_input_days) : ''
+    editForm.amount_input_hours = ''
     editForm.amount_input_percent = row.amount_input_percent != null ? String(row.amount_input_percent) : ''
   }
   editForm.deduction_date = row.date
@@ -715,6 +753,7 @@ function deductionTypeLabel(type: string) {
               <option value="gross_daily_percent">
                 {{ t('attendance.deduction_mode_gross_daily_percent') }}
               </option>
+              <option value="basic_hours">{{ t('attendance.deduction_mode_basic_hours') }}</option>
             </select>
           </div>
           <div
@@ -728,6 +767,12 @@ function deductionTypeLabel(type: string) {
             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
           >
             {{ t('attendance.deduction_gross_salary_unavailable') }}
+          </div>
+          <div
+            v-if="needsHourlyForCreate && createForm.employee_id && !hasHourlyForCreate"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_hourly_rate_unavailable') }}
           </div>
           <div v-if="createForm.amount_input_mode === 'manual'">
             <Label for="create-amount">{{ t('attendance.deduction_amount') }}</Label>
@@ -799,6 +844,24 @@ function deductionTypeLabel(type: string) {
             />
             <p v-if="createForm.errors.amount_input_percent" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.amount_input_percent }}
+            </p>
+            <p v-if="createForm.errors.amount" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount }}
+            </p>
+          </div>
+          <div v-else-if="createForm.amount_input_mode === 'basic_hours'">
+            <Label for="create-input-hours">{{ t('attendance.deduction_input_hours') }}</Label>
+            <Input
+              id="create-input-hours"
+              v-model="createForm.amount_input_hours"
+              type="number"
+              step="any"
+              min="0.01"
+              class="mt-1"
+              :required="createForm.amount_input_mode === 'basic_hours'"
+            />
+            <p v-if="createForm.errors.amount_input_hours" class="text-sm text-red-500 mt-1">
+              {{ createForm.errors.amount_input_hours }}
             </p>
             <p v-if="createForm.errors.amount" class="text-sm text-red-500 mt-1">
               {{ createForm.errors.amount }}
@@ -899,6 +962,7 @@ function deductionTypeLabel(type: string) {
               <option value="gross_daily_percent">
                 {{ t('attendance.deduction_mode_gross_daily_percent') }}
               </option>
+              <option value="basic_hours">{{ t('attendance.deduction_mode_basic_hours') }}</option>
             </select>
           </div>
           <div
@@ -912,6 +976,12 @@ function deductionTypeLabel(type: string) {
             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
           >
             {{ t('attendance.deduction_gross_salary_unavailable') }}
+          </div>
+          <div
+            v-if="needsHourlyForEdit && !hasHourlyForEdit"
+            class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            {{ t('attendance.deduction_hourly_rate_unavailable') }}
           </div>
           <div v-if="editForm.amount_input_mode === 'manual'">
             <Label for="edit-amount">{{ t('attendance.deduction_amount') }}</Label>
@@ -970,6 +1040,21 @@ function deductionTypeLabel(type: string) {
             />
             <p v-if="editForm.errors.amount_input_percent" class="text-sm text-red-500 mt-1">
               {{ editForm.errors.amount_input_percent }}
+            </p>
+            <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
+          </div>
+          <div v-else-if="editForm.amount_input_mode === 'basic_hours'">
+            <Label for="edit-input-hours">{{ t('attendance.deduction_input_hours') }}</Label>
+            <Input
+              id="edit-input-hours"
+              v-model="editForm.amount_input_hours"
+              type="number"
+              step="any"
+              min="0.01"
+              class="mt-1"
+            />
+            <p v-if="editForm.errors.amount_input_hours" class="text-sm text-red-500 mt-1">
+              {{ editForm.errors.amount_input_hours }}
             </p>
             <p v-if="editForm.errors.amount" class="text-sm text-red-500 mt-1">{{ editForm.errors.amount }}</p>
           </div>

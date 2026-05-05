@@ -22,12 +22,15 @@ class ManualDeductionAmountService
 
     public const INPUT_GROSS_DAILY_PERCENT = 'gross_daily_percent';
 
+    public const INPUT_BASIC_HOURS = 'basic_hours';
+
     public const INPUT_MODES = [
         self::INPUT_MANUAL,
         self::INPUT_BASIC_DAYS,
         self::INPUT_BASIC_DAILY_PERCENT,
         self::INPUT_GROSS_DAYS,
         self::INPUT_GROSS_DAILY_PERCENT,
+        self::INPUT_BASIC_HOURS,
     ];
 
     public function hasValidBasicSalary(Employee $employee): bool
@@ -74,12 +77,44 @@ class ManualDeductionAmountService
         return round($this->grossMonthly($employee) / 30, 8);
     }
 
+    /**
+     * Basic hourly wage using the same minute-rate convention as AttendancePenaltyService:
+     * basic_salary / (work_days_per_month × average_work_minutes_per_day) × 60.
+     */
+    public function basicHourlyWage(Employee $employee): ?float
+    {
+        if (! $this->hasValidBasicSalary($employee)) {
+            return null;
+        }
+
+        $employee->loadMissing('shift.workdays');
+        if (! $employee->shift) {
+            return null;
+        }
+
+        $workDaysPerWeek = $employee->shift->workdays()->where('is_workday', true)->count();
+        if ($workDaysPerWeek <= 0) {
+            return null;
+        }
+
+        $averageWorkMinutesPerDay = $employee->shift->averageWorkMinutesPerWorkday();
+        if ($averageWorkMinutesPerDay === null || $averageWorkMinutesPerDay <= 0) {
+            return null;
+        }
+
+        $workDaysPerMonth = $workDaysPerWeek * (30 / 7);
+        $minuteRate = (float) $employee->basic_salary / ($workDaysPerMonth * $averageWorkMinutesPerDay);
+
+        return round($minuteRate * 60, 8);
+    }
+
     public function resolveAmount(
         Employee $employee,
         string $mode,
         ?float $manualAmount,
         ?float $days,
-        ?float $percent
+        ?float $percent,
+        ?float $hours
     ): ?float {
         return match ($mode) {
             self::INPUT_MANUAL => $manualAmount !== null
@@ -89,6 +124,7 @@ class ManualDeductionAmountService
             self::INPUT_BASIC_DAILY_PERCENT => $this->fromBasicDailyPercent($employee, $percent),
             self::INPUT_GROSS_DAYS => $this->fromGrossDays($employee, $days),
             self::INPUT_GROSS_DAILY_PERCENT => $this->fromGrossDailyPercent($employee, $percent),
+            self::INPUT_BASIC_HOURS => $this->fromBasicHours($employee, $hours),
             default => null,
         };
     }
@@ -143,5 +179,19 @@ class ManualDeductionAmountService
         }
 
         return round(($percent / 100) * $daily, 2);
+    }
+
+    public function fromBasicHours(Employee $employee, ?float $hours): ?float
+    {
+        if ($hours === null || $hours <= 0) {
+            return null;
+        }
+
+        $hourly = $this->basicHourlyWage($employee);
+        if ($hourly === null) {
+            return null;
+        }
+
+        return round($hours * $hourly, 2);
     }
 }

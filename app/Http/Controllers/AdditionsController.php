@@ -152,7 +152,8 @@ class AdditionsController extends Controller
             $mode,
             isset($validated['amount']) && $validated['amount'] !== null ? (float) $validated['amount'] : null,
             isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null ? (float) $validated['amount_input_days'] : null,
-            isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null ? (float) $validated['amount_input_percent'] : null
+            isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null ? (float) $validated['amount_input_percent'] : null,
+            null
         );
 
         if ($resolved === null || $resolved < 0.01) {
@@ -242,7 +243,8 @@ class AdditionsController extends Controller
             $mode,
             isset($validated['amount']) && $validated['amount'] !== null ? (float) $validated['amount'] : null,
             isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null ? (float) $validated['amount_input_days'] : null,
-            isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null ? (float) $validated['amount_input_percent'] : null
+            isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null ? (float) $validated['amount_input_percent'] : null,
+            null
         );
 
         if ($resolved === null || $resolved < 0.01) {

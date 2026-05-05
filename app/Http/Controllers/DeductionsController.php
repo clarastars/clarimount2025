@@ -53,10 +53,21 @@ class DeductionsController extends Controller
         $end = $range['end'];
 
         $employees = Employee::query()
+            ->with('shift.workdays')
             ->where('company_id', $company->id)
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'basic_salary', 'allowances']);
+            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'shift_id', 'basic_salary', 'allowances'])
+            ->map(fn (Employee $employee) => [
+                'id' => $employee->id,
+                'first_name' => $employee->first_name,
+                'last_name' => $employee->last_name,
+                'employee_id' => $employee->employee_id,
+                'company_id' => $employee->company_id,
+                'basic_salary' => $employee->basic_salary,
+                'allowances' => $employee->allowances,
+                'basic_hourly_wage' => $this->manualDeductionAmountService->basicHourlyWage($employee),
+            ]);
 
         $approvedPenaltiesQuery = AttendancePenalty::query()
             ->approved()
@@ -114,6 +125,7 @@ class DeductionsController extends Controller
                 'amount' => (float) $d->amount,
                 'amount_input_mode' => $d->amount_input_mode ?? ManualDeductionAmountService::INPUT_MANUAL,
                 'amount_input_days' => $d->amount_input_days !== null ? (float) $d->amount_input_days : null,
+                'amount_input_hours' => $d->amount_input_hours !== null ? (float) $d->amount_input_hours : null,
                 'amount_input_percent' => $d->amount_input_percent !== null ? (float) $d->amount_input_percent : null,
                 'deduction_type' => $d->deduction_type,
                 'reason' => $d->reason,
@@ -154,6 +166,13 @@ class DeductionsController extends Controller
                 'min:0.01',
                 'max:365',
             ],
+            'amount_input_hours' => [
+                Rule::requiredIf(fn () => (string) $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_HOURS),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:744',
+            ],
             'amount_input_percent' => [
                 Rule::requiredIf(fn () => in_array(
                     (string) $request->input('amount_input_mode'),
@@ -191,11 +210,20 @@ class DeductionsController extends Controller
                 ->withInput()
                 ->withErrors(['amount' => __('messages.attendance.deduction_gross_salary_required')]);
         }
+        if ($mode === ManualDeductionAmountService::INPUT_BASIC_HOURS
+            && $this->manualDeductionAmountService->basicHourlyWage($employee) === null) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_hourly_rate_unavailable')]);
+        }
 
         $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
             ? (float) $validated['amount'] : null;
         $days = isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null
             ? (float) $validated['amount_input_days'] : null;
+        $hours = isset($validated['amount_input_hours']) && $validated['amount_input_hours'] !== null
+            ? (float) $validated['amount_input_hours'] : null;
         $percent = isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null
             ? (float) $validated['amount_input_percent'] : null;
 
@@ -204,7 +232,8 @@ class DeductionsController extends Controller
             $mode,
             $manualAmount,
             $days,
-            $percent
+            $percent,
+            $hours
         );
 
         if ($resolved === null || $resolved < 0.01) {
@@ -223,6 +252,7 @@ class DeductionsController extends Controller
                 [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
                 true
             ) ? $days : null,
+            'amount_input_hours' => $mode === ManualDeductionAmountService::INPUT_BASIC_HOURS ? $hours : null,
             'amount_input_percent' => in_array(
                 $mode,
                 [ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT],
@@ -270,6 +300,13 @@ class DeductionsController extends Controller
                 'min:0.01',
                 'max:365',
             ],
+            'amount_input_hours' => [
+                Rule::requiredIf(fn () => (string) $request->input('amount_input_mode') === ManualDeductionAmountService::INPUT_BASIC_HOURS),
+                'nullable',
+                'numeric',
+                'min:0.01',
+                'max:744',
+            ],
             'amount_input_percent' => [
                 Rule::requiredIf(fn () => in_array(
                     (string) $request->input('amount_input_mode'),
@@ -310,11 +347,20 @@ class DeductionsController extends Controller
                 ->withInput()
                 ->withErrors(['amount' => __('messages.attendance.deduction_gross_salary_required')]);
         }
+        if ($mode === ManualDeductionAmountService::INPUT_BASIC_HOURS
+            && $this->manualDeductionAmountService->basicHourlyWage($employee) === null) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['amount' => __('messages.attendance.deduction_hourly_rate_unavailable')]);
+        }
 
         $manualAmount = isset($validated['amount']) && $validated['amount'] !== null
             ? (float) $validated['amount'] : null;
         $days = isset($validated['amount_input_days']) && $validated['amount_input_days'] !== null
             ? (float) $validated['amount_input_days'] : null;
+        $hours = isset($validated['amount_input_hours']) && $validated['amount_input_hours'] !== null
+            ? (float) $validated['amount_input_hours'] : null;
         $percent = isset($validated['amount_input_percent']) && $validated['amount_input_percent'] !== null
             ? (float) $validated['amount_input_percent'] : null;
 
@@ -323,7 +369,8 @@ class DeductionsController extends Controller
             $mode,
             $manualAmount,
             $days,
-            $percent
+            $percent,
+            $hours
         );
 
         if ($resolved === null || $resolved < 0.01) {
@@ -341,6 +388,7 @@ class DeductionsController extends Controller
                 [ManualDeductionAmountService::INPUT_BASIC_DAYS, ManualDeductionAmountService::INPUT_GROSS_DAYS],
                 true
             ) ? $days : null,
+            'amount_input_hours' => $mode === ManualDeductionAmountService::INPUT_BASIC_HOURS ? $hours : null,
             'amount_input_percent' => in_array(
                 $mode,
                 [ManualDeductionAmountService::INPUT_BASIC_DAILY_PERCENT, ManualDeductionAmountService::INPUT_GROSS_DAILY_PERCENT],
