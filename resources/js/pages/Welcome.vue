@@ -18,10 +18,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head :title="t('auth.welcome')">
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-    </Head>
+    <Head :title="t('auth.welcome')" />
 
     <!-- Off-white background for entire page -->
     <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -134,14 +131,5 @@ const submit = () => {
 
 [dir="rtl"] .text-right {
     text-align: left;
-}
-
-/* Ensure proper font rendering for Arabic */
-body {
-    font-family: 'Inter', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
-}
-
-[dir="rtl"] body {
-    font-family: 'Inter', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
 }
 </style>

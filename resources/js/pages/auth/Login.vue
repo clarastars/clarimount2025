@@ -18,10 +18,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head :title="t('auth.welcome')">
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
-    </Head>
+    <Head :title="t('auth.welcome')" />
 
     <div class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-10 sm:px-6 lg:px-8">
         <div class="mx-auto flex min-h-[85vh] w-full max-w-xl items-center justify-center">
@@ -97,14 +94,5 @@ const submit = () => {
 
 [dir="rtl"] .text-right {
     text-align: left;
-}
-
-/* Ensure proper font rendering for Arabic */
-body {
-    font-family: 'Inter', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
-}
-
-[dir="rtl"] body {
-    font-family: 'Inter', 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
 }
 </style>
