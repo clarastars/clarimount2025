@@ -2,10 +2,10 @@
 
 @import 'tw-animate-css';
 
-/* Tajawal — files in public/assets/fonts (served as /assets/fonts/…) */
+/* Tajawal — place files under public/fonts (served as /fonts/...) */
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-ExtraLight.ttf') format('truetype');
+    src: url('/fonts/Tajawal-ExtraLight.ttf') format('truetype');
     font-weight: 200;
     font-style: normal;
     font-display: swap;
@@ -13,7 +13,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-Light.ttf') format('truetype');
+    src: url('/fonts/Tajawal-Light.ttf') format('truetype');
     font-weight: 300;
     font-style: normal;
     font-display: swap;
@@ -21,7 +21,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-Regular.ttf') format('truetype');
+    src: url('/fonts/Tajawal-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -29,7 +29,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-Medium.ttf') format('truetype');
+    src: url('/fonts/Tajawal-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -37,7 +37,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-Bold.ttf') format('truetype');
+    src: url('/fonts/Tajawal-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -45,7 +45,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-ExtraBold.ttf') format('truetype');
+    src: url('/fonts/Tajawal-ExtraBold.ttf') format('truetype');
     font-weight: 800;
     font-style: normal;
     font-display: swap;
@@ -53,7 +53,7 @@
 
 @font-face {
     font-family: 'Tajawal';
-    src: url('/assets/fonts/Tajawal-Black.ttf') format('truetype');
+    src: url('/fonts/Tajawal-Black.ttf') format('truetype');
     font-weight: 900;
     font-style: normal;
     font-display: swap;
