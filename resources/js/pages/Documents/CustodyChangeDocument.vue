@@ -26,7 +26,7 @@
                 <div class="p-8 print:p-4">
                     <!-- Company Info -->
                     <div class="text-center mb-6">
-                        <h2>مجموعة فهد نواف الزير التجارة</h2>
+                        <h2>{{ companyName }}</h2>
                     </div>
 
                     <!-- Header -->
@@ -225,6 +225,24 @@ const departmentName = computed(() => {
         return props.employee.department;
     }
     
+    return t('custody.na');
+});
+
+const companyName = computed(() => {
+    if (!props.employee.company) {
+        return t('custody.na');
+    }
+
+    if (typeof props.employee.company === 'object') {
+        return locale.value === 'ar'
+            ? (props.employee.company.name_ar || props.employee.company.name_en || t('custody.na'))
+            : (props.employee.company.name_en || props.employee.company.name_ar || t('custody.na'));
+    }
+
+    if (typeof props.employee.company === 'string') {
+        return props.employee.company;
+    }
+
     return t('custody.na');
 });
 
