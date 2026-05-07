@@ -175,160 +175,163 @@
                                         <div v-if="form.errors.work_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.work_phone || "") }}</div>
                                     </div>
 
-                                    <!-- Location -->
-                                    <div>
-                                        <Label for="location_id" class="mb-2">{{ t('employees.location') }}</Label>
-                                        <select 
-                                            id="location_id"
-                                            v-model="form.location_id"
-                                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <option value="">{{ t('employees.select_location') }}</option>
-                                            <option v-for="location in locations" :key="location.id" :value="location.id">
-                                                {{ location.display_name || `${location.code}: ${location.name}` }}
-                                            </option>
-                                        </select>
-                                        <div v-if="form.errors.location_id" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.location_id || "") }}</div>
-                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
 
                 <Card v-if="props.canManagePortalAccount">
-                    <CardHeader class="cursor-pointer hover:bg-gray-50">
-                        <div class="flex items-center gap-3">
-                            <Icon name="KeyRound" class="h-5 w-5 text-violet-600" />
-                            <CardTitle class="text-xl">{{ t('employees.employee_account') }}</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="space-y-6">
-                        <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                            {{ t('employees.employee_account_email_hint') }}:
-                            <span class="font-medium text-foreground">{{ form.work_email || props.portalAccount?.email || '-' }}</span>
-                        </div>
+                    <Collapsible v-model:open="sectionEmployeeAccount">
+                        <CollapsibleTrigger asChild>
+                            <CardHeader class="cursor-pointer hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <Icon name="KeyRound" class="h-5 w-5 text-violet-600" />
+                                        <CardTitle class="text-xl">{{ t('employees.employee_account') }}</CardTitle>
+                                    </div>
+                                    <Icon :name="!sectionEmployeeAccount ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
+                                </div>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent class="space-y-6">
+                                <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                                    {{ t('employees.employee_account_email_hint') }}:
+                                    <span class="font-medium text-foreground">{{ form.work_email || props.portalAccount?.email || '-' }}</span>
+                                </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <Label for="portal_password" class="mb-2">{{ t('employees.portal_password') }}</Label>
-                                <div class="relative">
-                                    <Input
-                                        id="portal_password"
-                                        v-model="form.portal_password"
-                                        :type="showPortalPassword ? 'text' : 'password'"
-                                        autocomplete="new-password"
-                                        :placeholder="t('employees.portal_password_placeholder')"
-                                        :class="[
-                                            'pr-20',
-                                            form.errors.portal_password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
-                                        ]"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
-                                        :aria-label="showPortalPassword ? t('employees.hide_password') : t('employees.show_password')"
-                                        @click="showPortalPassword = !showPortalPassword"
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <Label for="portal_password" class="mb-2">{{ t('employees.portal_password') }}</Label>
+                                        <div class="relative">
+                                            <Input
+                                                id="portal_password"
+                                                v-model="form.portal_password"
+                                                :type="showPortalPassword ? 'text' : 'password'"
+                                                autocomplete="new-password"
+                                                :placeholder="t('employees.portal_password_placeholder')"
+                                                :class="[
+                                                    'pr-20',
+                                                    form.errors.portal_password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
+                                                ]"
+                                            />
+                                            <button
+                                                type="button"
+                                                class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
+                                                :aria-label="showPortalPassword ? t('employees.hide_password') : t('employees.show_password')"
+                                                @click="showPortalPassword = !showPortalPassword"
+                                            >
+                                                <Icon :name="showPortalPassword ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        <div v-if="form.errors.portal_password" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                            <Icon name="AlertCircle" class="h-4 w-4" />
+                                            {{ translateValidationError(form.errors.portal_password || "") }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <Label for="portal_password_confirmation" class="mb-2">{{ t('employees.portal_password_confirmation') }}</Label>
+                                        <div class="relative">
+                                            <Input
+                                                id="portal_password_confirmation"
+                                                v-model="form.portal_password_confirmation"
+                                                :type="showPortalPasswordConfirmation ? 'text' : 'password'"
+                                                autocomplete="new-password"
+                                                :placeholder="t('employees.portal_password_confirmation_placeholder')"
+                                                class="pr-20"
+                                            />
+                                            <button
+                                                type="button"
+                                                class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
+                                                :aria-label="showPortalPasswordConfirmation ? t('employees.hide_password') : t('employees.show_password')"
+                                                @click="showPortalPasswordConfirmation = !showPortalPasswordConfirmation"
+                                            >
+                                                <Icon :name="showPortalPasswordConfirmation ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                    <input
+                                        v-model="form.portal_password_reset"
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                     >
-                                        <Icon :name="showPortalPassword ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
-                                    </button>
-                                </div>
-                                <div v-if="form.errors.portal_password" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                    <Icon name="AlertCircle" class="h-4 w-4" />
-                                    {{ translateValidationError(form.errors.portal_password || "") }}
-                                </div>
-                            </div>
-
-                            <div>
-                                <Label for="portal_password_confirmation" class="mb-2">{{ t('employees.portal_password_confirmation') }}</Label>
-                                <div class="relative">
-                                    <Input
-                                        id="portal_password_confirmation"
-                                        v-model="form.portal_password_confirmation"
-                                        :type="showPortalPasswordConfirmation ? 'text' : 'password'"
-                                        autocomplete="new-password"
-                                        :placeholder="t('employees.portal_password_confirmation_placeholder')"
-                                        class="pr-20"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="absolute inset-y-0 right-2 text-muted-foreground hover:text-foreground"
-                                        :aria-label="showPortalPasswordConfirmation ? t('employees.hide_password') : t('employees.show_password')"
-                                        @click="showPortalPasswordConfirmation = !showPortalPasswordConfirmation"
-                                    >
-                                        <Icon :name="showPortalPasswordConfirmation ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                            <input
-                                v-model="form.portal_password_reset"
-                                type="checkbox"
-                                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            >
-                            <span>{{ t('employees.portal_password_reset') }}</span>
-                        </label>
-                    </CardContent>
+                                    <span>{{ t('employees.portal_password_reset') }}</span>
+                                </label>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </Card>
 
                 <Card v-if="props.canManagePortalAccount">
-                    <CardHeader class="cursor-pointer hover:bg-gray-50">
-                        <div class="flex items-center gap-3">
-                            <Icon name="Users" class="h-5 w-5 text-emerald-600" />
-                            <CardTitle class="text-xl">{{ t('settings.permissions_teams') }}</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <div
-                            v-if="!props.portalAccount?.exists"
-                            class="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
-                        >
-                            <template v-if="form.work_email || form.personal_email">
-                                لا يوجد حساب بوابة حاليًا لهذا الموظف. سيتم إنشاء الحساب تلقائيًا عند الحفظ.
-                            </template>
-                            <template v-else>
-                                لإتاحة إنشاء حساب بوابة للموظف، أدخل بريد العمل أو البريد الشخصي أولًا ثم احفظ.
-                            </template>
-                        </div>
-
-                        <div>
-                            <Label for="team_id" class="mb-2">{{ t('settings.assign_employee_team') }}</Label>
-                            <select
-                                id="team_id"
-                                v-model="form.team_id"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            >
-                                <option :value="null">{{ t('settings.no_team') }}</option>
-                                <option v-for="team in (props.availableTeams || [])" :key="team.id" :value="team.id">
-                                    {{ team.name }}
-                                </option>
-                            </select>
-                            <div v-if="form.errors.team_id" class="text-red-500 text-sm mt-1">{{ form.errors.team_id }}</div>
-                        </div>
-
-                        <div class="space-y-2">
-                            <Label>{{ t('companies.title') }}</Label>
-                            <p class="text-xs text-muted-foreground">
-                                حدد الشركات المسموح للموظف الوصول لها عبر دوره.
-                            </p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
-                                <label
-                                    v-for="company in (props.roleCompanies || [])"
-                                    :key="company.id"
-                                    class="flex items-center gap-2 text-sm"
+                    <Collapsible v-model:open="sectionPermissionsTeams">
+                        <CollapsibleTrigger asChild>
+                            <CardHeader class="cursor-pointer hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <Icon name="Users" class="h-5 w-5 text-emerald-600" />
+                                        <CardTitle class="text-xl">{{ t('settings.permissions_teams') }}</CardTitle>
+                                    </div>
+                                    <Icon :name="!sectionPermissionsTeams ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
+                                </div>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent class="space-y-4">
+                                <div
+                                    v-if="!props.portalAccount?.exists"
+                                    class="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
                                 >
-                                    <input
-                                        v-model="form.role_company_ids"
-                                        :value="company.id"
-                                        type="checkbox"
-                                        class="h-4 w-4 rounded border-gray-300"
+                                    <template v-if="form.work_email || form.personal_email">
+                                        لا يوجد حساب بوابة حاليًا لهذا الموظف. سيتم إنشاء الحساب تلقائيًا عند الحفظ.
+                                    </template>
+                                    <template v-else>
+                                        لإتاحة إنشاء حساب بوابة للموظف، أدخل بريد العمل أو البريد الشخصي أولًا ثم احفظ.
+                                    </template>
+                                </div>
+
+                                <div>
+                                    <Label for="team_id" class="mb-2">{{ t('settings.assign_employee_team') }}</Label>
+                                    <select
+                                        id="team_id"
+                                        v-model="form.team_id"
+                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                     >
-                                    <span>{{ company.name }}</span>
-                                </label>
-                            </div>
-                            <div v-if="form.errors.role_company_ids" class="text-red-500 text-sm mt-1">{{ form.errors.role_company_ids }}</div>
-                        </div>
-                    </CardContent>
+                                        <option :value="null">{{ t('settings.no_team') }}</option>
+                                        <option v-for="team in (props.availableTeams || [])" :key="team.id" :value="team.id">
+                                            {{ team.name }}
+                                        </option>
+                                    </select>
+                                    <div v-if="form.errors.team_id" class="text-red-500 text-sm mt-1">{{ form.errors.team_id }}</div>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <Label>{{ t('companies.title') }}</Label>
+                                    <p class="text-xs text-muted-foreground">
+                                        حدد الشركات المسموح للموظف الوصول لها عبر دوره.
+                                    </p>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
+                                        <label
+                                            v-for="company in (props.roleCompanies || [])"
+                                            :key="company.id"
+                                            class="flex items-center gap-2 text-sm"
+                                        >
+                                            <input
+                                                v-model="form.role_company_ids"
+                                                :value="company.id"
+                                                type="checkbox"
+                                                class="h-4 w-4 rounded border-gray-300"
+                                            >
+                                            <span>{{ company.name }}</span>
+                                        </label>
+                                    </div>
+                                    <div v-if="form.errors.role_company_ids" class="text-red-500 text-sm mt-1">{{ form.errors.role_company_ids }}</div>
+                                </div>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </Card>
 
                 <!-- Work Details Section -->
@@ -586,30 +589,37 @@
 
                 <!-- Annual Leave Section -->
                 <Card>
-                    <CardHeader class="cursor-pointer hover:bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <Icon name="Calendar" class="h-5 w-5 text-amber-600" />
-                                <CardTitle class="text-xl">{{ t('leaves.annual_leave_section') }}</CardTitle>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div>
-                                <Label for="annual_leave_balance" class="mb-2">{{ t('leaves.annual_leave_balance') }}</Label>
-                                <Input
-                                    id="annual_leave_balance"
-                                    v-model.number="form.annual_leave_balance"
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    :placeholder="t('leaves.annual_leave_balance_placeholder')"
-                                />
-                                <div v-if="form.errors.annual_leave_balance" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.annual_leave_balance || "") }}</div>
-                            </div>
-                        </div>
-                    </CardContent>
+                    <Collapsible v-model:open="sectionAnnualLeave">
+                        <CollapsibleTrigger asChild>
+                            <CardHeader class="cursor-pointer hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <Icon name="Calendar" class="h-5 w-5 text-amber-600" />
+                                        <CardTitle class="text-xl">{{ t('leaves.annual_leave_section') }}</CardTitle>
+                                    </div>
+                                    <Icon :name="!sectionAnnualLeave ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
+                                </div>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div>
+                                        <Label for="annual_leave_balance" class="mb-2">{{ t('leaves.annual_leave_balance') }}</Label>
+                                        <Input
+                                            id="annual_leave_balance"
+                                            v-model.number="form.annual_leave_balance"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            :placeholder="t('leaves.annual_leave_balance_placeholder')"
+                                        />
+                                        <div v-if="form.errors.annual_leave_balance" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.annual_leave_balance || "") }}</div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </Card>
 
                 <!-- Legal Information Section -->
@@ -920,6 +930,28 @@
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <CardContent class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <Label for="emergency_contact_name" class="mb-2">{{ t('employees.emergency_contact_name') }}</Label>
+                                        <Input id="emergency_contact_name" v-model="form.emergency_contact_name" type="text" />
+                                        <div v-if="form.errors.emergency_contact_name" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_name || "") }}</div>
+                                    </div>
+                                    <div>
+                                        <Label for="emergency_contact_phone" class="mb-2">{{ t('employees.emergency_contact_phone') }}</Label>
+                                        <Input id="emergency_contact_phone" v-model="form.emergency_contact_phone" type="text" />
+                                        <div v-if="form.errors.emergency_contact_phone" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_phone || "") }}</div>
+                                    </div>
+                                    <div>
+                                        <Label for="emergency_contact_email" class="mb-2">{{ t('employees.emergency_contact_email') }}</Label>
+                                        <Input id="emergency_contact_email" v-model="form.emergency_contact_email" type="email" />
+                                        <div v-if="form.errors.emergency_contact_email" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_email || "") }}</div>
+                                    </div>
+                                    <div>
+                                        <Label for="emergency_contact_address" class="mb-2">{{ t('employees.emergency_contact_address') }}</Label>
+                                        <Input id="emergency_contact_address" v-model="form.emergency_contact_address" type="text" />
+                                        <div v-if="form.errors.emergency_contact_address" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.emergency_contact_address || "") }}</div>
+                                    </div>
+                                </div>
                                 <div>
                                     <Label for="notes" class="mb-2">{{ t('employees.notes') }}</Label>
                                     <textarea 
@@ -1077,7 +1109,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/Icon.vue';
-import type { Employee, Department, Company, Location, BreadcrumbItem } from '@/types';
+import type { Employee, Department, Company, BreadcrumbItem } from '@/types';
 
 const { t } = useI18n();
 const page = usePage();
@@ -1101,7 +1133,6 @@ interface Props {
     countries: Country[];
     nationalities: Nationality[];
     defaultResidenceCountryId?: number;
-    locations: Location[];
     departments: Department[];
     shifts?: any[];
     canManagePortalAccount?: boolean;
@@ -1161,8 +1192,7 @@ const form = useForm({
     work_email: props.employee.work_email || '',
     personal_phone: props.employee.personal_phone || '',
     work_phone: props.employee.work_phone || '',
-    location_id: props.employee.location_id || null as number | null,
-    
+
     // Work Details
     company_id: props.employee.company_id || props.defaultCompanyId || null,
     employment_date: dateToInputValue(props.employee.employment_date),
@@ -1209,6 +1239,10 @@ const form = useForm({
     additional_approver_3: props.employee.additional_approver_3 || '',
     
     // Additional Information
+    emergency_contact_name: props.employee.emergency_contact_name || '',
+    emergency_contact_phone: props.employee.emergency_contact_phone || '',
+    emergency_contact_email: props.employee.emergency_contact_email || '',
+    emergency_contact_address: props.employee.emergency_contact_address || '',
     notes: props.employee.notes || '',
 
     // Employee Account (super-admin only)
@@ -1235,7 +1269,10 @@ watch(allowanceDetailFields, () => {
 
 // Section collapse states
 const sectionGeneral = ref(true)
+const sectionEmployeeAccount = ref(true)
+const sectionPermissionsTeams = ref(true)
 const sectionWork = ref(true)
+const sectionAnnualLeave = ref(false)
 const sectionLegal = ref(false)
 const sectionInsurance = ref(false)
 const sectionEmployment = ref(false)

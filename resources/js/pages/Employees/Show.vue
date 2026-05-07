@@ -25,20 +25,6 @@
                 </Card>
 
                 <Card class="border-border/60 shadow-sm">
-                    <CardHeader><CardTitle>{{ t('settings.permissions_teams') }}</CardTitle></CardHeader>
-                    <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label class="text-sm text-muted-foreground">{{ t('employees.employee_account') }}</Label>
-                            <p>{{ props.portalAccount?.exists ? displayValue(props.portalAccount?.email) : '-' }}</p>
-                        </div>
-                        <div>
-                            <Label class="text-sm text-muted-foreground">{{ t('settings.assign_employee_team') }}</Label>
-                            <p>{{ displayValue(props.assignedTeamName, t('settings.no_team')) }}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('employees.general_information') }}</CardTitle></CardHeader>
                     <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.employee_id') }}</Label><p>{{ displayValue(employee.employee_id) }}</p></div>
@@ -50,8 +36,22 @@
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.birth_date') }}</Label><p>{{ displayDate(employee.birth_date) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.work_email') }}</Label><p>{{ displayValue(employee.work_email) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.personal_email') }}</Label><p>{{ displayValue(employee.personal_email) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">رقم الجوال الشخصي</Label><p>{{ displayValue(employee.personal_phone) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">رقم جوال العمل</Label><p>{{ displayValue(employee.work_phone) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.personal_phone') }}</Label><p>{{ displayValue(employee.personal_phone) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.work_phone') }}</Label><p>{{ displayValue(employee.work_phone) }}</p></div>
+                    </CardContent>
+                </Card>
+
+                <Card class="border-border/60 shadow-sm">
+                    <CardHeader><CardTitle>{{ t('settings.permissions_teams') }}</CardTitle></CardHeader>
+                    <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('employees.employee_account') }}</Label>
+                            <p>{{ props.portalAccount?.exists ? displayValue(props.portalAccount?.email) : '-' }}</p>
+                        </div>
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('settings.assign_employee_team') }}</Label>
+                            <p>{{ displayValue(props.assignedTeamName, t('settings.no_team')) }}</p>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -68,6 +68,11 @@
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.job_title') }}</Label><p>{{ displayValue(employee.job_title) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.basic_salary') }}</Label><p>{{ displayCurrency(employee.basic_salary) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowances') }}</Label><p>{{ displayCurrency(employee.allowances) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowance_housing') }}</Label><p>{{ displayCurrency(employee.allowance_housing) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowance_transportation') }}</Label><p>{{ displayCurrency(employee.allowance_transportation) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowance_other') }}</Label><p>{{ displayCurrency(employee.allowance_other) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowance_food') }}</Label><p>{{ displayCurrency(employee.allowance_food) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.allowance_personal_car') }}</Label><p>{{ displayCurrency(employee.allowance_personal_car) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.social_insurance_deduction_rate') }}</Label><p>{{ employee.social_insurance_deduction_rate !== null && employee.social_insurance_deduction_rate !== undefined && employee.social_insurance_deduction_rate !== '' ? `${employee.social_insurance_deduction_rate}%` : '-' }}</p></div>
                     </CardContent>
                 </Card>
@@ -124,8 +129,31 @@
                 <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('employees.additional_information') }}</CardTitle></CardHeader>
                     <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div><Label class="text-sm text-muted-foreground">{{ t('employees.emergency_contact_name') }}</Label><p>{{ displayValue(employee.emergency_contact_name) }}</p></div>
+                            <div><Label class="text-sm text-muted-foreground">{{ t('employees.emergency_contact_phone') }}</Label><p>{{ displayValue(employee.emergency_contact_phone) }}</p></div>
+                            <div><Label class="text-sm text-muted-foreground">{{ t('employees.emergency_contact_email') }}</Label><p>{{ displayValue(employee.emergency_contact_email) }}</p></div>
+                            <div><Label class="text-sm text-muted-foreground">{{ t('employees.emergency_contact_address') }}</Label><p>{{ displayValue(employee.emergency_contact_address) }}</p></div>
+                        </div>
                         <Label class="text-sm text-muted-foreground">{{ t('employees.notes') }}</Label>
                         <p>{{ displayValue(employee.notes) }}</p>
+                    </CardContent>
+                </Card>
+
+                <Card class="border-border/60 shadow-sm">
+                    <CardHeader><CardTitle>{{ t('debts.title') }}</CardTitle></CardHeader>
+                    <CardContent>
+                        <div v-if="employee.debts?.length" class="space-y-2">
+                            <div
+                                v-for="debt in employee.debts"
+                                :key="debt.id"
+                                class="flex items-center justify-between rounded-md border p-3"
+                            >
+                                <span>{{ displayValue(debt.debt_type || t('common.optional')) }}</span>
+                                <span class="font-medium">{{ displayCurrency(debt.amount) }}</span>
+                            </div>
+                        </div>
+                        <p v-else class="text-sm text-muted-foreground">{{ t('debts.no_debts') }}</p>
                     </CardContent>
                 </Card>
 
