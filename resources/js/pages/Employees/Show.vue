@@ -59,8 +59,6 @@
                     <CardHeader><CardTitle>{{ t('employees.work_details') }}</CardTitle></CardHeader>
                     <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.company') }}</Label><p>{{ displayValue(employee.company?.name_en || employee.company?.name_ar) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.employment_date') }}</Label><p>{{ displayDate(employee.employment_date) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.probation_end_date') }}</Label><p>{{ displayDate(employee.probation_end_date) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.fingerprint_device_id') }}</Label><p>{{ displayValue(employee.fingerprint_device_id) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.shift') }}</Label><p>{{ displayValue(employee.shift?.name) }}</p></div>
                         <div class="md:col-span-2 lg:col-span-3"><Label class="text-sm text-muted-foreground">{{ t('employees.work_address') }}</Label><p>{{ displayValue(employee.work_address) }}</p></div>
@@ -109,6 +107,7 @@
                     <CardHeader><CardTitle>{{ t('employees.employment_status') }}</CardTitle></CardHeader>
                     <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.hire_date') }}</Label><p>{{ displayDate(employee.hire_date) }}</p></div>
+                        <div><Label class="text-sm text-muted-foreground">{{ t('employees.probation_end_date') }}</Label><p>{{ displayDate(employee.probation_end_date) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.employment_status') }}</Label><p>{{ t(`employees.status_${employee.employment_status}`) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.termination_date') }}</Label><p>{{ displayDate(employee.termination_date) }}</p></div>
                         <div><Label class="text-sm text-muted-foreground">{{ t('employees.departure_date') }}</Label><p>{{ displayDate(employee.departure_date) }}</p></div>

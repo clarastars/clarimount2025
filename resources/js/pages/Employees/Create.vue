@@ -61,7 +61,6 @@ const form = useForm({
     
     // Work Details
     company_id: props.defaultCompanyId || null,
-    employment_date: '',
     probation_end_date: '',
     fingerprint_device_id: '',
     shift_id: null as number | null,
@@ -176,7 +175,7 @@ const selectedDepartment = ref<Department | null>(null)
 const completedSections = computed(() => {
     const sections = {
         general: form.first_name && form.last_name,
-        work: form.job_title || form.department || form.employment_date,
+        work: form.job_title || form.department || form.company_id,
         legal: form.id_number || form.passport_number,
         insurance: form.insurance_policy,
         employment: form.hire_date || form.employment_status,
@@ -260,21 +259,6 @@ const handleDepartmentBlur = () => {
     }, 200)
 }
 
-const setProbationEndDate = (months: number) => {
-    if (!form.employment_date) return
-    
-    const employmentDate = new Date(form.employment_date)
-    const probationEndDate = new Date(employmentDate)
-    probationEndDate.setMonth(probationEndDate.getMonth() + months)
-    
-    // Format to YYYY-MM-DD for the date input
-    const year = probationEndDate.getFullYear()
-    const month = String(probationEndDate.getMonth() + 1).padStart(2, '0')
-    const day = String(probationEndDate.getDate()).padStart(2, '0')
-    
-    form.probation_end_date = `${year}-${month}-${day}`
-}
-
 // Remove the unused toggleSection function since we're using direct refs now
 
 const submit = () => {
@@ -326,8 +310,6 @@ const getFieldLabel = (field: string) => {
             return t('employees.personal_email')
         case 'work_email':
             return t('employees.work_email')
-        case 'employment_date':
-            return t('employees.employment_date')
         case 'probation_end_date':
             return t('employees.probation_end_date')
         case 'job_title':
@@ -999,7 +981,7 @@ const formatCurrency = (amount: number) => {
                                         <Icon name="Briefcase" class="h-5 w-5 text-green-600" />
                                         <CardTitle class="text-xl">{{ t('employees.work_details') }}</CardTitle>
                                         <Badge v-if="completedSections.work" variant="default">✓</Badge>
-                                        <Badge v-if="hasErrorsInSection(['employment_date', 'probation_end_date', 'job_title', 'fingerprint_device_id', 'work_address', 'company_id', 'department_id'])" variant="destructive">!</Badge>
+                                        <Badge v-if="hasErrorsInSection(['job_title', 'fingerprint_device_id', 'work_address', 'company_id', 'department_id'])" variant="destructive">!</Badge>
                                     </div>
                                     <Icon :name="!sectionWork ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
                                 </div>
@@ -1008,66 +990,6 @@ const formatCurrency = (amount: number) => {
                         <CollapsibleContent>
                             <CardContent class="space-y-6">
                                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <!-- Employment Date -->
-                                    <div>
-                                        <Label for="employment_date" class="mb-2">
-                                            {{ t('employees.employment_date') }}
-                                            <span v-if="form.errors.employment_date" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="employment_date"
-                                            v-model="form.employment_date" 
-                                            type="date" 
-                                            :class="form.errors.employment_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.employment_date" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.employment_date || "") }}
-                                        </div>
-                                    </div>
-
-                                    <!-- Probation End Date -->
-                                    <div>
-                                        <Label for="probation_end_date" class="mb-2">
-                                            {{ t('employees.probation_end_date') }}
-                                            <span v-if="form.errors.probation_end_date" class="text-red-500 ml-1">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="probation_end_date"
-                                            v-model="form.probation_end_date" 
-                                            type="date" 
-                                            :class="form.errors.probation_end_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
-                                        />
-                                        <div v-if="form.errors.probation_end_date" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
-                                            <Icon name="AlertCircle" class="h-4 w-4" />
-                                            {{ translateValidationError(form.errors.probation_end_date || "") }}
-                                        </div>
-                                        <div v-if="form.employment_date" class="mt-2 flex gap-2 text-xs">
-                                            <span class="text-gray-500">Quick select:</span>
-                                            <button 
-                                                type="button"
-                                                @click="setProbationEndDate(1)"
-                                                class="text-blue-600 underline hover:text-blue-800"
-                                            >
-                                                1 month
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                @click="setProbationEndDate(2)"
-                                                class="text-blue-600 underline hover:text-blue-800"
-                                            >
-                                                2 months
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                @click="setProbationEndDate(3)"
-                                                class="text-blue-600 underline hover:text-blue-800"
-                                            >
-                                                3 months
-                                            </button>
-                                        </div>
-                                    </div>
-
                                     <!-- Job Title -->
                                     <div>
                                         <Label for="job_title" class="mb-2">
@@ -1575,7 +1497,7 @@ const formatCurrency = (amount: number) => {
                                         <Icon name="Calendar" class="h-5 w-5 text-indigo-600" />
                                         <CardTitle class="text-xl">{{ t('employees.employment_status') }}</CardTitle>
                                         <Badge v-if="completedSections.employment" variant="default">✓</Badge>
-                                        <Badge v-if="hasErrorsInSection(['hire_date', 'employment_status', 'termination_date', 'departure_date', 'departure_reason'])" variant="destructive">!</Badge>
+                                        <Badge v-if="hasErrorsInSection(['hire_date', 'probation_end_date', 'employment_status', 'termination_date', 'departure_date', 'departure_reason'])" variant="destructive">!</Badge>
                                     </div>
                                     <Icon :name="!sectionEmployment ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
                                 </div>
@@ -1623,6 +1545,23 @@ const formatCurrency = (amount: number) => {
                                         <div v-if="form.errors.employment_status" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />
                                             {{ translateValidationError(form.errors.employment_status || "") }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <Label for="probation_end_date" class="mb-2">
+                                            {{ t('employees.probation_end_date') }}
+                                            <span v-if="form.errors.probation_end_date" class="text-red-500 ml-1">*</span>
+                                        </Label>
+                                        <Input
+                                            id="probation_end_date"
+                                            v-model="form.probation_end_date"
+                                            type="date"
+                                            :class="form.errors.probation_end_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''"
+                                        />
+                                        <div v-if="form.errors.probation_end_date" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
+                                            <Icon name="AlertCircle" class="h-4 w-4" />
+                                            {{ translateValidationError(form.errors.probation_end_date || "") }}
                                         </div>
                                     </div>
 

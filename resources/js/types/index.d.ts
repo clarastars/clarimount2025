@@ -133,7 +133,6 @@ export interface Employee {
     additional_approver_2?: string;
     additional_approver_3?: string;
     hire_date?: string;
-    employment_date?: string;
     probation_end_date?: string;
     termination_date?: string;
     departure_date?: string;

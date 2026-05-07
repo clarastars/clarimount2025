@@ -44,7 +44,6 @@ class Employee extends Model
         'additional_approver_2',
         'additional_approver_3',
         'hire_date',
-        'employment_date',
         'probation_end_date',
         'termination_date',
         'departure_date',
@@ -71,7 +70,6 @@ class Employee extends Model
     protected $casts = [
         'settings' => 'array',
         'hire_date' => 'date',
-        'employment_date' => 'date',
         'probation_end_date' => 'date',
         'termination_date' => 'date',
         'departure_date' => 'date',

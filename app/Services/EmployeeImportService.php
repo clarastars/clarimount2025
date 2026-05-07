@@ -65,7 +65,6 @@ class EmployeeImportService
         'additional_approver_2',
         'additional_approver_3',
         'hire_date',
-        'employment_date',
         'probation_end_date',
         'employment_status',
         'termination_date',
@@ -94,7 +93,6 @@ class EmployeeImportService
     private const EMPLOYEE_IMPORT_DATE_FIELDS = [
         'birth_date',
         'hire_date',
-        'employment_date',
         'probation_end_date',
         'termination_date',
         'departure_date',
@@ -149,7 +147,6 @@ class EmployeeImportService
             'additional_approver_2',
             'additional_approver_3',
             'hire_date',
-            'employment_date',
             'probation_end_date',
             'employment_status',
             'termination_date',
@@ -266,7 +263,6 @@ class EmployeeImportService
             'additional_approver_2',
             'additional_approver_3',
             'hire_date',
-            'employment_date',
             'probation_end_date',
             'employment_status',
             'termination_date',
@@ -321,7 +317,6 @@ class EmployeeImportService
                 $employee->additional_approver_2,
                 $employee->additional_approver_3,
                 $employee->hire_date ? $employee->hire_date->format('Y-m-d') : '',
-                $employee->employment_date ? $employee->employment_date->format('Y-m-d') : '',
                 $employee->probation_end_date ? $employee->probation_end_date->format('Y-m-d') : '',
                 $employee->employment_status,
                 $employee->termination_date ? $employee->termination_date->format('Y-m-d') : '',
@@ -434,7 +429,6 @@ class EmployeeImportService
         $setIfBlank('additional_approver_3', $employee->additional_approver_3);
 
         $setIfBlank('hire_date', $date($employee->hire_date));
-        $setIfBlank('employment_date', $date($employee->employment_date));
         $setIfBlank('probation_end_date', $date($employee->probation_end_date));
         $setIfBlank('employment_status', $employee->employment_status);
         $setIfBlank('termination_date', $date($employee->termination_date));
@@ -998,7 +992,6 @@ class EmployeeImportService
             'additional_approver_2' => $rowData['additional_approver_2'] ?? null,
             'additional_approver_3' => $rowData['additional_approver_3'] ?? null,
             'hire_date' => ! empty($rowData['hire_date']) ? $rowData['hire_date'] : null,
-            'employment_date' => ! empty($rowData['employment_date']) ? $rowData['employment_date'] : null,
             'probation_end_date' => ! empty($rowData['probation_end_date']) ? $rowData['probation_end_date'] : null,
             'employment_status' => $rowData['employment_status'] ?? 'active',
             'termination_date' => ! empty($rowData['termination_date']) ? $rowData['termination_date'] : null,

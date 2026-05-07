@@ -345,7 +345,6 @@ class EmployeeImportController extends Controller
             'additional_approver_2' => 'Additional Approver 2',
             'additional_approver_3' => 'Additional Approver 3',
             'hire_date' => 'Hire Date (YYYY-MM-DD)',
-            'employment_date' => 'Employment Date (YYYY-MM-DD)',
             'probation_end_date' => 'Probation End Date (YYYY-MM-DD)',
             'employment_status' => 'Employment Status (active/inactive/terminated)',
             'termination_date' => 'Termination Date (YYYY-MM-DD)',

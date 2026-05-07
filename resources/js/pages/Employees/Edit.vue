@@ -369,28 +369,6 @@
                                         <div v-if="form.errors.company_id" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.company_id || "") }}</div>
                                     </div>
 
-                                    <!-- Employment Date -->
-                                    <div>
-                                        <Label for="employment_date" class="mb-2">{{ t('employees.employment_date') }}</Label>
-                                        <Input 
-                                            id="employment_date"
-                                            v-model="form.employment_date" 
-                                            type="date" 
-                                        />
-                                        <div v-if="form.errors.employment_date" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.employment_date || "") }}</div>
-                                    </div>
-
-                                    <!-- Probation End Date -->
-                                    <div>
-                                        <Label for="probation_end_date" class="mb-2">{{ t('employees.probation_end_date') }}</Label>
-                                        <Input 
-                                            id="probation_end_date"
-                                            v-model="form.probation_end_date" 
-                                            type="date" 
-                                        />
-                                        <div v-if="form.errors.probation_end_date" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.probation_end_date || "") }}</div>
-                                    </div>
-
                                     <!-- Fingerprint Device ID -->
                                     <div>
                                         <Label for="fingerprint_device_id" class="mb-2">{{ t('employees.fingerprint_device_id') }}</Label>
@@ -803,6 +781,16 @@
                                         <div v-if="form.errors.employment_status" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.employment_status || "") }}</div>
                                     </div>
 
+                                    <div>
+                                        <Label for="probation_end_date" class="mb-2">{{ t('employees.probation_end_date') }}</Label>
+                                        <Input 
+                                            id="probation_end_date"
+                                            v-model="form.probation_end_date" 
+                                            type="date" 
+                                        />
+                                        <div v-if="form.errors.probation_end_date" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.probation_end_date || "") }}</div>
+                                    </div>
+
                                     <!-- Termination Date -->
                                     <div v-if="form.employment_status === 'terminated'">
                                         <Label for="termination_date" class="mb-2">{{ t('employees.termination_date') }}</Label>
@@ -1195,7 +1183,6 @@ const form = useForm({
 
     // Work Details
     company_id: props.employee.company_id || props.defaultCompanyId || null,
-    employment_date: dateToInputValue(props.employee.employment_date),
     probation_end_date: dateToInputValue(props.employee.probation_end_date),
     fingerprint_device_id: props.employee.fingerprint_device_id || '',
     shift_id: props.employee.shift_id || null as number | null,
@@ -1383,7 +1370,7 @@ if (props.employee.department_id) {
 const completedSections = computed(() => {
     const sections = {
         general: form.first_name && form.last_name,
-        work: form.job_title || form.department || form.employment_date,
+        work: form.job_title || form.department || form.company_id,
         legal: form.id_number || form.passport_number,
         insurance: form.insurance_policy,
         employment: form.hire_date || form.employment_status,
