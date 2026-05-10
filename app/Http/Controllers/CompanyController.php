@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -57,6 +58,23 @@ class CompanyController extends Controller
     }
 
     /**
+     * @return array{data: \Illuminate\Database\Eloquent\Collection<int, Company>, current_page: int, last_page: int, per_page: int, total: int}
+     */
+    private function companiesIndexPayload(Builder $query): array
+    {
+        $list = $query->latest()->get();
+        $total = $list->count();
+
+        return [
+            'data' => $list,
+            'current_page' => 1,
+            'last_page' => 1,
+            'per_page' => max($total, 1),
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Display a listing of the companies.
      */
     public function index(): Response
@@ -64,32 +82,32 @@ class CompanyController extends Controller
         $user = Auth::user();
 
         if ($user->hasRole('super-admin')) {
-            $companies = Company::query()->latest()->paginate(10);
+            $companies = $this->companiesIndexPayload(Company::query());
         } elseif ($this->canViewAllCompanies()) {
             $allowedCompanyIds = $this->userAccessibleCompanyIds();
-            $companies = Company::query()
-                ->when(
-                    ! empty($allowedCompanyIds),
-                    fn ($q) => $q->whereIn('id', $allowedCompanyIds),
-                    fn ($q) => $q->whereRaw('1 = 0')
-                )
-                ->latest()
-                ->paginate(10);
-        } else {
-            $ownedCompanies = Company::where('owner_id', $user->id);
-
-            if ($ownedCompanies->exists()) {
-                $companies = $ownedCompanies->latest()->paginate(10);
-            } elseif ($this->canViewCompanyReadOnly()) {
-                $allowedCompanyIds = $this->userAccessibleCompanyIds();
-                $companies = Company::query()
+            $companies = $this->companiesIndexPayload(
+                Company::query()
                     ->when(
                         ! empty($allowedCompanyIds),
                         fn ($q) => $q->whereIn('id', $allowedCompanyIds),
                         fn ($q) => $q->whereRaw('1 = 0')
                     )
-                    ->latest()
-                    ->paginate(10);
+            );
+        } else {
+            $ownedCompanies = Company::where('owner_id', $user->id);
+
+            if ($ownedCompanies->exists()) {
+                $companies = $this->companiesIndexPayload($ownedCompanies);
+            } elseif ($this->canViewCompanyReadOnly()) {
+                $allowedCompanyIds = $this->userAccessibleCompanyIds();
+                $companies = $this->companiesIndexPayload(
+                    Company::query()
+                        ->when(
+                            ! empty($allowedCompanyIds),
+                            fn ($q) => $q->whereIn('id', $allowedCompanyIds),
+                            fn ($q) => $q->whereRaw('1 = 0')
+                        )
+                );
             } else {
                 abort(403);
             }
@@ -167,7 +185,7 @@ class CompanyController extends Controller
 
         // Load the company with owner and Bayzat configuration
         $company->load(['owner', 'bayzatConfig']);
-        
+
         // Get total assets count from all locations associated with this company
         $totalAssetsCount = $company->locations()
             ->withCount('assets')
@@ -203,7 +221,7 @@ class CompanyController extends Controller
         $validated = $request->validate([
             'name_en' => 'required|string|max:255',
             'name_ar' => 'required|string|max:255',
-            'company_email' => 'required|email|unique:companies,company_email,' . $company->id,
+            'company_email' => 'required|email|unique:companies,company_email,'.$company->id,
             'description_en' => 'nullable|string|max:1000',
             'description_ar' => 'nullable|string|max:1000',
             'website' => 'nullable|url|max:255',
@@ -217,13 +235,13 @@ class CompanyController extends Controller
             $validated['slug'] = Str::slug($validated['name_en']);
         }
 
-        if ($request->boolean('remove_logo') && !empty($company->logo)) {
+        if ($request->boolean('remove_logo') && ! empty($company->logo)) {
             Storage::disk('public')->delete($company->logo);
             $validated['logo'] = null;
         }
 
         if ($request->hasFile('logo')) {
-            if (!empty($company->logo)) {
+            if (! empty($company->logo)) {
                 Storage::disk('public')->delete($company->logo);
             }
 
@@ -245,7 +263,7 @@ class CompanyController extends Controller
     {
         abort_unless($this->canManageCompany($company), 403);
 
-        if (!empty($company->logo)) {
+        if (! empty($company->logo)) {
             Storage::disk('public')->delete($company->logo);
         }
 
@@ -303,7 +321,7 @@ class CompanyController extends Controller
                     'name_en' => $company->name_en,
                     'name_ar' => $company->name_ar,
                     'company_email' => $company->company_email,
-                    'display_name' => $company->name_en . ($company->name_ar ? " ({$company->name_ar})" : ''),
+                    'display_name' => $company->name_en.($company->name_ar ? " ({$company->name_ar})" : ''),
                 ];
             });
 

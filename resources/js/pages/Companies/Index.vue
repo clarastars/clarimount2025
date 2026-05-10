@@ -136,10 +136,6 @@ const getCompanyDescription = (company: Company) => {
                 </Card>
             </div>
 
-            <!-- Pagination would go here if needed -->
-            <div v-if="companies.last_page > 1" class="flex justify-center">
-                <!-- Add pagination component here if needed -->
-            </div>
         </div>
     </AppLayout>
 </template> 
