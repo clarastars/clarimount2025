@@ -12,6 +12,7 @@ use App\Models\EmployeeDeduction;
 use App\Models\Leave;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SalaryRunService
@@ -49,6 +50,7 @@ class SalaryRunService
             $startDate = $operationalRange['start'];
             $endDate = $operationalRange['end'];
 
+            /** @var \Illuminate\Database\Eloquent\Collection<int, Employee> $employees */
             foreach ($employees as $employee) {
                 $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
                     ->where('employee_id', $employee->id)
@@ -56,19 +58,33 @@ class SalaryRunService
 
                 $breakdownExclusions = $existingItem?->breakdown_exclusions ?? [];
 
-                $grossSalary = ($employee->basic_salary ?? 0) + ($employee->allowances ?? 0);
-                $insuranceBase = (float) ($employee->basic_salary ?? 0) + (float) ($employee->allowance_housing ?? 0);
+                $fullBasicSalary = (float) ($employee->basic_salary ?? 0);
+                $fullAllowances = (float) ($employee->allowances ?? 0);
+                $fullGrossSalary = $fullBasicSalary + $fullAllowances;
+
+                $proration = $this->resolveEmploymentProration(
+                    $employee,
+                    $startDate->copy()->startOfDay(),
+                    $endDate->copy()->startOfDay()
+                );
+                $effectivePeriodStart = $proration['effective_start'];
+                $salaryFactor = $proration['factor'];
+
+                $basicSalary = round($fullBasicSalary * $salaryFactor, 2);
+                $allowances = round($fullAllowances * $salaryFactor, 2);
+                $grossSalary = round($basicSalary + $allowances, 2);
+                $insuranceBase = round((($employee->basic_salary ?? 0) + ($employee->allowance_housing ?? 0)) * $salaryFactor, 2);
                 $insuranceRate = (float) ($employee->social_insurance_deduction_rate ?? 0);
                 $socialInsuranceDeductionTotal = $insuranceRate > 0
                     ? round(($insuranceBase * $insuranceRate) / 100, 2)
                     : 0.0;
-                $dailyWage = $grossSalary / 30; // Simplified: using 30 days
+                $dailyWage = $fullGrossSalary / 30; // Keep a full daily wage; monthly proration is applied separately.
 
                 // Get approved penalties for this employee in this month
                 $approvedPenalties = AttendancePenalty::where('employee_id', $employee->id)
                     ->where('approval_status', 'approved')
                     ->whereBetween('attendance_date', [
-                        $startDate->format('Y-m-d'),
+                        $effectivePeriodStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->get();
@@ -82,8 +98,7 @@ class SalaryRunService
                         continue;
                     }
 
-                    $basicSalary = $employee->basic_salary ? (float) $employee->basic_salary : null;
-                    $penaltyAmount = $this->calculatePenaltyAmount($penalty, $grossSalary, $dailyWage, $basicSalary);
+                    $penaltyAmount = $this->calculatePenaltyAmount($penalty, $fullGrossSalary, $dailyWage, $fullBasicSalary);
                     $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
                     $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
                     $penaltiesTotal += $totalForPenalty;
@@ -107,7 +122,7 @@ class SalaryRunService
                 // Manual deductions (employee_deductions) for this month
                 $manualDeductions = EmployeeDeduction::where('employee_id', $employee->id)
                     ->whereBetween('deduction_date', [
-                        $startDate->format('Y-m-d'),
+                        $effectivePeriodStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->orderBy('deduction_date')
@@ -135,7 +150,7 @@ class SalaryRunService
                 // Manual additions (employee_additions) for this month
                 $manualAdditions = EmployeeAddition::where('employee_id', $employee->id)
                     ->whereBetween('addition_date', [
-                        $startDate->format('Y-m-d'),
+                        $effectivePeriodStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->orderBy('addition_date')
@@ -175,7 +190,7 @@ class SalaryRunService
                 $unpaidLeaves = Leave::where('employee_id', $employee->id)
                     ->where('is_paid', false)
                     ->get()
-                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($startDate, $endDate));
+                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($effectivePeriodStart, $endDate));
 
                 $unpaidLeaveTotal = 0;
                 foreach ($unpaidLeaves as $leave) {
@@ -184,7 +199,7 @@ class SalaryRunService
                         continue;
                     }
 
-                    $daysInOperationalRange = $leave->daysInDateRange($startDate, $endDate);
+                    $daysInOperationalRange = $leave->daysInDateRange($effectivePeriodStart, $endDate);
                     $amount = round($daysInOperationalRange * $dailyWage, 2);
                     $unpaidLeaveTotal += $amount;
                     $breakdown[] = [
@@ -197,6 +212,17 @@ class SalaryRunService
                         'amount' => $amount,
                         'leave_id' => $leave->id,
                         'source' => 'unpaid_leave',
+                    ];
+                }
+
+                if ($salaryFactor < 1.0) {
+                    $breakdown[] = [
+                        'date' => $effectivePeriodStart->format('Y-m-d').' / '.$endDate->format('Y-m-d'),
+                        'action_type' => 'employment_proration',
+                        'action_value' => round($salaryFactor * 100, 2),
+                        'action_text' => 'Salary prorated from hire date',
+                        'amount' => $grossSalary,
+                        'source' => 'employment_proration',
                     ];
                 }
 
@@ -214,8 +240,8 @@ class SalaryRunService
                         'employee_id' => $employee->id,
                     ],
                     [
-                        'basic_salary' => $employee->basic_salary ?? 0,
-                        'allowances' => $employee->allowances ?? 0,
+                        'basic_salary' => $basicSalary,
+                        'allowances' => $allowances,
                         'gross_salary' => $grossSalary,
                         'penalties_total' => $penaltiesTotal,
                         'additions_total' => $additionsTotal,
@@ -231,6 +257,36 @@ class SalaryRunService
 
             return $salaryRun->fresh(['items.employee']);
         });
+    }
+
+    /**
+     * @return array{factor: float, effective_start: Carbon}
+     */
+    private function resolveEmploymentProration(Employee $employee, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        if ($employee->hire_date === null) {
+            return ['factor' => 1.0, 'effective_start' => $periodStart];
+        }
+
+        $hireDate = Carbon::parse((string) $employee->hire_date)->startOfDay();
+        if ($hireDate->lte($periodStart)) {
+            return ['factor' => 1.0, 'effective_start' => $periodStart];
+        }
+
+        // Joined after this payroll period: no base salary payable in this period.
+        if ($hireDate->gt($periodEnd)) {
+            return ['factor' => 0.0, 'effective_start' => $periodEnd];
+        }
+
+        // Requested behavior: only prorate when employment age is less than one month.
+        if ($hireDate->diffInDays($periodEnd) >= 30) {
+            return ['factor' => 1.0, 'effective_start' => $periodStart];
+        }
+
+        $workedDays = $hireDate->diffInDays($periodEnd) + 1;
+        $factor = min(1.0, max(0.0, $workedDays / 30));
+
+        return ['factor' => $factor, 'effective_start' => $hireDate];
     }
 
     /**
