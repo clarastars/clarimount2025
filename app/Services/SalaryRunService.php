@@ -47,10 +47,15 @@ class SalaryRunService
                 ->where('employment_status', 'active')
                 ->get();
 
-            // Calculate start and end dates based on global operational month boundaries.
+            // Operational month: penalties, manual deductions/additions, unpaid leave overlap (custom boundaries when set).
             $operationalRange = $this->operationalMonthService->resolveRangeForPayrollMonth($year, $month);
             $startDate = $operationalRange['start'];
             $endDate = $operationalRange['end'];
+
+            // Calendar month: base salary, allowances, gross, insurance proration (always 1st–last day of payroll month).
+            $calendarRange = $this->resolveCalendarMonthRange($year, $month);
+            $calendarMonthStart = $calendarRange['start'];
+            $calendarMonthEndDay = $calendarRange['end'];
 
             /** @var \Illuminate\Database\Eloquent\Collection<int, Employee> $employees */
             foreach ($employees as $employee) {
@@ -66,11 +71,18 @@ class SalaryRunService
 
                 $proration = $this->resolveEmploymentProration(
                     $employee,
-                    $startDate->copy()->startOfDay(),
-                    $endDate->copy()->startOfDay()
+                    $calendarMonthStart,
+                    $calendarMonthEndDay
                 );
-                $effectivePeriodStart = $proration['effective_start'];
                 $salaryFactor = $proration['factor'];
+
+                $hireDateTz = $employee->hire_date !== null
+                    ? Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay()
+                    : null;
+                $opStart = $startDate->copy()->timezone(self::TZ)->startOfDay();
+                $attendanceRangeStart = ($hireDateTz !== null && $hireDateTz->gt($opStart))
+                    ? $hireDateTz
+                    : $opStart;
 
                 $basicSalary = round($fullBasicSalary * $salaryFactor, 2);
                 $allowances = round($fullAllowances * $salaryFactor, 2);
@@ -82,11 +94,11 @@ class SalaryRunService
                     : 0.0;
                 $dailyWage = $fullGrossSalary / 30; // Keep a full daily wage; monthly proration is applied separately.
 
-                // Get approved penalties for this employee in this month
+                // Get approved penalties for this employee in the operational payroll window (not calendar month).
                 $approvedPenalties = AttendancePenalty::where('employee_id', $employee->id)
                     ->where('approval_status', 'approved')
                     ->whereBetween('attendance_date', [
-                        $effectivePeriodStart->format('Y-m-d'),
+                        $attendanceRangeStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->get();
@@ -121,10 +133,10 @@ class SalaryRunService
                     ];
                 }
 
-                // Manual deductions (employee_deductions) for this month
+                // Manual deductions (employee_deductions) in the operational payroll window.
                 $manualDeductions = EmployeeDeduction::where('employee_id', $employee->id)
                     ->whereBetween('deduction_date', [
-                        $effectivePeriodStart->format('Y-m-d'),
+                        $attendanceRangeStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->orderBy('deduction_date')
@@ -149,10 +161,10 @@ class SalaryRunService
                     ];
                 }
 
-                // Manual additions (employee_additions) for this month
+                // Manual additions (employee_additions) in the operational payroll window.
                 $manualAdditions = EmployeeAddition::where('employee_id', $employee->id)
                     ->whereBetween('addition_date', [
-                        $effectivePeriodStart->format('Y-m-d'),
+                        $attendanceRangeStart->format('Y-m-d'),
                         $endDate->format('Y-m-d'),
                     ])
                     ->orderBy('addition_date')
@@ -188,11 +200,11 @@ class SalaryRunService
                     }
                 }
 
-                // Unpaid leave deduction: get leaves where is_paid = false overlapping this month
+                // Unpaid leave: overlap with operational payroll window only.
                 $unpaidLeaves = Leave::where('employee_id', $employee->id)
                     ->where('is_paid', false)
                     ->get()
-                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($effectivePeriodStart, $endDate));
+                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($attendanceRangeStart, $endDate));
 
                 $unpaidLeaveTotal = 0;
                 foreach ($unpaidLeaves as $leave) {
@@ -201,15 +213,15 @@ class SalaryRunService
                         continue;
                     }
 
-                    $daysInOperationalRange = $leave->daysInDateRange($effectivePeriodStart, $endDate);
-                    $amount = round($daysInOperationalRange * $dailyWage, 2);
+                    $daysInAttendanceRange = $leave->daysInDateRange($attendanceRangeStart, $endDate);
+                    $amount = round($daysInAttendanceRange * $dailyWage, 2);
                     $unpaidLeaveTotal += $amount;
                     $breakdown[] = [
                         'date' => \Carbon\Carbon::parse((string) $leave->start_date)->format('Y-m-d')
                             .' / '
                             .\Carbon\Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
                         'action_type' => 'unpaid_leave',
-                        'action_value' => $daysInOperationalRange,
+                        'action_value' => $daysInAttendanceRange,
                         'action_text' => 'Unpaid leave',
                         'amount' => $amount,
                         'leave_id' => $leave->id,
@@ -219,10 +231,10 @@ class SalaryRunService
 
                 if ($salaryFactor < 1.0) {
                     $breakdown[] = [
-                        'date' => $effectivePeriodStart->format('Y-m-d').' / '.$endDate->format('Y-m-d'),
+                        'date' => $calendarMonthStart->format('Y-m-d').' / '.$calendarMonthEndDay->format('Y-m-d'),
                         'action_type' => 'employment_proration',
                         'action_value' => round($salaryFactor * 100, 2),
-                        'action_text' => 'Salary prorated from hire date',
+                        'action_text' => 'Salary prorated from hire date (calendar month)',
                         'amount' => $grossSalary,
                         'source' => 'employment_proration',
                     ];
@@ -259,6 +271,21 @@ class SalaryRunService
 
             return $salaryRun->fresh(['items.employee']);
         });
+    }
+
+    /**
+     * First and last calendar day of the payroll month (Asia/Riyadh). Used for salary amounts and hire proration only.
+     *
+     * @return array{start: Carbon, end: Carbon}
+     */
+    private function resolveCalendarMonthRange(int $year, int $month): array
+    {
+        $base = Carbon::create($year, $month, 1, 0, 0, 0, self::TZ);
+
+        return [
+            'start' => $base->copy()->startOfMonth()->startOfDay(),
+            'end' => $base->copy()->endOfMonth()->startOfDay(),
+        ];
     }
 
     /**
