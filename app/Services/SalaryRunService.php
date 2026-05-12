@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 class SalaryRunService
 {
+    private const TZ = 'Asia/Riyadh';
+
     public function __construct(
         private OperationalMonthService $operationalMonthService
     ) {}
@@ -264,26 +266,32 @@ class SalaryRunService
      */
     private function resolveEmploymentProration(Employee $employee, Carbon $periodStart, Carbon $periodEnd): array
     {
+        $periodStart = $periodStart->copy()->timezone(self::TZ)->startOfDay();
+        $periodEndDay = $periodEnd->copy()->timezone(self::TZ)->startOfDay();
+
         if ($employee->hire_date === null) {
             return ['factor' => 1.0, 'effective_start' => $periodStart];
         }
 
-        $hireDate = Carbon::parse((string) $employee->hire_date)->startOfDay();
+        // Parse hire on the same calendar zone as operational payroll (avoids UTC vs Riyadh skew in diffInDays).
+        $hireDate = Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay();
+
         if ($hireDate->lte($periodStart)) {
             return ['factor' => 1.0, 'effective_start' => $periodStart];
         }
 
         // Joined after this payroll period: no base salary payable in this period.
-        if ($hireDate->gt($periodEnd)) {
-            return ['factor' => 0.0, 'effective_start' => $periodEnd];
+        if ($hireDate->gt($periodEndDay)) {
+            return ['factor' => 0.0, 'effective_start' => $periodEndDay];
         }
 
         // Requested behavior: only prorate when employment age is less than one month.
-        if ($hireDate->diffInDays($periodEnd) >= 30) {
+        if ($hireDate->diffInDays($periodEndDay) >= 30) {
             return ['factor' => 1.0, 'effective_start' => $periodStart];
         }
 
-        $workedDays = $hireDate->diffInDays($periodEnd) + 1;
+        // Inclusive calendar days from hire through last day of period (both at start-of-day in TZ).
+        $workedDays = $hireDate->diffInDays($periodEndDay) + 1;
         $factor = min(1.0, max(0.0, $workedDays / 30));
 
         return ['factor' => $factor, 'effective_start' => $hireDate];
