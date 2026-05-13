@@ -145,10 +145,10 @@ onBeforeUnmount(() => {
 
 <template>
     <header
-        class="grid h-16 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b bg-background px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4"
+        class="flex min-h-12 shrink-0 flex-col gap-2 border-b bg-background px-3 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:md:h-12 md:grid md:h-16 md:grid-cols-[1fr_minmax(0,36rem)_1fr] md:items-center md:gap-3 md:px-4 md:py-0 lg:px-6"
     >
-        <div class="flex items-center gap-2 min-w-0">
-            <SidebarTrigger class="-ml-1" />
+        <div class="flex min-h-9 min-w-0 items-center gap-2 md:min-h-0">
+            <SidebarTrigger class="-ms-1 shrink-0" />
             <template v-if="breadcrumbs && breadcrumbs.length > 0">
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
@@ -157,21 +157,26 @@ onBeforeUnmount(() => {
         <div
             v-if="showGlobalSearch"
             ref="searchWrapRef"
-            class="relative w-full min-w-[320px] max-w-xl justify-self-center"
+            class="relative w-full min-w-0 max-w-none md:max-w-xl md:justify-self-center"
         >
-            <div class="relative">
-                <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div class="relative w-full">
+                <Search
+                    class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                />
                 <input
                     v-model="searchQuery"
-                    type="text"
-                    class="h-10 w-full rounded-md border border-input bg-background px-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    type="search"
+                    enterkeyhint="search"
+                    autocomplete="off"
+                    class="h-10 w-full min-w-0 rounded-md border border-input bg-background py-2 ps-10 pe-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     :placeholder="$t('settings.employee_global_search_placeholder')"
                     @focus="searchQuery.trim().length >= 2 && suggestions.length > 0 ? openSuggestions = true : null"
                     @keydown="onSearchKeydown"
                 >
                 <span
                     v-if="loading"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
+                    class="absolute end-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
                 >
                     ...
                 </span>
@@ -179,13 +184,13 @@ onBeforeUnmount(() => {
 
             <div
                 v-if="openSuggestions"
-                class="absolute mt-1 max-h-80 w-full overflow-auto rounded-md border bg-popover shadow-lg"
+                class="absolute z-50 mt-1 max-h-[min(20rem,70vh)] w-full overflow-auto rounded-md border bg-popover shadow-lg"
             >
                 <button
                     v-for="(employee, index) in suggestions"
                     :key="employee.id"
                     type="button"
-                    class="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-accent"
+                    class="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-start hover:bg-accent"
                     :class="index === activeIndex ? 'bg-accent' : ''"
                     @mouseenter="activeIndex = index"
                     @click="selectEmployee(employee)"
@@ -202,7 +207,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div class="justify-self-end" />
+        <div class="hidden shrink-0 md:block md:justify-self-end" />
 
     </header>
 </template>
