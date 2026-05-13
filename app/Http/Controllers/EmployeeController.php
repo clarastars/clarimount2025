@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class EmployeeController extends Controller
 {
@@ -328,10 +328,10 @@ class EmployeeController extends Controller
             'nationality_id' => 'required|exists:nationalities,id',
             'residence_country_id' => 'required|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'personal_email' => 'nullable|email|max:255|required_without:work_email|unique:employees,personal_email',
-            'work_email' => 'nullable|email|max:255|required_without:personal_email|unique:employees,work_email',
-            'personal_phone' => 'nullable|string|max:20|required_without:work_phone',
-            'work_phone' => 'nullable|string|max:20|required_without:personal_phone',
+            'personal_email' => 'nullable|email|max:255|unique:employees,personal_email',
+            'work_email' => 'nullable|email|max:255|unique:employees,work_email',
+            'personal_phone' => 'nullable|string|max:20',
+            'work_phone' => 'nullable|string|max:20',
             'fingerprint_device_id' => 'nullable|string|max:50',
             'shift_id' => 'nullable|exists:shifts,id',
             'work_address' => 'nullable|string|max:500',
@@ -610,10 +610,10 @@ class EmployeeController extends Controller
             'nationality_id' => 'required|exists:nationalities,id',
             'residence_country_id' => 'required|exists:countries,id',
             'birth_date' => 'nullable|date',
-            'personal_email' => 'nullable|email|max:255|required_without:work_email|unique:employees,personal_email,'.$employee->id,
-            'work_email' => 'nullable|email|max:255|required_without:personal_email|unique:employees,work_email,'.$employee->id,
-            'personal_phone' => 'nullable|string|max:20|required_without:work_phone',
-            'work_phone' => 'nullable|string|max:20|required_without:personal_phone',
+            'personal_email' => 'nullable|email|max:255|unique:employees,personal_email,'.$employee->id,
+            'work_email' => 'nullable|email|max:255|unique:employees,work_email,'.$employee->id,
+            'personal_phone' => 'nullable|string|max:20',
+            'work_phone' => 'nullable|string|max:20',
             'fingerprint_device_id' => 'nullable|string|max:50',
             'shift_id' => 'nullable|exists:shifts,id',
             'work_address' => 'nullable|string|max:500',
