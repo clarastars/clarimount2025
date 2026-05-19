@@ -21,6 +21,7 @@ use App\Http\Controllers\LaborLawRuleController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PrintJobController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SalaryRunController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TeamController;
@@ -282,6 +283,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/departments/search', [DepartmentController::class, 'search'])->name('api.departments.search');
     Route::get('api/employees/search', [EmployeeController::class, 'search'])->name('api.employees.search');
     Route::get('api/employees/global-search', [EmployeeController::class, 'globalSearch'])->name('api.employees.global-search');
+
+    Route::get('api/notifications', [NotificationController::class, 'index'])->name('api.notifications.index');
+    Route::post('api/notifications/{notificationId}/read', [NotificationController::class, 'markAsRead'])->name('api.notifications.read');
+    Route::post('api/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('api.notifications.read-all');
 });
 
 require __DIR__.'/auth.php';

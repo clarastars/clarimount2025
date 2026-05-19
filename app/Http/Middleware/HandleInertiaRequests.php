@@ -81,6 +81,13 @@ class HandleInertiaRequests extends Middleware
                     || $user->ownedCompanies()->exists()
                     || $user->can('employees.global-search')
                 ),
+                'can_view_salary_run_notifications' => $user !== null && (
+                    $isSuperAdmin
+                    || $user->ownedCompanies()->exists()
+                    || in_array('salary-runs.readonly', $permissionNames, true)
+                    || in_array('salary-runs.approve', $permissionNames, true)
+                ),
+                'unread_notifications_count' => $user?->unreadNotifications()->count() ?? 0,
             ],
             'locale' => $userLanguage,
             'translations' => $this->getTranslations($userLanguage),

@@ -12,6 +12,7 @@ use App\Models\SalaryRunStepApproval;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\PermissionRegistrar;
 
 class SalaryRunApprovalService
 {
@@ -113,6 +114,15 @@ class SalaryRunApprovalService
         return $approvedCount === $stepCount;
     }
 
+    public function getNextPendingStep(SalaryRun $salaryRun): ?SalaryRunApprovalStep
+    {
+        $approvedStepIds = $salaryRun->stepApprovals()->pluck('approval_step_id');
+
+        return $this->activeSteps()->first(
+            fn (SalaryRunApprovalStep $step) => ! $approvedStepIds->contains($step->id)
+        );
+    }
+
     public function canUserApproveStep(
         User $user,
         Company $company,
@@ -128,7 +138,7 @@ class SalaryRunApprovalService
             return false;
         }
 
-        if (! $previousStepsApproved && ! $this->previousStepsAreApproved($salaryRun, $step)) {
+        if (! $this->previousStepsAreApproved($salaryRun, $step)) {
             return false;
         }
 
@@ -147,6 +157,10 @@ class SalaryRunApprovalService
         if ((int) $user->team_id !== (int) $step->team_id) {
             return false;
         }
+
+        app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
+        $user->unsetRelation('roles');
+        $user->unsetRelation('permissions');
 
         return $user->can('salary-runs.approve');
     }

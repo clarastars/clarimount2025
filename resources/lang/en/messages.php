@@ -162,6 +162,16 @@ return [
         'en' => 'English',
         'ar' => 'العربية',
     ],
+    'notifications' => [
+        'title' => 'Notifications',
+        'empty' => 'No notifications yet',
+        'mark_all_read' => 'Mark all as read',
+        'salary_run_step_approved' => '{name} approved step «{step}» for {company} salary run ({period}).',
+        'salary_run_your_turn' => 'It is your turn to approve {company} salary run ({period}) at step «{step}».',
+        'salary_run_your_turn_after_rejection' => '{company} salary run ({period}) was rejected and it is now your turn at step «{step}». Reason: {reason}',
+        'salary_run_rejected' => '{name} rejected {company} salary run ({period}) at step «{step}». Reason: {reason}',
+        'salary_run_finalized' => '{company} salary run ({period}) is fully approved and was finalized automatically after {name}\'s approval.',
+    ],
     'common' => [
         'loading' => 'Loading...',
         'error' => 'An error occurred',

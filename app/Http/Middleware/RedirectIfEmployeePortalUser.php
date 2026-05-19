@@ -147,6 +147,9 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.index',
                 'salary-runs.show',
                 'salary-runs.export-excel',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
             ]);
         }
 
@@ -157,6 +160,9 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.export-excel',
                 'salary-runs.approve-step',
                 'salary-runs.reject-step',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
             ]);
         }
 

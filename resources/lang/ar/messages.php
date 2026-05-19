@@ -162,6 +162,16 @@ return [
         'en' => 'English',
         'ar' => 'العربية',
     ],
+    'notifications' => [
+        'title' => 'الإشعارات',
+        'empty' => 'لا توجد إشعارات حالياً',
+        'mark_all_read' => 'تعليم الكل كمقروء',
+        'salary_run_step_approved' => 'تم اعتماد خطوة «{step}» في مسير رواتب {company} ({period}) بواسطة {name}.',
+        'salary_run_your_turn' => 'حان دورك لاعتماد مسير رواتب {company} ({period}) في خطوة «{step}».',
+        'salary_run_your_turn_after_rejection' => 'تم رفض مسير رواتب {company} ({period}) وأصبح دورك للاعتماد في خطوة «{step}». السبب: {reason}',
+        'salary_run_rejected' => 'تم رفض مسير رواتب {company} ({period}) في خطوة «{step}» بواسطة {name}. السبب: {reason}',
+        'salary_run_finalized' => 'اكتمل اعتماد مسير رواتب {company} ({period}) وتم إقراره تلقائياً بعد اعتماد {name}.',
+    ],
     'common' => [
         'loading' => 'جارٍ التحميل...',
         'error' => 'حدث خطأ',

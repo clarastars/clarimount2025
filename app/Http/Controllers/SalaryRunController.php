@@ -11,6 +11,7 @@ use App\Models\SalaryRun;
 use App\Models\SalaryRunApprovalStep;
 use App\Models\SalaryRunItem;
 use App\Services\SalaryRunApprovalService;
+use App\Services\SalaryRunNotificationService;
 use App\Services\SalaryRunService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,8 @@ class SalaryRunController extends Controller
 {
     public function __construct(
         private SalaryRunService $salaryRunService,
-        private SalaryRunApprovalService $salaryRunApprovalService
+        private SalaryRunApprovalService $salaryRunApprovalService,
+        private SalaryRunNotificationService $salaryRunNotificationService
     ) {}
 
     private function userAccessibleCompanyIds($user): array
@@ -121,6 +123,7 @@ class SalaryRunController extends Controller
 
         $approvalSteps = $this->salaryRunApprovalService->buildApprovalPayload($salaryRun, $user, $company);
         $latestRejection = $this->salaryRunApprovalService->buildLatestRejectionPayload($salaryRun);
+        $this->salaryRunNotificationService->ensureYourTurnNotifications($salaryRun, $company);
 
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
@@ -176,6 +179,10 @@ class SalaryRunController extends Controller
             $validated['year'],
             $validated['month']
         );
+
+        if ($salaryRun->wasRecentlyCreated) {
+            $this->salaryRunNotificationService->notifyWorkflowStarted($salaryRun, $company, $user);
+        }
 
         return redirect()
             ->route('salary-runs.show', [$company, $validated['year'], $validated['month']])
@@ -260,9 +267,17 @@ class SalaryRunController extends Controller
 
         if ($this->salaryRunApprovalService->allStepsApproved($salaryRun)) {
             $this->salaryRunService->finalizeSalaryRun($salaryRun);
+            $this->salaryRunNotificationService->notifyWorkflowFinalized($salaryRun, $company, $user);
 
             return back()->with('success', __('messages.salary_runs.finalized_after_last_approval'));
         }
+
+        $this->salaryRunNotificationService->notifyStepApproved(
+            $salaryRun,
+            $company,
+            $salaryRunApprovalStep,
+            $user
+        );
 
         return back()->with('success', __('messages.salary_runs.approval_saved'));
     }
@@ -305,6 +320,15 @@ class SalaryRunController extends Controller
         } catch (\RuntimeException $exception) {
             return back()->with('info', $exception->getMessage());
         }
+
+        $salaryRun->refresh();
+        $this->salaryRunNotificationService->notifyStepRejected(
+            $salaryRun,
+            $company,
+            $salaryRunApprovalStep,
+            $user,
+            $validated['reason']
+        );
 
         return back()->with('success', __('messages.salary_runs.approval_rejection_saved'));
     }

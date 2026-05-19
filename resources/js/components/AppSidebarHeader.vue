@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import NotificationBell from '@/components/NotificationBell.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { router, usePage } from '@inertiajs/vue3';
 import { Search, User } from 'lucide-vue-next';
@@ -213,7 +214,9 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div class="hidden shrink-0 md:block md:justify-self-end" />
+        <div class="flex shrink-0 items-center justify-end gap-2 md:justify-self-end">
+            <NotificationBell />
+        </div>
 
     </header>
 </template>
