@@ -160,6 +160,8 @@ class SalaryRunController extends Controller
         $latestRejection = $this->salaryRunApprovalService->buildLatestRejectionPayload($salaryRun);
         $this->salaryRunNotificationService->ensureYourTurnNotifications($salaryRun, $company);
 
+        $salaryRun->loadMissing(['items.employee.debts', 'creator']);
+
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
             'salaryRun' => $salaryRun,

@@ -56,7 +56,6 @@ class SalaryRunNotificationService
 
     public function ensureYourTurnNotifications(SalaryRun $salaryRun, Company $company): void
     {
-        $salaryRun->refresh();
         $nextStep = $this->approvalService->getNextPendingStep($salaryRun);
 
         if ($nextStep === null) {
