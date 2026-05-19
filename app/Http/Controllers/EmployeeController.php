@@ -832,6 +832,7 @@ class EmployeeController extends Controller
                     'company_id' => $employee->company_id,
                     'employee_id' => $employee->employee_id,
                     'first_name' => $employee->first_name,
+                    'father_name' => $employee->father_name,
                     'last_name' => $employee->last_name,
                     'basic_salary' => $employee->basic_salary,
                     'allowances' => $employee->allowances,

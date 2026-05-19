@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import PayrollMonthFilter from '@/components/attendance/PayrollMonthFilter.vue'
 import { Banknote, Plus, Pencil, Trash2, X } from 'lucide-vue-next'
 import axios from 'axios'
+import { formatEmployeeSelectLabel } from '@/lib/utils'
 
 const { t } = useI18n()
 
@@ -32,6 +33,7 @@ interface Company {
 interface EmployeeOption {
   id: number
   first_name: string
+  father_name?: string | null
   last_name: string
   employee_id?: string
   company_id: number
@@ -569,8 +571,7 @@ function deductionTypeLabel(type: string) {
                   >
                     <option value="">{{ t('attendance.all_employees') }}</option>
                     <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                      {{ emp.first_name }} {{ emp.last_name }}
-                      <template v-if="emp.employee_id"> ({{ emp.employee_id }})</template>
+                      {{ formatEmployeeSelectLabel(emp) }}
                     </option>
                   </select>
                 </div>
@@ -734,8 +735,7 @@ function deductionTypeLabel(type: string) {
             >
               <option value="">{{ t('attendance.filter_employee') }}</option>
               <option v-for="emp in employeesForCreate" :key="emp.id" :value="emp.id">
-                {{ emp.first_name }} {{ emp.last_name }}
-                <template v-if="emp.employee_id"> ({{ emp.employee_id }})</template>
+                {{ formatEmployeeSelectLabel(emp) }}
               </option>
             </select>
             <p v-if="createForm.errors.employee_id" class="text-sm text-red-500 mt-1">

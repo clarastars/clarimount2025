@@ -52,7 +52,7 @@ class AdditionsController extends Controller
             ->where('company_id', $company->id)
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'basic_salary', 'allowances']);
+            ->get(['id', 'first_name', 'father_name', 'last_name', 'employee_id', 'company_id', 'basic_salary', 'allowances']);
 
         $manualAdditionsQuery = EmployeeAddition::query()
             ->with(['employee:id,first_name,last_name,employee_id,company_id', 'creator:id,name'])

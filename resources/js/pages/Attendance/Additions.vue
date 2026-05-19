@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import PayrollMonthFilter from '@/components/attendance/PayrollMonthFilter.vue'
 import { Banknote, Plus, Pencil, Trash2 } from 'lucide-vue-next'
 import axios from 'axios'
+import { formatEmployeeSelectLabel } from '@/lib/utils'
 
 const { t } = useI18n()
 
@@ -25,6 +26,7 @@ interface Company {
 interface EmployeeOption {
   id: number
   first_name: string
+  father_name?: string | null
   last_name: string
   employee_id?: string
   company_id: number
@@ -370,7 +372,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
                   <Label for="filter-employee">{{ t('attendance.filter_employee') }}</Label>
                   <select id="filter-employee" v-model="employeeFilter" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="">{{ t('attendance.all_employees') }}</option>
-                    <option v-for="emp in employees" :key="emp.id" :value="emp.id">{{ emp.first_name }} {{ emp.last_name }}<template v-if="emp.employee_id"> ({{ emp.employee_id }})</template></option>
+                    <option v-for="emp in employees" :key="emp.id" :value="emp.id">{{ formatEmployeeSelectLabel(emp) }}</option>
                   </select>
                 </div>
               </div>
@@ -435,7 +437,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
         </DialogHeader>
         <form @submit.prevent="submitCreate" class="space-y-4">
           <div><Label for="create-company">{{ t('attendance.filter_company') }}</Label><select id="create-company" :value="createForm.company_id" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" @change="onCreateCompanySelectChange"><option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name_ar || c.name_en }}</option></select></div>
-          <div><Label for="create-employee">{{ t('attendance.filter_employee') }}</Label><select id="create-employee" v-model="createForm.employee_id" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required><option value="">{{ t('attendance.filter_employee') }}</option><option v-for="emp in employeesForCreate" :key="emp.id" :value="emp.id">{{ emp.first_name }} {{ emp.last_name }}<template v-if="emp.employee_id"> ({{ emp.employee_id }})</template></option></select><p v-if="createForm.errors.employee_id" class="text-sm text-red-500 mt-1">{{ createForm.errors.employee_id }}</p></div>
+          <div><Label for="create-employee">{{ t('attendance.filter_employee') }}</Label><select id="create-employee" v-model="createForm.employee_id" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required><option value="">{{ t('attendance.filter_employee') }}</option><option v-for="emp in employeesForCreate" :key="emp.id" :value="emp.id">{{ formatEmployeeSelectLabel(emp) }}</option></select><p v-if="createForm.errors.employee_id" class="text-sm text-red-500 mt-1">{{ createForm.errors.employee_id }}</p></div>
           <div><Label for="create-amount-mode">{{ t('attendance.deduction_amount_mode') }}</Label><select id="create-amount-mode" v-model="createForm.amount_input_mode" class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="manual">{{ t('attendance.deduction_mode_manual') }}</option><option value="basic_days">{{ t('attendance.deduction_mode_basic_days') }}</option><option value="basic_daily_percent">{{ t('attendance.deduction_mode_basic_daily_percent') }}</option><option value="gross_days">{{ t('attendance.deduction_mode_gross_days') }}</option><option value="gross_daily_percent">{{ t('attendance.deduction_mode_gross_daily_percent') }}</option></select></div>
           <div v-if="needsBasicForCreate && createForm.employee_id && !hasBasicForCreate" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ t('attendance.addition_basic_salary_unavailable') }}</div>
           <div v-if="needsGrossForCreate && createForm.employee_id && !hasGrossForCreate" class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ t('attendance.addition_gross_salary_unavailable') }}</div>

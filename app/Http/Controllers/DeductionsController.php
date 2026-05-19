@@ -58,10 +58,11 @@ class DeductionsController extends Controller
             ->where('company_id', $company->id)
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'company_id', 'shift_id', 'basic_salary', 'allowances'])
+            ->get(['id', 'first_name', 'father_name', 'last_name', 'employee_id', 'company_id', 'shift_id', 'basic_salary', 'allowances'])
             ->map(fn (Employee $employee) => [
                 'id' => $employee->id,
                 'first_name' => $employee->first_name,
+                'father_name' => $employee->father_name,
                 'last_name' => $employee->last_name,
                 'employee_id' => $employee->employee_id,
                 'company_id' => $employee->company_id,
