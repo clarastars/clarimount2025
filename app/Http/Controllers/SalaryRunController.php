@@ -49,21 +49,55 @@ class SalaryRunController extends Controller
 
     private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
     {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
         if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
             return true;
         }
 
         $teamCompanyIds = $this->userAccessibleCompanyIds($user);
 
-        if ($user->can($permission) && in_array((int) $company->id, $teamCompanyIds, true)) {
-            return true;
-        }
+        $salaryRunPermissions = [
+            'salary-runs.readonly',
+            'salary-runs.approve',
+            'salary-runs.create',
+            'salary-runs.delete',
+        ];
 
-        if ($user->can('salary-runs.approve') && in_array((int) $company->id, $teamCompanyIds, true)) {
-            return true;
+        foreach ($salaryRunPermissions as $salaryRunPermission) {
+            if ($user->can($salaryRunPermission) && in_array((int) $company->id, $teamCompanyIds, true)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private function canAccessCompanyWithPermission($user, Company $company, string $permission): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
+            return true;
+        }
+
+        $teamCompanyIds = $this->userAccessibleCompanyIds($user);
+
+        return $user->can($permission) && in_array((int) $company->id, $teamCompanyIds, true);
+    }
+
+    private function canCreateSalaryRun($user, Company $company): bool
+    {
+        return $this->canAccessCompanyWithPermission($user, $company, 'salary-runs.create');
+    }
+
+    private function canDeleteSalaryRun($user, Company $company): bool
+    {
+        return $this->canAccessCompanyWithPermission($user, $company, 'salary-runs.delete');
     }
 
     private function canApproveSalaryRunStep($user, Company $company, SalaryRunApprovalStep $step, SalaryRun $salaryRun): bool
@@ -100,7 +134,8 @@ class SalaryRunController extends Controller
         return Inertia::render('SalaryRuns/Index', [
             'company' => $company,
             'salaryRuns' => $salaryRuns,
-            'canManageSalaryRuns' => $this->canManageCompanySalaryRuns($user, $company),
+            'canCreateSalaryRuns' => $this->canCreateSalaryRun($user, $company),
+            'canDeleteSalaryRuns' => $this->canDeleteSalaryRun($user, $company),
         ]);
     }
 
@@ -164,9 +199,8 @@ class SalaryRunController extends Controller
     {
         $user = Auth::user();
 
-        // Verify user owns this company
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
-            abort(403, 'You do not have access to this company.');
+        if (! $this->canCreateSalaryRun($user, $company)) {
+            abort(403, 'You do not have permission to create salary runs for this company.');
         }
 
         $validated = $request->validate([
@@ -196,8 +230,8 @@ class SalaryRunController extends Controller
     {
         $user = Auth::user();
 
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
-            abort(403, 'You do not have access to this company.');
+        if (! $this->canDeleteSalaryRun($user, $company)) {
+            abort(403, 'You do not have permission to delete salary runs for this company.');
         }
 
         if ($salaryRun->company_id !== $company->id) {

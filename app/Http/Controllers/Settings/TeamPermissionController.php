@@ -31,6 +31,8 @@ class TeamPermissionController extends Controller
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
         ['name' => 'attendance.adjustments.manage', 'label' => 'إدارة الخصومات والإضافات واعتماد ورفض الجزاءات'],
         ['name' => 'salary-runs.readonly', 'label' => 'الاطلاع على مسير الرواتب (قراءة فقط)'],
+        ['name' => 'salary-runs.create', 'label' => 'إنشاء مسير الرواتب'],
+        ['name' => 'salary-runs.delete', 'label' => 'حذف مسير الرواتب'],
         ['name' => 'salary-runs.approve', 'label' => 'إمكانية اعتماد مسير الرواتب'],
     ];
 

@@ -227,7 +227,10 @@ class SalaryRunNotificationService
 
         $this->refreshUserPermissionContext($user);
 
-        return $user->can('salary-runs.readonly') || $user->can('salary-runs.approve');
+        return $user->can('salary-runs.readonly')
+            || $user->can('salary-runs.approve')
+            || $user->can('salary-runs.create')
+            || $user->can('salary-runs.delete');
     }
 
     private function refreshUserPermissionContext(User $user): void

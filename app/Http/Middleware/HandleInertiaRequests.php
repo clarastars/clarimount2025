@@ -72,7 +72,11 @@ class HandleInertiaRequests extends Middleware
                 'can_manage_attendance_adjustments' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('attendance.adjustments.manage', $permissionNames, true),
-                'can_view_salary_runs_readonly' => $isSuperAdmin || in_array('salary-runs.readonly', $permissionNames, true) || in_array('salary-runs.approve', $permissionNames, true),
+                'can_view_salary_runs_readonly' => $isSuperAdmin
+                    || in_array('salary-runs.readonly', $permissionNames, true)
+                    || in_array('salary-runs.approve', $permissionNames, true)
+                    || in_array('salary-runs.create', $permissionNames, true)
+                    || in_array('salary-runs.delete', $permissionNames, true),
                 'can_approve_salary_runs' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('salary-runs.approve', $permissionNames, true),

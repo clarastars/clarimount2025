@@ -153,6 +153,30 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('salary-runs.create')) {
+            $allowed = array_merge($allowed, [
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.store',
+                'salary-runs.export-excel',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($user->can('salary-runs.delete')) {
+            $allowed = array_merge($allowed, [
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.destroy',
+                'salary-runs.export-excel',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
         if ($user->can('salary-runs.approve')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
