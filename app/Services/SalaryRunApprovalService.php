@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\SalaryRun;
+use App\Models\SalaryRunApprovalRejection;
 use App\Models\SalaryRunApprovalStep;
 use App\Models\SalaryRunStepApproval;
 use App\Models\User;
@@ -59,6 +60,7 @@ class SalaryRunApprovalService
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
                 'can_approve' => $canApprove,
+                'can_reject' => $canApprove,
                 'waiting_previous' => ! $previousStepsApproved && ! $isApproved,
             ];
 
@@ -68,6 +70,47 @@ class SalaryRunApprovalService
         }
 
         return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function buildLatestRejectionPayload(SalaryRun $salaryRun): ?array
+    {
+        if ($this->allStepsApproved($salaryRun)) {
+            return null;
+        }
+
+        $rejection = SalaryRunApprovalRejection::query()
+            ->where('salary_run_id', $salaryRun->id)
+            ->with(['rejector', 'approvalStep'])
+            ->latest('rejected_at')
+            ->first();
+
+        if ($rejection === null) {
+            return null;
+        }
+
+        return [
+            'id' => $rejection->id,
+            'reason' => $rejection->reason,
+            'rejected_at' => $rejection->rejected_at->toIso8601String(),
+            'rejector_name' => $rejection->rejector?->name,
+            'step_title' => $rejection->approvalStep?->title,
+            'cleared_approvals_count' => $rejection->cleared_approvals_count,
+        ];
+    }
+
+    public function allStepsApproved(SalaryRun $salaryRun): bool
+    {
+        $stepCount = $this->activeSteps()->count();
+        if ($stepCount === 0) {
+            return false;
+        }
+
+        $approvedCount = $salaryRun->stepApprovals()->count();
+
+        return $approvedCount === $stepCount;
     }
 
     public function canUserApproveStep(
@@ -149,6 +192,31 @@ class SalaryRunApprovalService
                 'approval_step_id' => $step->id,
                 'approved_at' => now(),
                 'approved_by' => $user->id,
+            ]);
+        });
+    }
+
+    public function rejectStep(User $user, SalaryRun $salaryRun, SalaryRunApprovalStep $step, string $reason): SalaryRunApprovalRejection
+    {
+        return DB::transaction(function () use ($user, $salaryRun, $step, $reason) {
+            if ($salaryRun->stepApprovals()->where('approval_step_id', $step->id)->exists()) {
+                throw new \RuntimeException(__('messages.salary_runs.already_approved'));
+            }
+
+            if (! $this->previousStepsAreApproved($salaryRun, $step)) {
+                throw new \RuntimeException(__('messages.salary_runs.approval_previous_required'));
+            }
+
+            $clearedCount = $salaryRun->stepApprovals()->count();
+            $salaryRun->stepApprovals()->delete();
+
+            return SalaryRunApprovalRejection::query()->create([
+                'salary_run_id' => $salaryRun->id,
+                'approval_step_id' => $step->id,
+                'rejected_at' => now(),
+                'rejected_by' => $user->id,
+                'reason' => $reason,
+                'cleared_approvals_count' => $clearedCount,
             ]);
         });
     }

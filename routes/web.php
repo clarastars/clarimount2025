@@ -252,6 +252,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('companies/{company}/salary-runs/{salaryRun}', [SalaryRunController::class, 'destroy'])->name('salary-runs.destroy');
     Route::post('companies/{company}/salary-runs/{salaryRun}/finalize', [SalaryRunController::class, 'finalize'])->name('salary-runs.finalize');
     Route::post('companies/{company}/salary-runs/{salaryRun}/approval-steps/{salaryRunApprovalStep}/approve', [SalaryRunController::class, 'approveStep'])->name('salary-runs.approve-step');
+    Route::post('companies/{company}/salary-runs/{salaryRun}/approval-steps/{salaryRunApprovalStep}/reject', [SalaryRunController::class, 'rejectStep'])->name('salary-runs.reject-step');
     Route::post('companies/{company}/salary-runs/{salaryRun}/update-debt-deductions', [SalaryRunController::class, 'updateDebtDeductions'])->name('salary-runs.update-debt-deductions');
     Route::post('companies/{company}/salary-runs/{salaryRun}/remove-breakdown-line', [SalaryRunController::class, 'removeBreakdownLine'])->name('salary-runs.remove-breakdown-line');
 

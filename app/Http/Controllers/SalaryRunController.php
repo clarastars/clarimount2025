@@ -120,11 +120,13 @@ class SalaryRunController extends Controller
             ->firstOrFail();
 
         $approvalSteps = $this->salaryRunApprovalService->buildApprovalPayload($salaryRun, $user, $company);
+        $latestRejection = $this->salaryRunApprovalService->buildLatestRejectionPayload($salaryRun);
 
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
             'salaryRun' => $salaryRun,
             'approvalSteps' => $approvalSteps,
+            'latestRejection' => $latestRejection,
             'canManageSalaryRun' => $this->canManageCompanySalaryRuns($user, $company),
         ]);
     }
@@ -219,16 +221,9 @@ class SalaryRunController extends Controller
             abort(403, 'Salary run does not belong to this company.');
         }
 
-        DB::transaction(function () use ($salaryRun) {
-            // Apply debt deductions before finalizing
-            $this->salaryRunService->applyDebtDeductions($salaryRun);
+        $this->salaryRunService->finalizeSalaryRun($salaryRun);
 
-            $salaryRun->update([
-                'status' => 'finalized',
-            ]);
-        });
-
-        return back()->with('success', __('Salary run finalized successfully.'));
+        return back()->with('success', __('messages.salary_runs.finalized_successfully'));
     }
 
     public function approveStep(Company $company, SalaryRun $salaryRun, SalaryRunApprovalStep $salaryRunApprovalStep): RedirectResponse
@@ -241,6 +236,10 @@ class SalaryRunController extends Controller
 
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
+        }
+
+        if ($salaryRun->status === 'finalized') {
+            return back()->with('error', __('messages.salary_runs.cannot_update_finalized'));
         }
 
         if (! $salaryRunApprovalStep->is_active) {
@@ -257,7 +256,57 @@ class SalaryRunController extends Controller
             return back()->with('info', $exception->getMessage());
         }
 
+        $salaryRun->refresh();
+
+        if ($this->salaryRunApprovalService->allStepsApproved($salaryRun)) {
+            $this->salaryRunService->finalizeSalaryRun($salaryRun);
+
+            return back()->with('success', __('messages.salary_runs.finalized_after_last_approval'));
+        }
+
         return back()->with('success', __('messages.salary_runs.approval_saved'));
+    }
+
+    public function rejectStep(Request $request, Company $company, SalaryRun $salaryRun, SalaryRunApprovalStep $salaryRunApprovalStep): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
+            abort(403, 'You do not have access to this company.');
+        }
+
+        if ($salaryRun->company_id !== $company->id) {
+            abort(403, 'Salary run does not belong to this company.');
+        }
+
+        if ($salaryRun->status === 'finalized') {
+            return back()->with('error', __('messages.salary_runs.cannot_update_finalized'));
+        }
+
+        if (! $salaryRunApprovalStep->is_active) {
+            abort(403, 'This approval step is not active.');
+        }
+
+        if (! $this->canApproveSalaryRunStep($user, $company, $salaryRunApprovalStep, $salaryRun)) {
+            abort(403, 'You do not have permission to perform this rejection.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+
+        try {
+            $this->salaryRunApprovalService->rejectStep(
+                $user,
+                $salaryRun,
+                $salaryRunApprovalStep,
+                $validated['reason']
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->with('info', $exception->getMessage());
+        }
+
+        return back()->with('success', __('messages.salary_runs.approval_rejection_saved'));
     }
 
     /**

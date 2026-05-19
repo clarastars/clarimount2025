@@ -156,6 +156,7 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.show',
                 'salary-runs.export-excel',
                 'salary-runs.approve-step',
+                'salary-runs.reject-step',
             ]);
         }
 

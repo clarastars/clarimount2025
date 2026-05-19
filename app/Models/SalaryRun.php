@@ -95,6 +95,11 @@ class SalaryRun extends Model
         return $this->hasMany(SalaryRunStepApproval::class);
     }
 
+    public function approvalRejections(): HasMany
+    {
+        return $this->hasMany(SalaryRunApprovalRejection::class);
+    }
+
     /**
      * Check if salary run is finalized
      */

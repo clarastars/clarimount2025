@@ -462,4 +462,19 @@ class SalaryRunService
             }
         });
     }
+
+    public function finalizeSalaryRun(SalaryRun $salaryRun): void
+    {
+        if ($salaryRun->status === 'finalized') {
+            return;
+        }
+
+        DB::transaction(function () use ($salaryRun) {
+            $this->applyDebtDeductions($salaryRun);
+
+            $salaryRun->update([
+                'status' => 'finalized',
+            ]);
+        });
+    }
 }

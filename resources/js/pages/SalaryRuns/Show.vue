@@ -41,7 +41,36 @@
         <CardHeader>
           <CardTitle class="text-base">{{ t('salary_runs.approvals_section') }}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent class="space-y-4">
+          <div
+            v-if="latestRejection"
+            class="rounded-lg border border-red-200 bg-red-50/80 dark:bg-red-950/20 dark:border-red-800 p-4 space-y-2"
+          >
+            <div class="font-semibold text-red-800 dark:text-red-300">
+              {{ t('salary_runs.approval_rejection_notice_title') }}
+            </div>
+            <p class="text-sm text-red-700 dark:text-red-300">
+              {{
+                t('salary_runs.approval_rejection_notice_message', {
+                  name: latestRejection.rejector_name || '-',
+                  step: latestRejection.step_title || '-',
+                  date: formatApprovalDate(latestRejection.rejected_at),
+                  time: formatApprovalTime(latestRejection.rejected_at),
+                })
+              }}
+            </p>
+            <p v-if="latestRejection.cleared_approvals_count > 0" class="text-sm text-red-700 dark:text-red-300">
+              {{ t('salary_runs.approval_rejection_cleared_count', { count: latestRejection.cleared_approvals_count }) }}
+            </p>
+            <div class="text-sm">
+              <span class="font-medium text-red-800 dark:text-red-300">{{ t('salary_runs.approval_rejection_reason_label') }}:</span>
+              <span class="text-red-700 dark:text-red-300">{{ latestRejection.reason }}</span>
+            </div>
+            <p class="text-sm text-red-600 dark:text-red-400">
+              {{ t('salary_runs.approval_rejection_restart_hint') }}
+            </p>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div
               v-for="approval in approvalList"
@@ -74,15 +103,27 @@
                   {{ t('salary_runs.approval_waiting_previous') }}
                 </p>
                 <p v-else class="text-sm text-amber-600 dark:text-amber-400">{{ t('salary_runs.approval_pending') }}</p>
-                <Button
-                  v-if="approval.can_approve"
-                  size="sm"
-                  class="w-full"
-                  :disabled="approvingStepId === approval.id"
-                  @click="openApprovalConfirm(approval.id)"
-                >
-                  {{ approvingStepId === approval.id ? '...' : t('salary_runs.approval_approve') }}
-                </Button>
+                <div v-if="approval.can_approve || approval.can_reject" class="flex gap-2">
+                  <Button
+                    v-if="approval.can_approve"
+                    size="sm"
+                    class="flex-1"
+                    :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
+                    @click="openApprovalConfirm(approval.id)"
+                  >
+                    {{ approvingStepId === approval.id ? '...' : t('salary_runs.approval_approve') }}
+                  </Button>
+                  <Button
+                    v-if="approval.can_reject"
+                    size="sm"
+                    variant="destructive"
+                    class="flex-1"
+                    :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
+                    @click="openRejectDialog(approval.id)"
+                  >
+                    {{ rejectingStepId === approval.id ? '...' : t('salary_runs.approval_reject') }}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -459,12 +500,48 @@
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <!-- Rejection dialog -->
+      <Dialog :open="rejectDialogStepId !== null" @update:open="(open) => !open && closeRejectDialog()">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{{ t('salary_runs.approval_reject_confirm_title') }}</DialogTitle>
+            <DialogDescription>
+              {{ t('salary_runs.approval_reject_confirm_message') }}
+            </DialogDescription>
+          </DialogHeader>
+          <form class="space-y-3" @submit.prevent="submitRejection">
+            <div class="space-y-2">
+              <Label for="reject-reason">{{ t('salary_runs.approval_reject_reason_label') }}</Label>
+              <textarea
+                id="reject-reason"
+                v-model="rejectForm.reason"
+                rows="4"
+                required
+                minlength="5"
+                maxlength="2000"
+                class="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                :placeholder="t('salary_runs.approval_reject_reason_placeholder')"
+              />
+              <p v-if="rejectForm.errors.reason" class="text-sm text-red-600">{{ rejectForm.errors.reason }}</p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" @click="closeRejectDialog">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button type="submit" variant="destructive" :disabled="rejectForm.processing">
+                {{ rejectForm.processing ? '...' : t('salary_runs.approval_reject') }}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -489,7 +566,17 @@ interface ApprovalStepState {
   approved_at: string | null;
   approver_name: string | null;
   can_approve: boolean;
+  can_reject: boolean;
   waiting_previous: boolean;
+}
+
+interface LatestRejectionState {
+  id: number;
+  reason: string;
+  rejected_at: string;
+  rejector_name: string | null;
+  step_title: string | null;
+  cleared_approvals_count: number;
 }
 
 interface Props {
@@ -548,6 +635,7 @@ interface Props {
     }>;
   };
   approvalSteps?: ApprovalStepState[];
+  latestRejection?: LatestRejectionState | null;
 }
 
 const props = defineProps<Props>();
@@ -562,12 +650,28 @@ function getEmployeeFullName(employee?: { first_name?: string | null; father_nam
 }
 
 const approvalList = computed(() => props.approvalSteps ?? []);
+const latestRejection = computed(() => props.latestRejection ?? null);
 
 const approvingStepId = ref<number | null>(null);
+const rejectingStepId = ref<number | null>(null);
 const approvalConfirmStepId = ref<number | null>(null);
+const rejectDialogStepId = ref<number | null>(null);
+const rejectForm = useForm({ reason: '' });
 
 function openApprovalConfirm(stepId: number) {
   approvalConfirmStepId.value = stepId;
+}
+
+function openRejectDialog(stepId: number) {
+  rejectDialogStepId.value = stepId;
+  rejectForm.clearErrors();
+  rejectForm.reason = '';
+}
+
+function closeRejectDialog() {
+  rejectDialogStepId.value = null;
+  rejectForm.reset();
+  rejectForm.clearErrors();
 }
 
 function confirmApprovalSubmit() {
@@ -601,6 +705,25 @@ function submitApproval(stepId: number) {
     preserveScroll: true,
     onFinish: () => {
       approvingStepId.value = null;
+    },
+  });
+}
+
+function submitRejection() {
+  if (rejectDialogStepId.value === null) {
+    return;
+  }
+
+  const stepId = rejectDialogStepId.value;
+  rejectingStepId.value = stepId;
+
+  rejectForm.post(route('salary-runs.reject-step', [props.company.id, props.salaryRun.id, stepId]), {
+    preserveScroll: true,
+    onSuccess: () => {
+      closeRejectDialog();
+    },
+    onFinish: () => {
+      rejectingStepId.value = null;
     },
   });
 }
