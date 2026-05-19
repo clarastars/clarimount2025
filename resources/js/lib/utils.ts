@@ -19,7 +19,7 @@ export function formatEmployeeFullName(
     return [person.first_name, person.father_name, person.last_name]
         .map((part) => (part ?? '').trim())
         .filter((part) => part.length > 0)
-        .join(' - ');
+        .join(' ');
 }
 
 export function formatEmployeeSelectLabel(
