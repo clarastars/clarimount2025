@@ -171,6 +171,10 @@ return [
         'salary_run_your_turn_after_rejection' => '{company} salary run ({period}) was rejected and it is now your turn at step «{step}». Reason: {reason}',
         'salary_run_rejected' => '{name} rejected {company} salary run ({period}) at step «{step}». Reason: {reason}',
         'salary_run_finalized' => '{company} salary run ({period}) is fully approved and was finalized automatically after {name}\'s approval.',
+        'salary_run_email_subject' => 'Salary Run Workflow Notification',
+        'salary_run_email_greeting' => 'Dear :name,',
+        'salary_run_email_cta' => 'View salary run',
+        'salary_run_email_footer' => 'Please log in to the system to review and take action if required.',
     ],
     'common' => [
         'loading' => 'Loading...',

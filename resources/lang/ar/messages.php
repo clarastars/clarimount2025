@@ -171,6 +171,10 @@ return [
         'salary_run_your_turn_after_rejection' => 'تم رفض مسير رواتب {company} ({period}) وأصبح دورك للاعتماد في خطوة «{step}». السبب: {reason}',
         'salary_run_rejected' => 'تم رفض مسير رواتب {company} ({period}) في خطوة «{step}» بواسطة {name}. السبب: {reason}',
         'salary_run_finalized' => 'اكتمل اعتماد مسير رواتب {company} ({period}) وتم إقراره تلقائياً بعد اعتماد {name}.',
+        'salary_run_email_subject' => 'إشعار مسير الرواتب',
+        'salary_run_email_greeting' => 'عزيزي/عزيزتي :name،',
+        'salary_run_email_cta' => 'عرض مسير الرواتب',
+        'salary_run_email_footer' => 'يرجى تسجيل الدخول إلى النظام للمراجعة واتخاذ الإجراء المطلوب إن وجد.',
     ],
     'common' => [
         'loading' => 'جارٍ التحميل...',

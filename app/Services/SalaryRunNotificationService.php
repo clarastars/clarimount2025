@@ -7,9 +7,12 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\SalaryRun;
 use App\Models\SalaryRunApprovalStep;
+use App\Mail\SalaryRunWorkflowMail;
 use App\Models\User;
 use App\Notifications\SalaryRunWorkflowNotification;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
 
 class SalaryRunNotificationService
@@ -256,8 +259,35 @@ class SalaryRunNotificationService
     private function send(User $user, string $eventType, array $payload): void
     {
         $user->notify(new SalaryRunWorkflowNotification($eventType, $payload));
+        $this->sendWorkflowEmail($user, $eventType, $payload);
 
         $this->broadcastToSuperAdmins($eventType, $payload, [$user->id]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function sendWorkflowEmail(User $user, string $eventType, array $payload): void
+    {
+        $user->loadMissing('employee');
+
+        $workEmail = trim((string) ($user->employee?->work_email ?? ''));
+        if ($workEmail === '' || ! filter_var($workEmail, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        try {
+            Mail::to($workEmail)->send(new SalaryRunWorkflowMail($user, $eventType, $payload));
+        } catch (\Throwable $exception) {
+            Log::error('Failed to send salary run workflow email.', [
+                'user_id' => $user->id,
+                'employee_id' => $user->employee?->id,
+                'event_type' => $eventType,
+                'salary_run_id' => $payload['salary_run_id'] ?? null,
+                'work_email' => $workEmail,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -272,6 +302,9 @@ class SalaryRunNotificationService
             ->whereHas('roles', fn ($query) => $query->where('name', 'super-admin'))
             ->whereNotIn('id', $excludeUserIds)
             ->get()
-            ->each(fn (User $admin) => $admin->notify(new SalaryRunWorkflowNotification($eventType, $payload)));
+            ->each(function (User $admin) use ($eventType, $payload): void {
+                $admin->notify(new SalaryRunWorkflowNotification($eventType, $payload));
+                $this->sendWorkflowEmail($admin, $eventType, $payload);
+            });
     }
 }
