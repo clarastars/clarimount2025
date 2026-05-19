@@ -154,11 +154,13 @@ class SalaryRunApprovalService
             return false;
         }
 
-        if ((int) $user->team_id !== (int) $step->team_id) {
+        $stepTeamId = (int) $step->team_id;
+
+        if (! app(EmployeeUserRoleService::class)->userBelongsToTeam($user, $stepTeamId)) {
             return false;
         }
 
-        app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($stepTeamId);
         $user->unsetRelation('roles');
         $user->unsetRelation('permissions');
 

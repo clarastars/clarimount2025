@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import Icon from '@/components/Icon.vue'
+import EmployeeTeamAssignmentsFields from '@/components/employees/EmployeeTeamAssignmentsFields.vue'
 
 const { t } = useI18n()
 
@@ -41,6 +42,12 @@ interface Props {
     defaultResidenceCountryId?: number
     shifts?: any[]
     canManagePortalAccount?: boolean
+    availableTeams?: Array<{ id: number; name: string }>
+    assignableTeamRoles?: Array<{ name: string; label: string }>
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string }>
+    primaryTeamId?: number | null
+    roleCompanies?: Array<{ id: number; name: string }>
+    assignedRoleCompanyIds?: number[]
 }
 
 const props = defineProps<Props>()
@@ -114,6 +121,8 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
+    team_role_assignments: [] as Array<{ team_id: number; role_name: string }>,
+    role_company_ids: [] as number[],
 })
 
 // Auto-calculate total allowances from allowance details
@@ -130,6 +139,7 @@ watch(
 // Section collapse states
 const sectionGeneral = ref(true)
 const sectionEmployeeAccount = ref(true)
+const sectionPermissionsTeams = ref(true)
 const sectionWork = ref(true)
 const sectionAnnualLeave = ref(false)
 const sectionLegal = ref(false)
@@ -964,6 +974,50 @@ const formatCurrency = (amount: number) => {
                                                 <Icon :name="showPortalPasswordConfirmation ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
+                </Card>
+
+                <Card v-if="props.canManagePortalAccount">
+                    <Collapsible v-model:open="sectionPermissionsTeams">
+                        <CollapsibleTrigger asChild>
+                            <CardHeader class="cursor-pointer hover:bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <Icon name="Users" class="h-5 w-5 text-emerald-600" />
+                                        <CardTitle class="text-xl">{{ t('settings.permissions_teams') }}</CardTitle>
+                                    </div>
+                                    <Icon :name="!sectionPermissionsTeams ? 'ChevronRight' : 'ChevronDown'" class="h-5 w-5" />
+                                </div>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent class="space-y-4">
+                                <EmployeeTeamAssignmentsFields
+                                    v-model:team-role-assignments="form.team_role_assignments"
+                                    :available-teams="props.availableTeams || []"
+                                    :errors="form.errors"
+                                />
+                                <div class="space-y-2">
+                                    <Label>{{ t('companies.title') }}</Label>
+                                    <p class="text-xs text-muted-foreground">{{ t('settings.role_companies_hint') }}</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
+                                        <label
+                                            v-for="company in (props.roleCompanies || [])"
+                                            :key="company.id"
+                                            class="flex items-center gap-2 text-sm"
+                                        >
+                                            <input
+                                                v-model="form.role_company_ids"
+                                                :value="company.id"
+                                                type="checkbox"
+                                                class="h-4 w-4 rounded border-gray-300"
+                                            >
+                                            <span>{{ company.name }}</span>
+                                        </label>
                                     </div>
                                 </div>
                             </CardContent>

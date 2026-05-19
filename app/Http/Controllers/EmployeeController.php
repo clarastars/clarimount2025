@@ -9,9 +9,9 @@ use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
 use App\Models\SystemSetting;
-use App\Models\Team;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeePortalUserService;
+use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,9 +19,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
-
 class EmployeeController extends Controller
 {
     use AuthorizesEmployeeAccess;
@@ -297,6 +294,7 @@ class EmployeeController extends Controller
             'defaultResidenceCountryId' => $saudiArabia?->id,
             'shifts' => Shift::orderBy('name')->get(),
             'canManagePortalAccount' => $user->hasRole('super-admin'),
+            ...$this->portalRoleFormProps($user),
         ]);
     }
 
@@ -388,6 +386,7 @@ class EmployeeController extends Controller
             'annual_leave_balance' => 'nullable|integer|min:0',
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
+            ...$this->portalRoleValidationRules(),
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'personal_email.unique' => __('employees.email_already_used'),
@@ -447,6 +446,11 @@ class EmployeeController extends Controller
                 false
             );
 
+            $employee->refresh()->load('user');
+            if ($employee->user) {
+                $this->syncPortalUserRoles($employee->user, $user, $validated);
+            }
+
             return redirect()->route('employees.show', $employee)
                 ->with('success', 'Employee created successfully.');
         } catch (\Exception $e) {
@@ -471,7 +475,7 @@ class EmployeeController extends Controller
             'company',
             'nationality',
             'residenceCountry',
-            'user.team',
+            'user',
             'shift',
             'assets.assetCategory',
             'assetAssignments.asset.assetCategory',
@@ -488,7 +492,9 @@ class EmployeeController extends Controller
                 'exists' => (bool) $employee->user_id,
                 'email' => $employee->work_email ?: $employee->user?->email,
             ],
-            'assignedTeamName' => $employee->user?->team?->name,
+            'assignedTeams' => $employee->user
+                ? app(EmployeeUserRoleService::class)->assignedTeamsForUi($employee->user)
+                : [],
             'canManageEmployees' => $this->canManageEmployees($user),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
         ]);
@@ -526,24 +532,7 @@ class EmployeeController extends Controller
                 'exists' => (bool) $employee->user_id,
                 'email' => $employee->work_email ?: $employee->user?->email,
             ],
-            'availableTeams' => Team::query()
-                ->where('owner_id', $user->id)
-                ->orWhere('id', $user->team_id)
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->unique('id')
-                ->values(),
-            'assignedTeamId' => $employee->user?->team_id,
-            'roleCompanies' => \App\Models\Company::query()
-                ->orderBy('name_en')
-                ->orderBy('name_ar')
-                ->get(['id', 'name_en', 'name_ar'])
-                ->map(fn (\App\Models\Company $company) => [
-                    'id' => $company->id,
-                    'name' => trim(($company->name_en ?? '').' '.($company->name_ar ?? '')) ?: (string) $company->id,
-                ])
-                ->values(),
-            'assignedRoleCompanyIds' => $employee->user?->accessibleCompanies()->pluck('companies.id')->values() ?? [],
+            ...$this->portalRoleFormProps($user, $employee->user),
         ]);
     }
 
@@ -646,9 +635,7 @@ class EmployeeController extends Controller
             'annual_leave_balance' => 'nullable|integer|min:0',
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
-            'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')],
-            'role_company_ids' => ['array'],
-            'role_company_ids.*' => ['integer', Rule::exists('companies', 'id')],
+            ...$this->portalRoleValidationRules(),
         ], [
             'employee_id.unique' => __('employees.employee_id_already_used'),
             'personal_email.unique' => __('employees.email_already_used'),
@@ -693,39 +680,7 @@ class EmployeeController extends Controller
         $employee->refresh()->load('user');
 
         if ($employee->user) {
-            $selectedTeamId = isset($validated['team_id']) ? (int) $validated['team_id'] : null;
-            $selectedTeam = $selectedTeamId ? Team::query()->where('id', $selectedTeamId)->first() : null;
-
-            if ($selectedTeamId && ! $selectedTeam) {
-                return back()->withErrors(['team_id' => 'Selected team does not exist.']);
-            }
-
-            if ($selectedTeam && ! ($selectedTeam->owner_id === $user->id || $selectedTeam->id === $user->team_id)) {
-                return back()->withErrors(['team_id' => 'You are not allowed to assign this team.']);
-            }
-
-            $employee->user->update([
-                'team_id' => $selectedTeam?->id,
-                'joined_team_at' => $selectedTeam ? now() : null,
-            ]);
-
-            $employee->user->roles()
-                ->where('name', 'team-member')
-                ->detach();
-
-            if ($selectedTeam) {
-                app(PermissionRegistrar::class)->setPermissionsTeamId($selectedTeam->id);
-
-                $teamMemberRole = Role::query()->firstOrCreate([
-                    'name' => 'team-member',
-                    'guard_name' => 'web',
-                    'team_id' => $selectedTeam->id,
-                ]);
-
-                $employee->user->assignRole($teamMemberRole);
-            }
-
-            $employee->user->accessibleCompanies()->sync($validated['role_company_ids'] ?? []);
+            $this->syncPortalUserRoles($employee->user, $user, $validated);
         }
 
         return redirect()->route('employees.show', $employee)
@@ -914,5 +869,83 @@ class EmployeeController extends Controller
         }
 
         return in_array((string) $value, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    /**
+     * @return array<int, array{team_id: int, role_name: string}>
+     */
+    private function resolveTeamRoleAssignments(EmployeeUserRoleService $roleService, \App\Models\User $portalUser): array
+    {
+        $assignments = $roleService->assignedTeamRoleAssignments($portalUser);
+
+        if ($assignments === [] && $portalUser->team_id) {
+            return [
+                [
+                    'team_id' => (int) $portalUser->team_id,
+                    'role_name' => 'team-member',
+                ],
+            ];
+        }
+
+        return $assignments;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function portalRoleFormProps($actingUser, ?\App\Models\User $portalUser = null): array
+    {
+        $roleService = app(EmployeeUserRoleService::class);
+
+        return [
+            'availableTeams' => $roleService->manageableTeamsFor($actingUser)->values()->all(),
+            'assignableTeamRoles' => $roleService->assignableTeamRolesForUi(),
+            'teamRoleAssignments' => $portalUser ? $this->resolveTeamRoleAssignments($roleService, $portalUser) : [],
+            'primaryTeamId' => $portalUser?->team_id,
+            'roleCompanies' => Company::query()
+                ->orderBy('name_en')
+                ->orderBy('name_ar')
+                ->get(['id', 'name_en', 'name_ar'])
+                ->map(fn (Company $company) => [
+                    'id' => $company->id,
+                    'name' => trim(($company->name_en ?? '').' '.($company->name_ar ?? '')) ?: (string) $company->id,
+                ])
+                ->values()
+                ->all(),
+            'assignedRoleCompanyIds' => $portalUser
+                ? $portalUser->accessibleCompanies()->pluck('companies.id')->values()->all()
+                : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function portalRoleValidationRules(): array
+    {
+        return [
+            'team_role_assignments' => ['array'],
+            'team_role_assignments.*.team_id' => ['required', 'integer', Rule::exists('teams', 'id')],
+            'team_role_assignments.*.role_name' => ['nullable', 'string', Rule::in(array_keys(EmployeeUserRoleService::TEAM_ROLES))],
+            'role_company_ids' => ['array'],
+            'role_company_ids.*' => ['integer', Rule::exists('companies', 'id')],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function syncPortalUserRoles(\App\Models\User $portalUser, $actingUser, array $validated): void
+    {
+        $roleService = app(EmployeeUserRoleService::class);
+
+        $roleService->sync(
+            $portalUser,
+            $actingUser,
+            $validated['team_role_assignments'] ?? [],
+            null,
+            $roleService->assignedGlobalRoleNames($portalUser),
+            $validated['role_company_ids'] ?? [],
+        );
     }
 }

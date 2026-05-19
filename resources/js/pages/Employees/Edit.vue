@@ -292,25 +292,16 @@
                                     </template>
                                 </div>
 
-                                <div>
-                                    <Label for="team_id" class="mb-2">{{ t('settings.assign_employee_team') }}</Label>
-                                    <select
-                                        id="team_id"
-                                        v-model="form.team_id"
-                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                    >
-                                        <option :value="null">{{ t('settings.no_team') }}</option>
-                                        <option v-for="team in (props.availableTeams || [])" :key="team.id" :value="team.id">
-                                            {{ team.name }}
-                                        </option>
-                                    </select>
-                                    <div v-if="form.errors.team_id" class="text-red-500 text-sm mt-1">{{ form.errors.team_id }}</div>
-                                </div>
+                                <EmployeeTeamAssignmentsFields
+                                    v-model:team-role-assignments="form.team_role_assignments"
+                                    :available-teams="props.availableTeams || []"
+                                    :errors="form.errors"
+                                />
 
                                 <div class="space-y-2">
                                     <Label>{{ t('companies.title') }}</Label>
                                     <p class="text-xs text-muted-foreground">
-                                        حدد الشركات المسموح للموظف الوصول لها عبر دوره.
+                                        {{ t('settings.role_companies_hint') }}
                                     </p>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
                                         <label
@@ -1097,6 +1088,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/Icon.vue';
+import EmployeeTeamAssignmentsFields from '@/components/employees/EmployeeTeamAssignmentsFields.vue';
 import type { Employee, Department, Company, BreadcrumbItem } from '@/types';
 
 const { t } = useI18n();
@@ -1129,7 +1121,9 @@ interface Props {
         email?: string | null;
     };
     availableTeams?: Array<{ id: number; name: string }>;
-    assignedTeamId?: number | null;
+    assignableTeamRoles?: Array<{ name: string; label: string }>;
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string }>;
+    primaryTeamId?: number | null;
     roleCompanies?: Array<{ id: number; name: string }>;
     assignedRoleCompanyIds?: number[];
 }
@@ -1236,7 +1230,7 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
-    team_id: props.assignedTeamId ?? null as number | null,
+    team_role_assignments: props.teamRoleAssignments ?? [] as Array<{ team_id: number; role_name: string }>,
     role_company_ids: props.assignedRoleCompanyIds ?? [] as number[],
 })
 

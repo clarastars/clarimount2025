@@ -95,7 +95,7 @@ class SalaryRunNotificationService
             return false;
         }
 
-        return (int) $user->team_id === (int) $step->team_id;
+        return app(EmployeeUserRoleService::class)->userBelongsToTeam($user, (int) $step->team_id);
     }
 
     public function notifyStepRejected(
@@ -189,9 +189,17 @@ class SalaryRunNotificationService
 
         $userIds = collect([$company->owner_id])->filter();
 
+        $roleService = app(EmployeeUserRoleService::class);
+
         foreach ($teamIds as $teamId) {
+            $teamMemberIds = $roleService->userIdsForTeam((int) $teamId);
+
+            if ($teamMemberIds === []) {
+                continue;
+            }
+
             $teamUserIds = User::query()
-                ->where('team_id', $teamId)
+                ->whereIn('id', $teamMemberIds)
                 ->where(function ($query) use ($company) {
                     $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
                         $companyQuery->where('companies.id', $company->id);
@@ -221,21 +229,31 @@ class SalaryRunNotificationService
             return true;
         }
 
-        if (! $user->team_id) {
+        $teamIds = app(EmployeeUserRoleService::class)->assignedTeamIdsFor($user);
+
+        if ($teamIds === []) {
             return false;
         }
 
-        $this->refreshUserPermissionContext($user);
+        foreach ($teamIds as $teamId) {
+            $this->refreshUserPermissionContext($user, $teamId);
 
-        return $user->can('salary-runs.readonly')
-            || $user->can('salary-runs.approve')
-            || $user->can('salary-runs.create')
-            || $user->can('salary-runs.delete');
+            if (
+                $user->can('salary-runs.readonly')
+                || $user->can('salary-runs.approve')
+                || $user->can('salary-runs.create')
+                || $user->can('salary-runs.delete')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    private function refreshUserPermissionContext(User $user): void
+    private function refreshUserPermissionContext(User $user, ?int $teamId = null): void
     {
-        app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId ?? $user->team_id);
         $user->unsetRelation('roles');
         $user->unsetRelation('permissions');
     }

@@ -48,9 +48,18 @@
                             <Label class="text-sm text-muted-foreground">{{ t('employees.employee_account') }}</Label>
                             <p>{{ props.portalAccount?.exists ? displayValue(props.portalAccount?.email) : '-' }}</p>
                         </div>
-                        <div>
-                            <Label class="text-sm text-muted-foreground">{{ t('settings.assign_employee_team') }}</Label>
-                            <p>{{ displayValue(props.assignedTeamName, t('settings.no_team')) }}</p>
+                        <div class="md:col-span-2">
+                            <Label class="text-sm text-muted-foreground">{{ t('settings.assign_employee_teams') }}</Label>
+                            <div v-if="(props.assignedTeams || []).length" class="mt-2 flex flex-wrap gap-2">
+                                <Badge
+                                    v-for="team in props.assignedTeams"
+                                    :key="team.id"
+                                    variant="secondary"
+                                >
+                                    {{ team.name }}
+                                </Badge>
+                            </div>
+                            <p v-else class="mt-1">{{ t('settings.no_team') }}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -207,7 +216,10 @@ interface Props {
         exists: boolean;
         email?: string | null;
     };
-    assignedTeamName?: string | null;
+    assignedTeams?: Array<{
+        id: number
+        name: string
+    }>;
     canManageEmployees?: boolean;
     canUpdateEmployeeCustody?: boolean;
 }
