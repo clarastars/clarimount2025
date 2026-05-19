@@ -1,0 +1,1 @@
+import{c as o}from"./index-D3sOfQXf.js";import{d as t,a as r,o as n,n as c,e as p,M as l}from"./app-DfLyfL_g.js";const f=t({__name:"CardDescription",props:{class:{}},setup(s){const e=s;return(a,m)=>(n(),r("p",{"data-slot":"card-description",class:c(p(o)("text-muted-foreground text-sm",e.class))},[l(a.$slots,"default")],2))}});export{f as _};

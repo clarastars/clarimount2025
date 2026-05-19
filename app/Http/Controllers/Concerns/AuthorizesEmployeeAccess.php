@@ -111,4 +111,69 @@ trait AuthorizesEmployeeAccess
         abort_unless($this->canUpdateEmployeeCustody($user), 403);
         abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
+
+    /**
+     * Companies assigned to the user's team role only (not owned companies).
+     *
+     * @return array<int>
+     */
+    protected function roleAssignedCompanyIds(User $user): array
+    {
+        return $user->accessibleCompanies()
+            ->pluck('companies.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    protected function canUseEmployeeGlobalSearch(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $user->can('employees.global-search');
+    }
+
+    /**
+     * @return array<int>|null null = all companies (super-admin)
+     */
+    protected function globalSearchCompanyIdsForUser(User $user): ?array
+    {
+        if ($user->hasRole('super-admin')) {
+            return null;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return $this->userAccessibleCompanyIds($user);
+        }
+
+        if ($user->can('employees.global-search')) {
+            return $this->roleAssignedCompanyIds($user);
+        }
+
+        return [];
+    }
+
+    protected function canViewEmployeeViaGlobalSearch(User $user, Employee $employee): bool
+    {
+        if (! $user->can('employees.global-search')) {
+            return false;
+        }
+
+        return in_array((int) $employee->company_id, $this->roleAssignedCompanyIds($user), true);
+    }
+
+    protected function abortUnlessCanViewEmployeeProfile(User $user, Employee $employee): void
+    {
+        if ($this->canViewEmployees($user) && $this->canAccessEmployee($user, $employee)) {
+            return;
+        }
+
+        abort_unless($this->canViewEmployeeViaGlobalSearch($user, $employee), 403);
+    }
 }

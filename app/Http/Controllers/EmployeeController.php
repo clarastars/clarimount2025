@@ -8,6 +8,7 @@ use App\Models\Country;
 use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
+use App\Models\SystemSetting;
 use App\Models\Team;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeePortalUserService;
@@ -464,8 +465,7 @@ class EmployeeController extends Controller
     public function show(Employee $employee): Response|RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanViewEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanViewEmployeeProfile($user, $employee);
 
         $employee->load([
             'company',
@@ -855,8 +855,13 @@ class EmployeeController extends Controller
     public function globalSearch(Request $request): JsonResponse
     {
         $user = Auth::user();
+
+        if (! $this->canUseEmployeeGlobalSearch($user) || ! $this->isEmployeeGlobalSearchEnabled()) {
+            return response()->json([]);
+        }
+
         $query = trim((string) $request->get('q', ''));
-        $companyIds = $this->searchableCompanyIdsForUser($user);
+        $companyIds = $this->globalSearchCompanyIdsForUser($user);
 
         if ($query === '') {
             return response()->json([]);
@@ -895,5 +900,18 @@ class EmployeeController extends Controller
             ->values();
 
         return response()->json($employees);
+    }
+
+    private function isEmployeeGlobalSearchEnabled(): bool
+    {
+        $value = SystemSetting::query()
+            ->where('key', 'employee_global_search_enabled')
+            ->value('value');
+
+        if ($value === null) {
+            return true;
+        }
+
+        return in_array((string) $value, ['1', 'true', 'yes', 'on'], true);
     }
 }

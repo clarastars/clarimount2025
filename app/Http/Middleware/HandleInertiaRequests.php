@@ -76,6 +76,11 @@ class HandleInertiaRequests extends Middleware
                 'can_approve_salary_runs' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('salary-runs.approve', $permissionNames, true),
+                'can_use_employee_global_search' => $user !== null && (
+                    $isSuperAdmin
+                    || $user->ownedCompanies()->exists()
+                    || $user->can('employees.global-search')
+                ),
             ],
             'locale' => $userLanguage,
             'translations' => $this->getTranslations($userLanguage),

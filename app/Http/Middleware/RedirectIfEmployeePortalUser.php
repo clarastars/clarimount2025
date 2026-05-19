@@ -74,6 +74,13 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('employees.global-search')) {
+            $allowed = array_merge($allowed, [
+                'employees.show',
+                'api.employees.global-search',
+            ]);
+        }
+
         if ($user->can('employees.manage')) {
             $allowed = array_merge($allowed, [
                 'employees.index',

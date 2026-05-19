@@ -24,9 +24,15 @@ interface SearchEmployeeResult {
 }
 
 const page = usePage();
-const authProps = computed(() => (page.props.auth as { is_employee?: boolean }) ?? {});
+const authProps = computed(() => (page.props.auth as {
+    is_employee?: boolean;
+    can_use_employee_global_search?: boolean;
+}) ?? {});
 const uiProps = computed(() => (page.props.ui as { show_employee_global_search?: boolean }) ?? {});
-const showGlobalSearch = computed(() => (uiProps.value.show_employee_global_search ?? true) && !authProps.value.is_employee);
+const showGlobalSearch = computed(() =>
+    (uiProps.value.show_employee_global_search ?? true)
+    && (authProps.value.can_use_employee_global_search ?? false),
+);
 
 const searchQuery = ref('');
 const suggestions = ref<SearchEmployeeResult[]>([]);
