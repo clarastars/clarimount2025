@@ -12,11 +12,20 @@ import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
 const page = usePage();
-const authProps = computed(() => (page.props.auth as { is_employee?: boolean; can_access_settings?: boolean; can_access_asset_inventory?: boolean; can_view_company_readonly?: boolean }) ?? {});
+const authProps = computed(() => (page.props.auth as {
+    is_employee?: boolean;
+    can_access_settings?: boolean;
+    can_access_asset_inventory?: boolean;
+    can_view_company_readonly?: boolean;
+    can_view_employees_readonly?: boolean;
+    can_manage_employees?: boolean;
+}) ?? {});
 const isEmployee = computed(() => authProps.value.is_employee ?? false);
 const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
 const canAccessAssetInventory = computed(() => authProps.value.can_access_asset_inventory ?? false);
 const canViewCompanyReadOnly = computed(() => authProps.value.can_view_company_readonly ?? false);
+const canViewEmployees = computed(() => authProps.value.can_view_employees_readonly ?? false);
+const canManageEmployees = computed(() => authProps.value.can_manage_employees ?? false);
 
 const mainNavItems = computed((): NavItem[] => [
     {
@@ -128,7 +137,10 @@ const footerNavItems = computed((): NavItem[] => [
         <SidebarContent>
             <NavMain
                 :items="isEmployee
-                    ? mainNavItems.filter((item) => item.href === '/dashboard' || (item.href === '/companies' && canViewCompanyReadOnly))
+                    ? mainNavItems.filter((item) =>
+                        item.href === '/dashboard'
+                        || (item.href === '/companies' && canViewCompanyReadOnly)
+                        || (item.href === '/employees' && canViewEmployees))
                     : mainNavItems"
             />
             <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />

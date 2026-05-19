@@ -92,7 +92,12 @@ const props = defineProps<{
   employeeId: number | null
   approvedPenalties: ApprovedPenalty[]
   manualDeductions: ManualDeduction[]
+  canManageAttendanceAdjustments?: boolean
 }>()
+
+const canManageAttendanceAdjustments = computed(
+  () => props.canManageAttendanceAdjustments ?? false,
+)
 
 const createModalOpen = ref(false)
 const createForm = useForm({
@@ -528,7 +533,7 @@ function deductionTypeLabel(type: string) {
               {{ t('attendance.deductions_description') }}
             </p>
           </div>
-          <Button class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700" @click="openCreateModal">
+          <Button v-if="canManageAttendanceAdjustments" class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700" @click="openCreateModal">
             <Plus class="w-4 h-4" />
             {{ t('attendance.create_deduction') }}
           </Button>
@@ -663,7 +668,7 @@ function deductionTypeLabel(type: string) {
                       </template>
                     </td>
                     <td class="px-4 py-3 text-sm">
-                      <template v-if="isManual(row)">
+                      <template v-if="canManageAttendanceAdjustments && isManual(row)">
                         <div class="flex gap-1">
                           <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditModal(row)" :title="t('attendance.edit_deduction')">
                             <Pencil class="h-4 w-4" />
@@ -673,7 +678,7 @@ function deductionTypeLabel(type: string) {
                           </Button>
                         </div>
                       </template>
-                      <template v-else-if="isPenalty(row)">
+                      <template v-else-if="canManageAttendanceAdjustments && isPenalty(row)">
                         <Button
                           variant="ghost"
                           size="sm"

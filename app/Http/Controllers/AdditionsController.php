@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesAttendanceAccess;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeAddition;
@@ -18,6 +19,8 @@ use Inertia\Response;
 
 class AdditionsController extends Controller
 {
+    use AuthorizesAttendanceAccess;
+
     public function __construct(
         private readonly ManualDeductionAmountService $manualDeductionAmountService,
         private readonly OperationalMonthService $operationalMonthService,
@@ -26,9 +29,7 @@ class AdditionsController extends Controller
     public function index(Request $request, Company $company): Response
     {
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
-            abort(403, 'You do not have access to this company.');
-        }
+        $this->abortUnlessCanViewAttendanceAdjustments($user, $company);
 
         $monthInput = $request->query('month');
         if ($monthInput === null || $monthInput === '') {
@@ -63,11 +64,20 @@ class AdditionsController extends Controller
         }
 
         $manualAdditions = $manualAdditionsQuery->orderBy('addition_date', 'desc')->get();
-        $companies = $user->ownedCompanies()->orderBy('name_en')->get(['id', 'name_en', 'name_ar']);
+        $viewableCompanyIds = array_unique(array_merge(
+            $user->ownedCompanies()->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+            $this->canManageAttendanceAdjustments($user) ? $this->userAccessibleCompanyIds($user) : [],
+            $this->canAccessCompanyAttendance($user, $company) ? [(int) $company->id] : [],
+        ));
+        $companies = Company::query()
+            ->whereIn('id', $viewableCompanyIds === [] ? [-1] : $viewableCompanyIds)
+            ->orderBy('name_en')
+            ->get(['id', 'name_en', 'name_ar']);
 
         return Inertia::render('Attendance/Additions', [
             'company' => $company->only(['id', 'name_en', 'name_ar']),
             'companies' => $companies,
+            'canManageAttendanceAdjustments' => $this->canManageAttendanceAdjustmentsForCompany($user, $company),
             'employees' => $employees,
             'month' => $month,
             'monthPeriodStart' => $start->format('Y-m-d'),
@@ -94,9 +104,11 @@ class AdditionsController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $user = Auth::user();
+        $company = Company::findOrFail($request->input('company_id'));
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
 
         $validated = $request->validate([
-            'company_id' => ['required', Rule::in($user->ownedCompanies()->pluck('id')->toArray())],
+            'company_id' => ['required', Rule::in($this->manageableAttendanceCompanyIds($user))],
             'employee_id' => [
                 'required',
                 Rule::exists('employees', 'id')->where('company_id', $request->input('company_id')),
@@ -184,9 +196,9 @@ class AdditionsController extends Controller
     public function update(Request $request, EmployeeAddition $addition): RedirectResponse
     {
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $addition->employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this addition.');
-        }
+        $addition->loadMissing('employee');
+        $company = Company::findOrFail($addition->employee->company_id);
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
 
         $validated = $request->validate([
             'amount_input_mode' => ['required', Rule::in(ManualDeductionAmountService::INPUT_MODES)],
@@ -271,9 +283,9 @@ class AdditionsController extends Controller
     public function destroy(EmployeeAddition $addition): RedirectResponse
     {
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $addition->employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this addition.');
-        }
+        $addition->loadMissing('employee');
+        $company = Company::findOrFail($addition->employee->company_id);
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
 
         $companyId = $addition->employee->company_id;
         $addition->delete();

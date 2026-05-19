@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Employee;
 use App\Models\Company;
 use App\Models\Country;
@@ -20,6 +21,8 @@ use Inertia\Response;
 
 class EmployeeImportController extends Controller
 {
+    use AuthorizesEmployeeAccess;
+
     protected $importService;
 
     public function __construct(EmployeeImportService $importService)
@@ -33,11 +36,14 @@ class EmployeeImportController extends Controller
     public function instructions(): Response|RedirectResponse
     {
         $user = Auth::user();
-        $companies = $user->ownedCompanies()->get();
+        $this->abortUnlessCanManageEmployees($user);
+
+        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
 
         if ($companies->isEmpty()) {
-            return redirect()->route('companies.create')
-                ->with('info', 'Please create a company first to import employees.');
+            return redirect()->route('employees.index')
+                ->with('info', 'No companies available to import employees.');
         }
 
         return Inertia::render('Employees/Import/Instructions', [
@@ -54,11 +60,14 @@ class EmployeeImportController extends Controller
     public function upload(): Response|RedirectResponse
     {
         $user = Auth::user();
-        $companies = $user->ownedCompanies()->get();
+        $this->abortUnlessCanManageEmployees($user);
+
+        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
 
         if ($companies->isEmpty()) {
-            return redirect()->route('companies.create')
-                ->with('info', 'Please create a company first to import employees.');
+            return redirect()->route('employees.index')
+                ->with('info', 'No companies available to import employees.');
         }
 
         return Inertia::render('Employees/Import/Upload', [
@@ -73,15 +82,18 @@ class EmployeeImportController extends Controller
     public function sampleCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $user = Auth::user();
-        $companies = $user->ownedCompanies();
+        $this->abortUnlessCanManageEmployees($user);
 
-        if ($companies->count() === 0) {
+        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->get();
+
+        if ($companies->isEmpty()) {
             abort(403, 'No companies associated with user.');
         }
 
         // Get company ID from request, or use first company as default
         $companyId = $request->query('company_id');
-        $company = $companyId ? $companies->find($companyId) : $companies->first();
+        $company = $companyId ? $companies->firstWhere('id', (int) $companyId) : $companies->first();
 
         if (!$company) {
             abort(403, 'Invalid company selection.');
@@ -101,15 +113,18 @@ class EmployeeImportController extends Controller
     public function exportCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $user = Auth::user();
-        $companies = $user->ownedCompanies();
+        $this->abortUnlessCanManageEmployees($user);
 
-        if ($companies->count() === 0) {
+        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->get();
+
+        if ($companies->isEmpty()) {
             abort(403, 'No companies associated with user.');
         }
 
         // Get company ID from request, or use first company as default
         $companyId = $request->query('company_id');
-        $company = $companyId ? $companies->find($companyId) : $companies->first();
+        $company = $companyId ? $companies->firstWhere('id', (int) $companyId) : $companies->first();
 
         if (!$company) {
             abort(403, 'Invalid company selection.');
@@ -133,7 +148,9 @@ class EmployeeImportController extends Controller
     public function processUpload(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $this->abortUnlessCanManageEmployees($user);
+
+        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             return response()->json([
@@ -226,7 +243,9 @@ class EmployeeImportController extends Controller
     public function executeImport(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $this->abortUnlessCanManageEmployees($user);
+
+        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             return response()->json([

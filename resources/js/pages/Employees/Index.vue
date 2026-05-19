@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,9 +53,18 @@ interface Props {
         department?: string;
         company_id?: string;
     };
+    canManageEmployees?: boolean;
+    isReadOnly?: boolean;
 }
 
 const props = defineProps<Props>();
+
+const page = usePage();
+const authCanManageEmployees = computed(() => {
+    const auth = page.props.auth as { can_manage_employees?: boolean } | undefined;
+    return props.canManageEmployees ?? auth?.can_manage_employees ?? true;
+});
+const isReadOnly = computed(() => props.isReadOnly ?? !authCanManageEmployees.value);
 
 function getFullName(person?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
     if (!person) return '';
@@ -373,7 +382,7 @@ async function unlinkFingerprint() {
                         {{ t('employees.manage_workforce') }}
                     </p>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-2">
+                <div v-if="!isReadOnly" class="flex flex-col sm:flex-row gap-2">
                     <Button variant="outline" asChild>
                         <Link :href="route('employees.fingerprint-device')">
                             <Icon name="Fingerprint" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
@@ -510,7 +519,7 @@ async function unlinkFingerprint() {
             </Card>
 
             <!-- Bulk Actions -->
-            <div v-if="selectedEmployees.length > 0" class="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div v-if="!isReadOnly && selectedEmployees.length > 0" class="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div class="flex items-center gap-2">
                     <Icon name="CheckCircle" class="h-5 w-5 text-blue-600" />
                     <span class="text-sm font-medium">
@@ -555,7 +564,7 @@ async function unlinkFingerprint() {
                 <p class="text-gray-600 dark:text-gray-400 mb-6">
                     {{ search || statusFilter || departmentFilter ? t('employees.no_employees_found') : t('employees.create_first_employee') }}
                 </p>
-                <Button asChild v-if="!search && !statusFilter && !departmentFilter" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                <Button asChild v-if="!isReadOnly && !search && !statusFilter && !departmentFilter" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     <Link :href="route('employees.create')">
                         <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
                         {{ t('employees.create_employee') }}
@@ -672,7 +681,7 @@ async function unlinkFingerprint() {
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <div class="flex items-center justify-center">
                                         <Button
-                                            v-if="employee.fingerprint_device_id"
+                                            v-if="!isReadOnly && employee.fingerprint_device_id"
                                             variant="outline"
                                             size="sm"
                                             class="border-green-600 text-green-700 dark:text-green-400"
@@ -682,7 +691,7 @@ async function unlinkFingerprint() {
                                             {{ t('employees.fingerprint_linked') }}
                                         </Button>
                                         <Button
-                                            v-else
+                                            v-else-if="!isReadOnly"
                                             variant="outline"
                                             size="sm"
                                             @click="openFingerprintLinkDialog(employee)"
@@ -712,13 +721,13 @@ async function unlinkFingerprint() {
                                                 <span class="sr-only">{{ t('common.view') }}</span>
                                             </Link>
                                         </Button>
-                                        <Button variant="ghost" size="sm" asChild>
+                                        <Button v-if="!isReadOnly" variant="ghost" size="sm" asChild>
                                             <Link :href="route('employees.edit', employee.id)">
                                                 <Icon name="Pencil" class="h-4 w-4" />
                                                 <span class="sr-only">{{ t('common.edit') }}</span>
                                             </Link>
                                         </Button>
-                                        <DropdownMenu>
+                                        <DropdownMenu v-if="!isReadOnly">
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="sm">
                                                     <Icon name="MoreVertical" class="h-4 w-4" />

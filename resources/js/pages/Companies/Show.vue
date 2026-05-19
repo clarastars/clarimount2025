@@ -34,8 +34,11 @@ const props = defineProps<Props>();
 const { t, locale } = useI18n();
 const auth = usePage().props.auth as {
     can_view_employees_readonly?: boolean;
+    can_manage_employees?: boolean;
     can_view_attendance_readonly?: boolean;
+    can_manage_attendance_adjustments?: boolean;
     can_view_salary_runs_readonly?: boolean;
+    can_approve_salary_runs?: boolean;
 };
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
@@ -92,19 +95,19 @@ const formatLastSync = (lastSync: string | null) => {
                     <Badge :variant="company.is_active ? 'default' : 'secondary'">
                         {{ company.is_active ? t('companies.active') : t('companies.inactive') }}
                     </Badge>
-                    <Button v-if="auth?.can_view_employees_readonly" variant="outline" as-child>
+                    <Button v-if="auth?.can_view_employees_readonly || auth?.can_manage_employees" variant="outline" as-child>
                         <Link :href="route('employees.index', { company_id: company.id })">
                             <Users class="mr-2 h-4 w-4" />
                             {{ t('nav.employees') }}
                         </Link>
                     </Button>
-                    <Button v-if="auth?.can_view_attendance_readonly" variant="outline" as-child>
+                    <Button v-if="auth?.can_view_attendance_readonly || auth?.can_manage_attendance_adjustments" variant="outline" as-child>
                         <Link :href="route('attendance.index', company.id)">
                             <FileText class="mr-2 h-4 w-4" />
                             {{ t('nav.attendance') }}
                         </Link>
                     </Button>
-                    <Button v-if="auth?.can_view_salary_runs_readonly" variant="outline" as-child>
+                    <Button v-if="auth?.can_view_salary_runs_readonly || auth?.can_approve_salary_runs" variant="outline" as-child>
                         <Link :href="route('salary-runs.index', company.id)">
                             <FileText class="mr-2 h-4 w-4" />
                             {{ t('salary_runs.title') }}

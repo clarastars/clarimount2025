@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesAttendanceAccess;
 use App\Http\Requests\AttendanceImportRequest;
 use App\Models\AttendanceDailyPresentation;
 use App\Models\AttendanceImport;
@@ -23,44 +24,18 @@ use Carbon\Carbon;
 
 class AttendanceController extends Controller
 {
+    use AuthorizesAttendanceAccess;
+
     public function __construct(
         private AttendanceImportService $importService,
         private OperationalMonthService $operationalMonthService,
     ) {}
 
-    private function userAccessibleCompanyIds($user): array
-    {
-        if (! $user) {
-            return [];
-        }
-
-        return $user->ownedCompanies()
-            ->pluck('id')
-            ->merge(
-                $user->accessibleCompanies()->pluck('companies.id')
-            )
-            ->unique()
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-    }
-
-    private function canAccessCompanyWithReadOnlyPermission($user, Company $company, string $permission): bool
-    {
-        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
-            return true;
-        }
-
-        $allowedCompanyIds = $this->userAccessibleCompanyIds($user);
-
-        return $user->can($permission) && in_array((int) $company->id, $allowedCompanyIds, true);
-    }
-
     public function index(Request $request, Company $company): Response
     {
         $user = Auth::user();
-        
-        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
+
+        if (! $this->canAccessCompanyAttendance($user, $company) && ! $this->canManageAttendanceAdjustmentsForCompany($user, $company)) {
             abort(403, 'You do not have access to this company.');
         }
         
@@ -209,6 +184,7 @@ class AttendanceController extends Controller
             'syncStats' => $syncStats,
             'fingerprintAttendance' => $fingerprintAttendance,
             'fingerprintStats' => $fingerprintStats,
+            'canManageAttendanceAdjustments' => $this->canManageAttendanceAdjustmentsForCompany($user, $company),
             'filters' => [
                 'filter' => $filterType,
                 'from' => $fromDate,
@@ -226,8 +202,8 @@ class AttendanceController extends Controller
     public function late(Request $request, Company $company): Response
     {
         $user = Auth::user();
-        
-        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
+
+        if (! $this->canAccessCompanyAttendance($user, $company) && ! $this->canManageAttendanceAdjustmentsForCompany($user, $company)) {
             abort(403, 'You do not have access to this company.');
         }
 
@@ -448,10 +424,10 @@ class AttendanceController extends Controller
     {
         $user = Auth::user();
         
-        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'attendance.readonly')) {
+        if (! $this->canAccessCompanyAttendance($user, $company)) {
             abort(403, 'You do not have access to this company.');
         }
-        
+
         try {
             $import = $this->importService->processImport(
                 $request->file('file'),

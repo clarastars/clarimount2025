@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\CustodyChange;
@@ -18,18 +19,17 @@ use Inertia\Response;
 
 class CustodyController extends Controller
 {
+    use AuthorizesEmployeeAccess;
+
     /**
      * Show the custody management interface for an employee.
      */
     public function show(Employee $employee): Response
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $this->abortUnlessCanUpdateEmployeeCustody($user, $employee);
 
-        // Check if user has access to this employee
-        if (!$ownedCompanyIds->contains($employee->company_id)) {
-            abort(403);
-        }
+        $companyIds = $this->employeeQueryableCompanyIds($user);
 
         // Load current assets with their categories
         $currentAssets = $employee->assets()
@@ -38,7 +38,7 @@ class CustodyController extends Controller
             ->get();
 
         // Get available assets for assignment (available assets from user's companies)
-        $availableAssets = Asset::whereIn('company_id', $ownedCompanyIds)
+        $availableAssets = Asset::whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
             ->where('status', 'available')
             ->with(['assetCategory', 'location', 'company', 'assetTemplate'])
             ->get();
@@ -64,12 +64,11 @@ class CustodyController extends Controller
     public function store(Request $request, Employee $employee): JsonResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
-
-        // Check if user has access to this employee
-        if (!$ownedCompanyIds->contains($employee->company_id)) {
+        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $employee)) {
             return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
         }
+
+        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
 
         $validated = $request->validate([
             'new_asset_ids' => 'present|array',
@@ -254,12 +253,8 @@ class CustodyController extends Controller
     public function generateDocument(CustodyChange $custodyChange): Response
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
-
-        // Check if user has access to this custody change
-        if (!$ownedCompanyIds->contains($custodyChange->employee->company_id)) {
-            abort(403);
-        }
+        $custodyChange->loadMissing('employee');
+        $this->abortUnlessCanUpdateEmployeeCustody($user, $custodyChange->employee);
 
         $custodyChange->load(['employee.company', 'employee.department', 'updatedBy']);
 
@@ -302,10 +297,8 @@ class CustodyController extends Controller
     public function uploadDocument(Request $request, CustodyChange $custodyChange): JsonResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
-
-        // Check if user has access to this custody change
-        if (!$ownedCompanyIds->contains($custodyChange->employee->company_id)) {
+        $custodyChange->loadMissing('employee');
+        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $custodyChange->employee)) {
             return response()->json(['error' => 'Unauthorized access.'], 403);
         }
 
@@ -348,9 +341,11 @@ class CustodyController extends Controller
     public function getAvailableAssets(Request $request): JsonResponse
     {
         $user = Auth::user();
-        $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        abort_unless($this->canUpdateEmployeeCustody($user), 403);
 
-        $query = Asset::whereIn('company_id', $ownedCompanyIds)
+        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
+
+        $query = Asset::whereIn('company_id', $ownedCompanyIds->isEmpty() ? [-1] : $ownedCompanyIds)
             ->where('status', 'available')
             ->with(['assetCategory', 'location', 'company', 'assetTemplate']);
 

@@ -23,11 +23,14 @@ class TeamPermissionController extends Controller
     private const MANAGED_PERMISSIONS = [
         ['name' => 'asset-inventory.access', 'label' => 'جرد الأصول'],
         ['name' => 'settings.access', 'label' => 'الإعدادات'],
-        ['name' => 'companies-salary-runs.global-read-approve', 'label' => 'عرض كل الشركات وكل مسيرات الرواتب مع الاعتماد'],
         ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
         ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
+        ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
+        ['name' => 'employees.custody.update', 'label' => 'إمكانية تحديث العهدة'],
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
+        ['name' => 'attendance.adjustments.manage', 'label' => 'إدارة الخصومات والإضافات واعتماد ورفض الجزاءات'],
         ['name' => 'salary-runs.readonly', 'label' => 'الاطلاع على مسير الرواتب (قراءة فقط)'],
+        ['name' => 'salary-runs.approve', 'label' => 'إمكانية اعتماد مسير الرواتب'],
     ];
 
     public function index(): Response

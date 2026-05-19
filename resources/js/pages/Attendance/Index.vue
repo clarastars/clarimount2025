@@ -13,7 +13,7 @@
             </p>
           </div>
           <div class="flex gap-2">
-            <DropdownMenu>
+            <DropdownMenu v-if="canManageAttendanceAdjustments">
               <DropdownMenuTrigger as-child>
                 <Button class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700">
                   <Banknote class="w-4 h-4" />
@@ -296,7 +296,7 @@
                         <div class="flex justify-center items-center gap-2">
                           <template v-if="record.penalty">
                             <!-- Pending: Show Approve/Reject buttons -->
-                            <template v-if="record.penalty.approval_status === 'pending'">
+                            <template v-if="canManageAttendanceAdjustments && record.penalty.approval_status === 'pending'">
                               <Button 
                                 @click="approvePenalty(record.penalty.id)" 
                                 size="sm" 
@@ -474,7 +474,7 @@ import {
   Calendar
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -491,6 +491,15 @@ const props = defineProps({
   fingerprintStats: Object,
   filters: Object,
   dateRange: Object,
+  canManageAttendanceAdjustments: { type: Boolean, default: undefined },
+})
+
+const canManageAttendanceAdjustments = computed(() => {
+  if (props.canManageAttendanceAdjustments !== undefined) {
+    return props.canManageAttendanceAdjustments
+  }
+  const auth = usePage().props.auth as { can_manage_attendance_adjustments?: boolean } | undefined
+  return auth?.can_manage_attendance_adjustments ?? false
 })
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [

@@ -48,7 +48,6 @@ class HandleInertiaRequests extends Middleware
 
         $isSuperAdmin = $user?->hasRole('super-admin') ?? false;
         $permissionNames = $user?->getAllPermissions()->pluck('name')->values()->all() ?? [];
-        $canViewAllCompaniesAndSalaryRuns = in_array('companies-salary-runs.global-read-approve', $permissionNames, true);
         $globalEmployeeSearchEnabled = $this->isEmployeeGlobalSearchEnabled();
         
         return [
@@ -61,10 +60,22 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $permissionNames,
                 'can_access_settings' => $isSuperAdmin || in_array('settings.access', $permissionNames, true),
                 'can_access_asset_inventory' => $isSuperAdmin || in_array('asset-inventory.access', $permissionNames, true),
-                'can_view_company_readonly' => $isSuperAdmin || $canViewAllCompaniesAndSalaryRuns || in_array('company.readonly', $permissionNames, true),
-                'can_view_employees_readonly' => $isSuperAdmin || in_array('employees.readonly', $permissionNames, true),
+                'can_view_company_readonly' => $isSuperAdmin || in_array('company.readonly', $permissionNames, true),
+                'can_view_employees_readonly' => $isSuperAdmin || in_array('employees.readonly', $permissionNames, true) || in_array('employees.manage', $permissionNames, true),
+                'can_manage_employees' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('employees.manage', $permissionNames, true),
+                'can_update_employee_custody' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('employees.custody.update', $permissionNames, true),
                 'can_view_attendance_readonly' => $isSuperAdmin || in_array('attendance.readonly', $permissionNames, true),
-                'can_view_salary_runs_readonly' => $isSuperAdmin || $canViewAllCompaniesAndSalaryRuns || in_array('salary-runs.readonly', $permissionNames, true),
+                'can_manage_attendance_adjustments' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('attendance.adjustments.manage', $permissionNames, true),
+                'can_view_salary_runs_readonly' => $isSuperAdmin || in_array('salary-runs.readonly', $permissionNames, true) || in_array('salary-runs.approve', $permissionNames, true),
+                'can_approve_salary_runs' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('salary-runs.approve', $permissionNames, true),
             ],
             'locale' => $userLanguage,
             'translations' => $this->getTranslations($userLanguage),

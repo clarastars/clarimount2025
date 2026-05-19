@@ -15,10 +15,10 @@
                                     <span class="text-sm font-mono text-muted-foreground">{{ displayValue(employee.employee_id) }}</span>
                                 </div>
                             </div>
-                            <div class="flex flex-wrap gap-2">
-                                <Button variant="outline" asChild><Link :href="route('employees.edit', employee.id)">{{ t('employees.edit') }}</Link></Button>
-                                <Button variant="secondary" asChild><Link :href="route('employees.custody.show', employee.id)">{{ t('custody.update_custody') }}</Link></Button>
-                                <Button variant="default" asChild><Link :href="route('employees.leaves.create', employee.id)">{{ t('leaves.create_leave') }}</Link></Button>
+                            <div v-if="canManageEmployees || canUpdateEmployeeCustody" class="flex flex-wrap gap-2">
+                                <Button v-if="canManageEmployees" variant="outline" asChild><Link :href="route('employees.edit', employee.id)">{{ t('employees.edit') }}</Link></Button>
+                                <Button v-if="canUpdateEmployeeCustody" variant="secondary" asChild><Link :href="route('employees.custody.show', employee.id)">{{ t('custody.update_custody') }}</Link></Button>
+                                <Button v-if="canManageEmployees" variant="default" asChild><Link :href="route('employees.leaves.create', employee.id)">{{ t('leaves.create_leave') }}</Link></Button>
                             </div>
                         </div>
                     </CardContent>
@@ -208,9 +208,13 @@ interface Props {
         email?: string | null;
     };
     assignedTeamName?: string | null;
+    canManageEmployees?: boolean;
+    canUpdateEmployeeCustody?: boolean;
 }
 
 const props = defineProps<Props>();
+const canManageEmployees = computed(() => props.canManageEmployees ?? true);
+const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
 const { t } = useI18n();
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [

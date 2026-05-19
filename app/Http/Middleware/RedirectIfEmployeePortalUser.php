@@ -65,26 +65,47 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('companies-salary-runs.global-read-approve')) {
-            $allowed = array_merge($allowed, [
-                'companies.index',
-                'companies.show',
-                'api.companies.search',
-                'salary-runs.index',
-                'salary-runs.show',
-                'salary-runs.export-excel',
-                'salary-runs.approve-hr',
-                'salary-runs.approve-director',
-                'salary-runs.approve-financial-manager',
-                'salary-runs.approve-accountant',
-                'salary-runs.approve-ceo',
-            ]);
-        }
-
         if ($user->can('employees.readonly')) {
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
+                'employees.expiring-documents.index',
+                'api.employees.search',
+            ]);
+        }
+
+        if ($user->can('employees.manage')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.create',
+                'employees.store',
+                'employees.edit',
+                'employees.update',
+                'employees.destroy',
+                'employees.fingerprint-link',
+                'employees.fingerprint-device',
+                'employees.expiring-documents.index',
+                'employees.import',
+                'employees.import.upload',
+                'employees.import.sample-csv',
+                'employees.export-csv',
+                'employees.import.process',
+                'employees.import.execute',
+                'api.employees.search',
+                'api.employees.fingerprint-device-list',
+            ]);
+        }
+
+        if ($user->can('employees.custody.update')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.custody.show',
+                'employees.custody.store',
+                'custody.document',
+                'custody.upload',
+                'api.custody.available-assets',
                 'api.employees.search',
             ]);
         }
@@ -97,7 +118,32 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('attendance.adjustments.manage')) {
+            $allowed = array_merge($allowed, [
+                'attendance.index',
+                'attendance.late',
+                'attendance.deductions',
+                'attendance.deductions.store',
+                'attendance.deductions.update',
+                'attendance.deductions.destroy',
+                'attendance.additions',
+                'attendance.additions.store',
+                'attendance.additions.update',
+                'attendance.additions.destroy',
+                'attendance-penalties.approve',
+                'attendance-penalties.reject',
+            ]);
+        }
+
         if ($user->can('salary-runs.readonly')) {
+            $allowed = array_merge($allowed, [
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.export-excel',
+            ]);
+        }
+
+        if ($user->can('salary-runs.approve')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',

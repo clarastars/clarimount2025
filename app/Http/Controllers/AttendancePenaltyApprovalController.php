@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesAttendanceAccess;
 use App\Http\Requests\RejectPenaltyRequest;
+use App\Models\Company;
 use App\Mail\AttendancePenaltyApprovedMail;
 use App\Models\AttendancePenalty;
 use App\Services\AttendancePenaltyService;
@@ -17,6 +19,8 @@ use Illuminate\Support\Str;
 
 class AttendancePenaltyApprovalController extends Controller
 {
+    use AuthorizesAttendanceAccess;
+
     public function __construct(
         private AttendancePenaltyService $attendancePenaltyService
     ) {}
@@ -28,11 +32,9 @@ class AttendancePenaltyApprovalController extends Controller
     {
         $penalty->loadMissing(['employee.company']);
 
-        // Verify user has access to this penalty's employee company
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this penalty.');
-        }
+        $company = Company::findOrFail($penalty->employee->company_id);
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
 
         $penalty->update([
             'approval_status' => 'approved',
@@ -64,11 +66,9 @@ class AttendancePenaltyApprovalController extends Controller
     {
         $penalty->loadMissing(['employee.company']);
 
-        // Verify user has access to this penalty's employee company
         $user = Auth::user();
-        if (! $user->ownedCompanies()->where('id', $penalty->employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this penalty.');
-        }
+        $company = Company::findOrFail($penalty->employee->company_id);
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
 
         if ($penalty->approval_status === 'rejected') {
             return back()->with('error', __('messages.attendance.penalty_already_rejected'));

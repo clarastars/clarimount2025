@@ -37,11 +37,6 @@ class CompanyController extends Controller
         return Auth::user()?->can('company.readonly') ?? false;
     }
 
-    private function canViewAllCompanies(): bool
-    {
-        return Auth::user()?->can('companies-salary-runs.global-read-approve') ?? false;
-    }
-
     private function canViewCompanyByTeamScope(Company $company): bool
     {
         return in_array((int) $company->id, $this->userAccessibleCompanyIds(), true);
@@ -83,16 +78,6 @@ class CompanyController extends Controller
 
         if ($user->hasRole('super-admin')) {
             $companies = $this->companiesIndexPayload(Company::query());
-        } elseif ($this->canViewAllCompanies()) {
-            $allowedCompanyIds = $this->userAccessibleCompanyIds();
-            $companies = $this->companiesIndexPayload(
-                Company::query()
-                    ->when(
-                        ! empty($allowedCompanyIds),
-                        fn ($q) => $q->whereIn('id', $allowedCompanyIds),
-                        fn ($q) => $q->whereRaw('1 = 0')
-                    )
-            );
         } else {
             $ownedCompanies = Company::where('owner_id', $user->id);
 
@@ -177,8 +162,7 @@ class CompanyController extends Controller
         $canManage = $this->canManageCompany($company);
         if (! $canManage) {
             abort_unless(
-                ($this->canViewAllCompanies() && $this->canViewCompanyByTeamScope($company))
-                || ($this->canViewCompanyReadOnly() && $this->canViewCompanyByTeamScope($company)),
+                $this->canViewCompanyReadOnly() && $this->canViewCompanyByTeamScope($company),
                 403
             );
         }
@@ -284,13 +268,6 @@ class CompanyController extends Controller
         $companyQuery = Company::query();
         if ($user->hasRole('super-admin')) {
             // no extra filter
-        } elseif ($this->canViewAllCompanies()) {
-            $allowedCompanyIds = $this->userAccessibleCompanyIds();
-            $companyQuery->when(
-                ! empty($allowedCompanyIds),
-                fn ($q) => $q->whereIn('id', $allowedCompanyIds),
-                fn ($q) => $q->whereRaw('1 = 0')
-            );
         } elseif (Company::where('owner_id', $user->id)->exists()) {
             $companyQuery->where('owner_id', $user->id);
         } elseif ($this->canViewCompanyReadOnly()) {

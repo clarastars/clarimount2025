@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -13,11 +15,16 @@ use Inertia\Response;
 
 class FingerprintDeviceEmployeeController extends Controller
 {
+    use AuthorizesEmployeeAccess;
+
     /**
      * Display employees fetched from the fingerprint device API.
      */
     public function index(Request $request): Response
     {
+        $user = Auth::user();
+        $this->abortUnlessCanManageEmployees($user);
+
         $baseUrl = rtrim(config('services.fingerprint_device.base_url'), '/');
         $token = config('services.fingerprint_device.token');
         $timeout = (int) config('services.fingerprint_device.timeout', 15);
@@ -81,6 +88,9 @@ class FingerprintDeviceEmployeeController extends Controller
      */
     public function listForSelect(Request $request): JsonResponse
     {
+        $user = Auth::user();
+        $this->abortUnlessCanManageEmployees($user);
+
         $baseUrl = rtrim(config('services.fingerprint_device.base_url'), '/');
         $token = config('services.fingerprint_device.token');
         $timeout = (int) config('services.fingerprint_device.timeout', 15);

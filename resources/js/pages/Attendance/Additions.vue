@@ -60,7 +60,12 @@ const props = defineProps<{
   monthPeriodEnd: string
   employeeId: number | null
   manualAdditions: ManualAddition[]
+  canManageAttendanceAdjustments?: boolean
 }>()
+
+const canManageAttendanceAdjustments = computed(
+  () => props.canManageAttendanceAdjustments ?? false,
+)
 
 const createModalOpen = ref(false)
 const createForm = useForm({
@@ -345,7 +350,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('attendance.additions_title') }}</h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ t('attendance.additions_description') }}</p>
           </div>
-          <Button class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700" @click="openCreateModal">
+          <Button v-if="canManageAttendanceAdjustments" class="gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700" @click="openCreateModal">
             <Plus class="w-4 h-4" />{{ t('attendance.create_addition') }}
           </Button>
         </div>
@@ -408,7 +413,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
                     <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate" :title="row.reason">{{ row.reason?.trim() ? row.reason : '—' }}</td>
                     <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ row.creator_name || '-' }}</td>
                     <td class="px-4 py-3 text-sm">
-                      <div class="flex gap-1">
+                      <div v-if="canManageAttendanceAdjustments" class="flex gap-1">
                         <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditModal(row)" :title="t('attendance.edit_addition')"><Pencil class="h-4 w-4" /></Button>
                         <Button variant="ghost" size="sm" class="h-8 w-8 p-0 text-red-600 hover:text-red-700" @click="confirmDelete(row)" :title="t('attendance.delete_addition')"><Trash2 class="h-4 w-4" /></Button>
                       </div>
