@@ -36,21 +36,24 @@
         </div>
       </div>
 
-      <!-- Approvals (5 steps) -->
-      <Card>
+      <!-- Approvals -->
+      <Card v-if="approvalList.length > 0">
         <CardHeader>
           <CardTitle class="text-base">{{ t('salary_runs.approvals_section') }}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div
-              v-for="(approval, key) in approvalList"
-              :key="key"
+              v-for="approval in approvalList"
+              :key="approval.id"
               class="rounded-lg border p-4 flex flex-col justify-between"
               :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
             >
-              <div class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-2">
-                {{ approval.label }}
+              <div class="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1">
+                {{ approval.title }}
+              </div>
+              <div v-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
+                {{ approval.team_name }}
               </div>
               <div v-if="approval.approved_at" class="text-sm space-y-1">
                 <div class="text-gray-600 dark:text-gray-400">
@@ -67,15 +70,18 @@
                 </div>
               </div>
               <div v-else class="space-y-2">
-                <p class="text-sm text-amber-600 dark:text-amber-400">{{ t('salary_runs.approval_pending') }}</p>
+                <p v-if="approval.waiting_previous" class="text-sm text-amber-600 dark:text-amber-400">
+                  {{ t('salary_runs.approval_waiting_previous') }}
+                </p>
+                <p v-else class="text-sm text-amber-600 dark:text-amber-400">{{ t('salary_runs.approval_pending') }}</p>
                 <Button
                   v-if="approval.can_approve"
                   size="sm"
                   class="w-full"
-                  :disabled="approvingStep === approval.key"
-                  @click="openApprovalConfirm(approval.key)"
+                  :disabled="approvingStepId === approval.id"
+                  @click="openApprovalConfirm(approval.id)"
                 >
-                  {{ approvingStep === approval.key ? '...' : t('salary_runs.approval_approve') }}
+                  {{ approvingStepId === approval.id ? '...' : t('salary_runs.approval_approve') }}
                 </Button>
               </div>
             </div>
@@ -435,7 +441,7 @@
       </Dialog>
 
       <!-- Approval confirmation dialog -->
-      <Dialog :open="!!approvalConfirmStep" @update:open="(open) => !open && (approvalConfirmStep = null)">
+      <Dialog :open="approvalConfirmStepId !== null" @update:open="(open) => !open && (approvalConfirmStepId = null)">
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{{ t('salary_runs.approval_confirm_title') }}</DialogTitle>
@@ -444,7 +450,7 @@
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" @click="approvalConfirmStep = null">
+            <Button variant="outline" @click="approvalConfirmStepId = null">
               {{ t('common.cancel') }}
             </Button>
             <Button @click="confirmApprovalSubmit">
@@ -474,10 +480,16 @@ import type { Company, BreadcrumbItem } from '@/types';
 
 const { t, locale } = useI18n();
 
-interface ApprovalState {
+interface ApprovalStepState {
+  id: number;
+  title: string;
+  sort_order: number;
+  team_id: number | null;
+  team_name: string | null;
   approved_at: string | null;
   approver_name: string | null;
   can_approve: boolean;
+  waiting_previous: boolean;
 }
 
 interface Props {
@@ -535,13 +547,7 @@ interface Props {
       }>;
     }>;
   };
-  approvals?: {
-    hr: ApprovalState;
-    director: ApprovalState;
-    financial_manager: ApprovalState;
-    accountant: ApprovalState;
-    ceo: ApprovalState;
-  };
+  approvalSteps?: ApprovalStepState[];
 }
 
 const props = defineProps<Props>();
@@ -555,29 +561,19 @@ function getEmployeeFullName(employee?: { first_name?: string | null; father_nam
     .join(' ');
 }
 
-const defaultApproval = { approved_at: null, approver_name: null, can_approve: false };
-const approvalList = computed(() => {
-  const a = props.approvals ?? { hr: defaultApproval, director: defaultApproval, financial_manager: defaultApproval, accountant: defaultApproval, ceo: defaultApproval };
-  return [
-    { key: 'hr', label: t('salary_runs.approval_hr'), ...a.hr },
-    { key: 'accountant', label: t('salary_runs.approval_accountant'), ...a.accountant },
-    { key: 'financial-manager', label: t('salary_runs.approval_financial_manager'), ...a.financial_manager },
-    { key: 'director', label: t('salary_runs.approval_director'), ...a.director },
-    { key: 'ceo', label: t('salary_runs.approval_ceo'), ...a.ceo },
-  ].map((item) => ({ ...item, approved_at: item.approved_at ?? null, approver_name: item.approver_name ?? null, can_approve: item.can_approve ?? false }));
-});
+const approvalList = computed(() => props.approvalSteps ?? []);
 
-const approvingStep = ref<string | null>(null);
-const approvalConfirmStep = ref<string | null>(null);
+const approvingStepId = ref<number | null>(null);
+const approvalConfirmStepId = ref<number | null>(null);
 
-function openApprovalConfirm(stepKey: string) {
-  approvalConfirmStep.value = stepKey;
+function openApprovalConfirm(stepId: number) {
+  approvalConfirmStepId.value = stepId;
 }
 
 function confirmApprovalSubmit() {
-  if (approvalConfirmStep.value) {
-    submitApproval(approvalConfirmStep.value);
-    approvalConfirmStep.value = null;
+  if (approvalConfirmStepId.value !== null) {
+    submitApproval(approvalConfirmStepId.value);
+    approvalConfirmStepId.value = null;
   }
 }
 
@@ -599,13 +595,12 @@ function formatApprovalTime(iso: string) {
   }
 }
 
-function submitApproval(stepKey: string) {
-  const routeName = `salary-runs.approve-${stepKey}` as 'salary-runs.approve-hr' | 'salary-runs.approve-director' | 'salary-runs.approve-financial-manager' | 'salary-runs.approve-accountant' | 'salary-runs.approve-ceo';
-  approvingStep.value = stepKey;
-  router.post(route(routeName, [props.company.id, props.salaryRun.id]), {}, {
+function submitApproval(stepId: number) {
+  approvingStepId.value = stepId;
+  router.post(route('salary-runs.approve-step', [props.company.id, props.salaryRun.id, stepId]), {}, {
     preserveScroll: true,
     onFinish: () => {
-      approvingStep.value = null;
+      approvingStepId.value = null;
     },
   });
 }

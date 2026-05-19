@@ -8,7 +8,9 @@ use App\Exports\SalaryRunExcelExport;
 use App\Models\Company;
 use App\Models\EmployeeDebt;
 use App\Models\SalaryRun;
+use App\Models\SalaryRunApprovalStep;
 use App\Models\SalaryRunItem;
+use App\Services\SalaryRunApprovalService;
 use App\Services\SalaryRunService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +24,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class SalaryRunController extends Controller
 {
     public function __construct(
-        private SalaryRunService $salaryRunService
+        private SalaryRunService $salaryRunService,
+        private SalaryRunApprovalService $salaryRunApprovalService
     ) {}
 
     private function userAccessibleCompanyIds($user): array
@@ -61,19 +64,13 @@ class SalaryRunController extends Controller
         return false;
     }
 
-    private function canApproveSalaryRunStep($user, Company $company, string $stepPermission): bool
+    private function canApproveSalaryRunStep($user, Company $company, SalaryRunApprovalStep $step, SalaryRun $salaryRun): bool
     {
-        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
-            return true;
+        if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
+            return false;
         }
 
-        if ($user->can('salary-runs.approve')
-            && in_array((int) $company->id, $this->userAccessibleCompanyIds($user), true)) {
-            return true;
-        }
-
-        return $user->can($stepPermission)
-            && in_array((int) $company->id, $this->userAccessibleCompanyIds($user), true);
+        return $this->salaryRunApprovalService->canUserApproveStep($user, $company, $salaryRun, $step);
     }
 
     private function canManageCompanySalaryRuns($user, Company $company): bool
@@ -119,41 +116,15 @@ class SalaryRunController extends Controller
         $salaryRun = SalaryRun::where('company_id', $company->id)
             ->where('year', $year)
             ->where('month', $month)
-            ->with(['items.employee.debts', 'creator', 'approverHr', 'approverDirector', 'approverFinancialManager', 'approverAccountant', 'approverCeo'])
+            ->with(['items.employee.debts', 'creator'])
             ->firstOrFail();
 
-        $approvals = [
-            'hr' => [
-                'approved_at' => $salaryRun->hr_approved_at?->toIso8601String(),
-                'approver_name' => $salaryRun->approverHr?->name,
-                'can_approve' => $this->canApproveSalaryRunStep($user, $company, 'approve_salary_run_hr'),
-            ],
-            'director' => [
-                'approved_at' => $salaryRun->director_approved_at?->toIso8601String(),
-                'approver_name' => $salaryRun->approverDirector?->name,
-                'can_approve' => $this->canApproveSalaryRunStep($user, $company, 'approve_salary_run_director'),
-            ],
-            'financial_manager' => [
-                'approved_at' => $salaryRun->financial_manager_approved_at?->toIso8601String(),
-                'approver_name' => $salaryRun->approverFinancialManager?->name,
-                'can_approve' => $this->canApproveSalaryRunStep($user, $company, 'approve_salary_run_financial_manager'),
-            ],
-            'accountant' => [
-                'approved_at' => $salaryRun->accountant_approved_at?->toIso8601String(),
-                'approver_name' => $salaryRun->approverAccountant?->name,
-                'can_approve' => $this->canApproveSalaryRunStep($user, $company, 'approve_salary_run_accountant'),
-            ],
-            'ceo' => [
-                'approved_at' => $salaryRun->ceo_approved_at?->toIso8601String(),
-                'approver_name' => $salaryRun->approverCeo?->name,
-                'can_approve' => $this->canApproveSalaryRunStep($user, $company, 'approve_salary_run_ceo'),
-            ],
-        ];
+        $approvalSteps = $this->salaryRunApprovalService->buildApprovalPayload($salaryRun, $user, $company);
 
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
             'salaryRun' => $salaryRun,
-            'approvals' => $approvals,
+            'approvalSteps' => $approvalSteps,
             'canManageSalaryRun' => $this->canManageCompanySalaryRuns($user, $company),
         ]);
     }
@@ -260,59 +231,33 @@ class SalaryRunController extends Controller
         return back()->with('success', __('Salary run finalized successfully.'));
     }
 
-    private function approveStep(Company $company, SalaryRun $salaryRun, string $permission, string $approvedAtColumn, string $approvedByColumn): RedirectResponse
+    public function approveStep(Company $company, SalaryRun $salaryRun, SalaryRunApprovalStep $salaryRunApprovalStep): RedirectResponse
     {
         $user = Auth::user();
+
         if (! $this->canAccessCompanyWithReadOnlyPermission($user, $company, 'salary-runs.readonly')) {
             abort(403, 'You do not have access to this company.');
         }
+
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
         }
-        if (! $this->canApproveSalaryRunStep($user, $company, $permission)) {
+
+        if (! $salaryRunApprovalStep->is_active) {
+            abort(403, 'This approval step is not active.');
+        }
+
+        if (! $this->canApproveSalaryRunStep($user, $company, $salaryRunApprovalStep, $salaryRun)) {
             abort(403, 'You do not have permission to perform this approval.');
         }
-        if ($salaryRun->$approvedAtColumn !== null) {
-            return back()->with('info', __('messages.salary_runs.already_approved'));
+
+        try {
+            $this->salaryRunApprovalService->approveStep($user, $salaryRun, $salaryRunApprovalStep);
+        } catch (\RuntimeException $exception) {
+            return back()->with('info', $exception->getMessage());
         }
 
-        $salaryRun->update([
-            $approvedAtColumn => now(),
-            $approvedByColumn => $user->id,
-        ]);
-
         return back()->with('success', __('messages.salary_runs.approval_saved'));
-    }
-
-    public function approveHr(Company $company, SalaryRun $salaryRun): RedirectResponse
-    {
-        return $this->approveStep($company, $salaryRun, 'approve_salary_run_hr', 'hr_approved_at', 'hr_approved_by');
-    }
-
-    public function approveDirector(Company $company, SalaryRun $salaryRun): RedirectResponse
-    {
-        return $this->approveStep($company, $salaryRun, 'approve_salary_run_director', 'director_approved_at', 'director_approved_by');
-    }
-
-    public function approveAccountant(Company $company, SalaryRun $salaryRun): RedirectResponse
-    {
-        return $this->approveStep($company, $salaryRun, 'approve_salary_run_accountant', 'accountant_approved_at', 'accountant_approved_by');
-    }
-
-    public function approveFinancialManager(Company $company, SalaryRun $salaryRun): RedirectResponse
-    {
-        return $this->approveStep(
-            $company,
-            $salaryRun,
-            'approve_salary_run_financial_manager',
-            'financial_manager_approved_at',
-            'financial_manager_approved_by'
-        );
-    }
-
-    public function approveCeo(Company $company, SalaryRun $salaryRun): RedirectResponse
-    {
-        return $this->approveStep($company, $salaryRun, 'approve_salary_run_ceo', 'ceo_approved_at', 'ceo_approved_by');
     }
 
     /**

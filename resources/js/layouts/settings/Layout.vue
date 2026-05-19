@@ -42,6 +42,10 @@ const sidebarNavItems = computed((): NavItem[] => [
                   title: t('settings.permissions_teams'),
                   href: '/settings/permissions-teams',
               },
+              {
+                  title: t('settings.salary_run_approvals'),
+                  href: '/settings/salary-run-approvals',
+              },
           ]
         : []),
 ]);

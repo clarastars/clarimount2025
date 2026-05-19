@@ -104,6 +104,11 @@ const settingsNavItems = computed((): NavItem[] => [
         href: '/settings/permissions-teams',
         icon: Users,
     },
+    {
+        title: t('settings.salary_run_approvals'),
+        href: '/settings/salary-run-approvals',
+        icon: Users,
+    },
 ]);
 
 const footerNavItems = computed((): NavItem[] => [

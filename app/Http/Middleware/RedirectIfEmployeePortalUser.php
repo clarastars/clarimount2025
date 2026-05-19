@@ -155,11 +155,7 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.index',
                 'salary-runs.show',
                 'salary-runs.export-excel',
-                'salary-runs.approve-hr',
-                'salary-runs.approve-director',
-                'salary-runs.approve-financial-manager',
-                'salary-runs.approve-accountant',
-                'salary-runs.approve-ceo',
+                'salary-runs.approve-step',
             ]);
         }
 

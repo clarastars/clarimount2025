@@ -6,6 +6,7 @@ use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\SalaryRunApprovalStepsController;
 use App\Http\Controllers\Settings\TeamPermissionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -46,5 +47,11 @@ Route::middleware('auth')->group(function () {
         Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
         Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
+
+        Route::get('settings/salary-run-approvals', [SalaryRunApprovalStepsController::class, 'index'])->name('settings.salary-run-approvals.index');
+        Route::post('settings/salary-run-approvals', [SalaryRunApprovalStepsController::class, 'store'])->name('settings.salary-run-approvals.store');
+        Route::put('settings/salary-run-approvals/{salaryRunApprovalStep}', [SalaryRunApprovalStepsController::class, 'update'])->name('settings.salary-run-approvals.update');
+        Route::delete('settings/salary-run-approvals/{salaryRunApprovalStep}', [SalaryRunApprovalStepsController::class, 'destroy'])->name('settings.salary-run-approvals.destroy');
+        Route::post('settings/salary-run-approvals/reorder', [SalaryRunApprovalStepsController::class, 'reorder'])->name('settings.salary-run-approvals.reorder');
     });
 });
