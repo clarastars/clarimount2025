@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import DeleteUser from '@/components/DeleteUser.vue';
@@ -32,6 +32,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const page = usePage();
 const user = page.props.auth.user as User;
+const canDeleteAccount = computed(
+    () => !((page.props.auth as { is_employee?: boolean })?.is_employee ?? false),
+);
 
 const form = useForm({
     name: user.name,
@@ -140,7 +143,7 @@ const submit = () => {
                 </form>
             </div>
 
-            <DeleteUser />
+            <DeleteUser v-if="canDeleteAccount" />
         </SettingsLayout>
     </AppLayout>
 </template>

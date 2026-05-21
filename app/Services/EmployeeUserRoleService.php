@@ -348,4 +348,47 @@ class EmployeeUserRoleService
 
         return $global->merge($teams)->values()->all();
     }
+
+    /**
+     * Name of the user's primary assigned team (portal dashboard subtitle).
+     */
+    public function primaryTeamNameFor(User $portalUser): ?string
+    {
+        $teams = $this->assignedTeamsForUi($portalUser);
+
+        if ($teams === []) {
+            return null;
+        }
+
+        $primaryTeamId = (int) ($portalUser->team_id ?? 0);
+        $primary = collect($teams)->firstWhere('id', $primaryTeamId);
+
+        return (string) ($primary['name'] ?? $teams[0]['name']);
+    }
+
+    /**
+     * Localized team role label for the user's primary team.
+     */
+    public function primaryTeamRoleLabelFor(User $portalUser): ?string
+    {
+        $assignments = $this->assignedTeamRoleAssignments($portalUser);
+
+        if ($assignments === [] && ! $portalUser->team_id) {
+            return null;
+        }
+
+        $primaryTeamId = (int) ($portalUser->team_id ?? 0);
+        $assignment = collect($assignments)->firstWhere('team_id', $primaryTeamId);
+
+        if ($assignment === null) {
+            $assignment = $assignments[0] ?? [
+                'team_id' => $primaryTeamId,
+                'role_name' => 'team-member',
+            ];
+        }
+
+        $roleName = (string) ($assignment['role_name'] ?? 'team-member');
+
+        return __(self::TEAM_ROLES[$roleName] ?? $roleName);
+    }
 }

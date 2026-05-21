@@ -30,7 +30,20 @@ class RedirectIfEmployeePortalUser
             app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
         }
 
-        $allowed = ['dashboard', 'logout', 'password.request', 'password.email', 'password.reset', 'verification.notice', 'profile.show'];
+        $allowed = [
+            'dashboard',
+            'logout',
+            'password.request',
+            'password.email',
+            'password.reset',
+            'password.edit',
+            'password.update',
+            'verification.notice',
+            'profile.show',
+            'profile.edit',
+            'profile.update',
+            'appearance',
+        ];
 
         // Allow employees to access only the sections explicitly granted by team permissions.
         if ($user->can('asset-inventory.access')) {

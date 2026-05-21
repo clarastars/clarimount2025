@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Services\EmployeeExpiryService;
+use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -23,8 +24,16 @@ class DashboardController extends Controller
                 return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
             }
             $employee->append('remaining_annual_leave_balance');
+            $roleService = app(EmployeeUserRoleService::class);
+            $primaryTeamName = $roleService->primaryTeamNameFor($user);
+
+            $dashboardSubtitle = $primaryTeamName
+                ? __('messages.dashboard.employee_subtitle_with_team', ['team' => $primaryTeamName])
+                : __('messages.dashboard.employee_subtitle');
+
             return Inertia::render('DashboardEmployee', [
                 'employee' => $employee->only(['id', 'first_name', 'last_name', 'full_name', 'annual_leave_balance', 'remaining_annual_leave_balance']),
+                'dashboardSubtitle' => $dashboardSubtitle,
             ]);
         }
 

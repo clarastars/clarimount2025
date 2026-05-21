@@ -16,6 +16,7 @@ interface Props {
         last_name: string;
         full_name: string;
     };
+    dashboardSubtitle?: string;
 }
 
 const props = defineProps<Props>();
@@ -37,7 +38,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => []);
                         {{ t('dashboard.employee_welcome') }}{{ props.employee?.first_name ? `، ${props.employee.first_name}` : '' }}
                     </h1>
                     <p class="text-muted-foreground max-w-xl">
-                        {{ t('dashboard.employee_subtitle') }}
+                        {{ props.dashboardSubtitle ?? t('dashboard.employee_subtitle') }}
                     </p>
                 </CardContent>
             </Card>
