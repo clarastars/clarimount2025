@@ -182,16 +182,16 @@
                       <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.attendance_status') }}
                       </th>
-                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+                      <th v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.attendance_late_minutes') }}
                       </th>
-                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+                      <th v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.penalty_action') }}
                       </th>
-                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+                      <th v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.penalty_reason') }}
                       </th>
-                      <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+                      <th v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                         {{ $t('attendance.penalty_approval') }}
                       </th>
                     </tr>
@@ -231,7 +231,7 @@
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex flex-col items-center justify-center space-y-1">
                           <div v-if="record.first_punch" class="text-base font-semibold text-gray-900 dark:text-white">
-                            {{ formatDateTime(record.first_punch) }}
+                            {{ formatDateTime(getDisplayAttendance(record).checkIn) }}
                           </div>
                           <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
                           <Badge v-if="record.first_verify_mode !== null" variant="outline" class="text-xs mt-1">
@@ -259,19 +259,19 @@
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center">
-                          <Badge :variant="getStatusVariant(record.status_ar)" class="px-3 py-1">
-                            {{ record.status_ar || '-' }}
-                          </Badge>
+                          <span class="text-sm font-medium text-gray-900 dark:text-white">
+                            {{ getDisplayAttendance(record).status || '-' }}
+                          </span>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                      <td v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center">
                           <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {{ formatLateMinutes(record.late_minutes, record.status_ar) }}
                           </span>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                      <td v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex flex-col justify-center items-center gap-1">
                           <Badge v-if="record.penalty?.action_text" :variant="getPenaltyVariant(record.penalty?.action_type)" class="px-3 py-1">
                             {{ record.penalty.action_text }}
@@ -284,7 +284,7 @@
                           </template>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                      <td v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center">
                           <span v-if="record.penalty?.reason_text" class="text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate" :title="record.penalty.reason_text">
                             {{ record.penalty.reason_text }}
@@ -292,7 +292,7 @@
                           <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
-                      <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
+                      <td v-if="showExtraAttendanceColumns" class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
                         <div class="flex justify-center items-center gap-2">
                           <template v-if="record.penalty">
                             <!-- Pending: Show Approve/Reject buttons -->
@@ -521,6 +521,12 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
   },
 ])
 
+/** TEMP: hide late minutes + penalty columns until workflow is ready */
+const showExtraAttendanceColumns = false
+
+/** UI-only: subtract from displayed check-in when late (DB unchanged) */
+const CHECK_IN_UI_ADJUSTMENT_MINUTES = 10
+
 const filterType = ref(props.filters?.filter || 'today')
 const fromDate = ref((props.filters as any)?.from || '')
 const toDate = ref((props.filters as any)?.to || '')
@@ -564,10 +570,32 @@ const applyFilters = () => {
   })
 }
 
+/**
+ * Display-only check-in adjustment for late arrivals (after grace).
+ * Uses server late_minutes (post-grace); no DB changes.
+ */
+const getDisplayAttendance = (record) => {
+  const status = record.status_ar || '-'
+  if (!record.first_punch || status !== 'متأخر') {
+    return { checkIn: record.first_punch, status }
+  }
+
+  const lateMinutes = record.late_minutes != null ? Number(record.late_minutes) : null
+  const adjusted = new Date(record.first_punch)
+  adjusted.setMinutes(adjusted.getMinutes() - CHECK_IN_UI_ADJUSTMENT_MINUTES)
+
+  const displayStatus =
+    lateMinutes !== null && lateMinutes > 0 && lateMinutes <= CHECK_IN_UI_ADJUSTMENT_MINUTES
+      ? 'في الموعد'
+      : status
+
+  return { checkIn: adjusted, status: displayStatus }
+}
+
 const formatDateTime = (dateTime) => {
   if (!dateTime) return '-'
   try {
-    const date = new Date(dateTime)
+    const date = dateTime instanceof Date ? dateTime : new Date(dateTime)
     // Convert UTC to Asia/Riyadh timezone
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: 'Asia/Riyadh',
