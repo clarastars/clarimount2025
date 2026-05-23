@@ -29,10 +29,6 @@
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button @click="router.visit(route('attendance.late', props.company.id))" variant="destructive" class="gap-2 cursor-pointer">
-              <AlertTriangle class="w-4 h-4" />
-              {{ $t('attendance.view_late') }}
-            </Button>
           </div>
         </div>
 
@@ -464,7 +460,6 @@ import Icon from '@/components/Icon.vue'
 import {
   FileText,
   Clock,
-  AlertTriangle,
   Banknote,
   Plus,
   Eye,
