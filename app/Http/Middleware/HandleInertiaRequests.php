@@ -76,7 +76,8 @@ class HandleInertiaRequests extends Middleware
                     || in_array('salary-runs.readonly', $permissionNames, true)
                     || in_array('salary-runs.approve', $permissionNames, true)
                     || in_array('salary-runs.create', $permissionNames, true)
-                    || in_array('salary-runs.delete', $permissionNames, true),
+                    || in_array('salary-runs.delete', $permissionNames, true)
+                    || in_array('salary-runs.debt-deductions.manage', $permissionNames, true),
                 'can_approve_salary_runs' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('salary-runs.approve', $permissionNames, true),

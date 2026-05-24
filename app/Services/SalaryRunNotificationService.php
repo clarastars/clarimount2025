@@ -242,6 +242,7 @@ class SalaryRunNotificationService
                 || $user->can('salary-runs.approve')
                 || $user->can('salary-runs.create')
                 || $user->can('salary-runs.delete')
+                || $user->can('salary-runs.debt-deductions.manage')
             ) {
                 return true;
             }

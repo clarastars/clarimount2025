@@ -114,6 +114,9 @@ class RedirectIfEmployeePortalUser
                 'employees.import.execute',
                 'api.employees.search',
                 'api.employees.fingerprint-device-list',
+                'employee-debts.store',
+                'employee-debts.update',
+                'employee-debts.destroy',
             ]);
         }
 
@@ -197,6 +200,18 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.export-excel',
                 'salary-runs.approve-step',
                 'salary-runs.reject-step',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($user->can('salary-runs.debt-deductions.manage')) {
+            $allowed = array_merge($allowed, [
+                'salary-runs.index',
+                'salary-runs.show',
+                'salary-runs.export-excel',
+                'salary-runs.update-debt-deductions',
                 'api.notifications.index',
                 'api.notifications.read',
                 'api.notifications.read-all',

@@ -304,7 +304,7 @@
                       {{ formatCurrency(getDebtDeductionsTotal(item)) }}
                     </div>
                     <Button
-                      v-if="salaryRun.status === 'draft' && canManageSalaryRun && item.employee?.debts && item.employee.debts.length > 0"
+                      v-if="salaryRun.status === 'draft' && canManageDebtDeductions && item.employee?.debts && item.employee.debts.length > 0"
                       variant="ghost"
                       size="sm"
                       @click="openDebtDeductionsModal(item)"
@@ -582,6 +582,7 @@ interface LatestRejectionState {
 interface Props {
   company: Company;
   canManageSalaryRun?: boolean;
+  canManageDebtDeductions?: boolean;
   salaryRun: {
     id: number;
     year: number;
@@ -640,6 +641,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const canManageSalaryRun = computed(() => props.canManageSalaryRun === true);
+const canManageDebtDeductions = computed(() => props.canManageDebtDeductions === true);
 
 function getEmployeeFullName(employee?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
   if (!employee) return '';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Employee;
 use App\Models\EmployeeDebt;
 use Illuminate\Http\RedirectResponse;
@@ -12,17 +13,16 @@ use Illuminate\Support\Facades\Auth;
 
 class EmployeeDebtController extends Controller
 {
+    use AuthorizesEmployeeAccess;
+
     /**
      * Store a newly created debt for an employee.
      */
     public function store(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
-
-        // Verify user has access to this employee's company
-        if (!$user->ownedCompanies()->where('id', $employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this employee.');
-        }
+        $this->abortUnlessCanManageEmployees($user);
+        $this->abortUnlessCanAccessEmployee($user, $employee);
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
@@ -40,13 +40,9 @@ class EmployeeDebtController extends Controller
     public function update(Request $request, Employee $employee, EmployeeDebt $debt): RedirectResponse
     {
         $user = Auth::user();
+        $this->abortUnlessCanManageEmployees($user);
+        $this->abortUnlessCanAccessEmployee($user, $employee);
 
-        // Verify user has access to this employee's company
-        if (!$user->ownedCompanies()->where('id', $employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this employee.');
-        }
-
-        // Verify debt belongs to employee
         if ($debt->employee_id !== $employee->id) {
             abort(404, 'Debt not found for this employee.');
         }
@@ -67,13 +63,9 @@ class EmployeeDebtController extends Controller
     public function destroy(Employee $employee, EmployeeDebt $debt): RedirectResponse
     {
         $user = Auth::user();
+        $this->abortUnlessCanManageEmployees($user);
+        $this->abortUnlessCanAccessEmployee($user, $employee);
 
-        // Verify user has access to this employee's company
-        if (!$user->ownedCompanies()->where('id', $employee->company_id)->exists()) {
-            abort(403, 'You do not have access to this employee.');
-        }
-
-        // Verify debt belongs to employee
         if ($debt->employee_id !== $employee->id) {
             abort(404, 'Debt not found for this employee.');
         }

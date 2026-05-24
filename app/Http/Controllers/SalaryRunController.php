@@ -64,6 +64,7 @@ class SalaryRunController extends Controller
             'salary-runs.approve',
             'salary-runs.create',
             'salary-runs.delete',
+            'salary-runs.debt-deductions.manage',
         ];
 
         foreach ($salaryRunPermissions as $salaryRunPermission) {
@@ -112,6 +113,11 @@ class SalaryRunController extends Controller
     private function canManageCompanySalaryRuns($user, Company $company): bool
     {
         return $user->ownedCompanies()->where('id', $company->id)->exists();
+    }
+
+    private function canManageSalaryRunDebtDeductions($user, Company $company): bool
+    {
+        return $this->canAccessCompanyWithPermission($user, $company, 'salary-runs.debt-deductions.manage');
     }
 
     /**
@@ -168,6 +174,7 @@ class SalaryRunController extends Controller
             'approvalSteps' => $approvalSteps,
             'latestRejection' => $latestRejection,
             'canManageSalaryRun' => $this->canManageCompanySalaryRuns($user, $company),
+            'canManageDebtDeductions' => $this->canManageSalaryRunDebtDeductions($user, $company),
         ]);
     }
 
@@ -376,17 +383,14 @@ class SalaryRunController extends Controller
     {
         $user = Auth::user();
 
-        // Verify user owns this company
-        if (! $user->ownedCompanies()->where('id', $company->id)->exists()) {
-            abort(403, 'You do not have access to this company.');
+        if (! $this->canManageSalaryRunDebtDeductions($user, $company)) {
+            abort(403, 'You do not have permission to update debt deductions.');
         }
 
-        // Verify salary run belongs to company
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
         }
 
-        // Verify salary run is not finalized
         if ($salaryRun->status === 'finalized') {
             return back()->with('error', __('messages.salary_runs.cannot_update_finalized'));
         }

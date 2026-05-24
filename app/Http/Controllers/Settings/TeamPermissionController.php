@@ -34,6 +34,7 @@ class TeamPermissionController extends Controller
         ['name' => 'salary-runs.create', 'label' => 'إنشاء مسير الرواتب'],
         ['name' => 'salary-runs.delete', 'label' => 'حذف مسير الرواتب'],
         ['name' => 'salary-runs.approve', 'label' => 'إمكانية اعتماد مسير الرواتب'],
+        ['name' => 'salary-runs.debt-deductions.manage', 'label' => 'تحديث الخصومات من الذمم في مسير الرواتب'],
     ];
 
     public function index(): Response
