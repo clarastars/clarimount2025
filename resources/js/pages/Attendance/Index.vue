@@ -570,22 +570,13 @@ const applyFilters = () => {
   })
 }
 
-/** UI-only −10 min when penalty is pending/rejected (or absent); approved penalty keeps raw data */
-const shouldAdjustCheckInForDisplay = (record) => {
-  const penalty = record.penalty
-  if (!penalty) {
-    return true
-  }
-  return penalty.approval_status === 'pending' || penalty.approval_status === 'rejected'
-}
-
 /**
  * Display-only check-in adjustment for late arrivals (after grace).
  * Uses server late_minutes (post-grace); no DB changes.
  */
 const getDisplayAttendance = (record) => {
   const status = record.status_ar || '-'
-  if (!record.first_punch || status !== 'متأخر' || !shouldAdjustCheckInForDisplay(record)) {
+  if (!record.first_punch || status !== 'متأخر') {
     return { checkIn: record.first_punch, status }
   }
 
