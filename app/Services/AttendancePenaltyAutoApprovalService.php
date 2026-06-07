@@ -7,11 +7,15 @@ namespace App\Services;
 use App\Models\AttendancePenalty;
 use App\Models\Company;
 use App\Models\Employee;
+use Carbon\Carbon;
 
 class AttendancePenaltyAutoApprovalService
 {
+    private const TZ = 'Asia/Riyadh';
+
     public function __construct(
         private AttendancePenaltyApprovalNotifier $approvalNotifier,
+        private OperationalMonthService $operationalMonthService,
     ) {}
 
     public function isEnabledForCompany(int $companyId): bool
@@ -29,7 +33,8 @@ class AttendancePenaltyAutoApprovalService
     }
 
     /**
-     * Auto-approve pending late penalty when company policy allows it.
+     * Auto-approve pending late penalty when company policy allows it
+     * and the attendance date falls within the current operational month.
      */
     public function applyForPenalty(AttendancePenalty $penalty): AttendancePenalty
     {
@@ -42,6 +47,10 @@ class AttendancePenaltyAutoApprovalService
         }
 
         if (! $this->isEnabledForEmployee((int) $penalty->employee_id)) {
+            return $penalty;
+        }
+
+        if (! $this->isWithinCurrentOperationalMonth($penalty)) {
             return $penalty;
         }
 
@@ -58,7 +67,8 @@ class AttendancePenaltyAutoApprovalService
     }
 
     /**
-     * Toggle company policy; when enabling, approve all pending penalties for its employees.
+     * Toggle company policy; when enabling, approve pending late penalties
+     * within the current operational month for its employees.
      *
      * @return int Number of penalties auto-approved when enabling
      */
@@ -84,10 +94,13 @@ class AttendancePenaltyAutoApprovalService
             return 0;
         }
 
+        [$periodStart, $periodEnd] = $this->currentOperationalMonthDateBounds();
+
         $pendingPenalties = AttendancePenalty::query()
             ->whereIn('employee_id', $employeeIds)
             ->where('approval_status', 'pending')
             ->lateViolations()
+            ->whereBetween('attendance_date', [$periodStart, $periodEnd])
             ->get();
 
         $approvedCount = 0;
@@ -104,5 +117,31 @@ class AttendancePenaltyAutoApprovalService
         }
 
         return $approvedCount;
+    }
+
+    /**
+     * @return array{0: string, 1: string} [startYmd, endYmd]
+     */
+    private function currentOperationalMonthDateBounds(): array
+    {
+        $range = $this->operationalMonthService->resolveCurrentOperationalMonthRange(
+            Carbon::now(self::TZ)
+        );
+
+        return [
+            $range['start']->format('Y-m-d'),
+            $range['end']->format('Y-m-d'),
+        ];
+    }
+
+    private function isWithinCurrentOperationalMonth(AttendancePenalty $penalty): bool
+    {
+        $attDate = $penalty->attendance_date instanceof Carbon
+            ? $penalty->attendance_date->format('Y-m-d')
+            : Carbon::parse((string) $penalty->attendance_date, self::TZ)->format('Y-m-d');
+
+        [$periodStart, $periodEnd] = $this->currentOperationalMonthDateBounds();
+
+        return $attDate >= $periodStart && $attDate <= $periodEnd;
     }
 }
