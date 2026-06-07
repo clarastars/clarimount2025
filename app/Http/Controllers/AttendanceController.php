@@ -14,9 +14,11 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ZkDailyAttendance;
 use App\Services\AttendanceImportService;
+use App\Services\AttendancePenaltyAutoApprovalService;
 use App\Services\OperationalMonthService;
 use App\Jobs\ProcessBayzatSync;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,6 +31,7 @@ class AttendanceController extends Controller
     public function __construct(
         private AttendanceImportService $importService,
         private OperationalMonthService $operationalMonthService,
+        private AttendancePenaltyAutoApprovalService $penaltyAutoApprovalService,
     ) {}
 
     public function index(Request $request, Company $company): Response
@@ -185,6 +188,7 @@ class AttendanceController extends Controller
             'fingerprintAttendance' => $fingerprintAttendance,
             'fingerprintStats' => $fingerprintStats,
             'canManageAttendanceAdjustments' => $this->canManageAttendanceAdjustmentsForCompany($user, $company),
+            'autoApprovePenalties' => $company->autoApproveAttendancePenalties(),
             'filters' => [
                 'filter' => $filterType,
                 'from' => $fromDate,
@@ -197,6 +201,27 @@ class AttendanceController extends Controller
                 'end' => $endDate->format('Y-m-d'),
             ],
         ]);
+    }
+
+    public function updatePenaltyAutoApproval(Request $request, Company $company): RedirectResponse
+    {
+        $user = Auth::user();
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
+
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        $approvedCount = $this->penaltyAutoApprovalService->setEnabledForCompany(
+            $company,
+            (bool) $validated['enabled']
+        );
+
+        $message = (bool) $validated['enabled']
+            ? __('messages.attendance.auto_approve_penalties_enabled', ['count' => $approvedCount])
+            : __('messages.attendance.auto_approve_penalties_disabled');
+
+        return back()->with('success', $message);
     }
 
     public function late(Request $request, Company $company): Response

@@ -36,6 +36,48 @@
           </div>
         </div>
 
+        <!-- Penalty auto-approval policy -->
+        <Card
+          v-if="canManageAttendanceAdjustments"
+          class="mb-6 overflow-hidden border-blue-100 dark:border-blue-900/50 bg-gradient-to-l from-blue-50/80 via-white to-white dark:from-blue-950/30 dark:via-gray-900 dark:to-gray-900"
+        >
+          <CardContent class="py-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+              <div class="flex gap-4 flex-1 min-w-0">
+                <div
+                  class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400"
+                >
+                  <Icon name="ShieldCheck" class="h-5 w-5" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 dark:text-white">
+                    {{ $t('attendance.auto_approve_penalties') }}
+                  </p>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                    {{ $t('attendance.auto_approve_penalties_description') }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 leading-relaxed">
+                    {{ $t('attendance.auto_approve_penalties_hint') }}
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0 ps-0 sm:ps-4 border-t sm:border-t-0 pt-4 sm:pt-0">
+                <Badge
+                  :variant="autoApprovePenaltiesEnabled ? 'default' : 'secondary'"
+                  :class="autoApprovePenaltiesEnabled ? 'bg-blue-600 hover:bg-blue-600' : ''"
+                >
+                  {{ autoApprovePenaltiesEnabled ? $t('settings.active') : $t('settings.inactive') }}
+                </Badge>
+                <Switch
+                  :checked="autoApprovePenaltiesEnabled"
+                  :disabled="penaltyAutoApprovalForm.processing"
+                  @update:checked="onAutoApproveToggle"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Fingerprint Attendance Section -->
         <Card class="mb-8">
           <CardHeader>
@@ -459,6 +501,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import Icon from '@/components/Icon.vue'
 import {
@@ -474,7 +517,7 @@ import {
   Calendar
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { router, usePage } from '@inertiajs/vue3'
+import { router, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -492,6 +535,7 @@ const props = defineProps({
   filters: Object,
   dateRange: Object,
   canManageAttendanceAdjustments: { type: Boolean, default: undefined },
+  autoApprovePenalties: { type: Boolean, default: false },
 })
 
 const canManageAttendanceAdjustments = computed(() => {
@@ -526,6 +570,30 @@ const fromDate = ref((props.filters as any)?.from || '')
 const toDate = ref((props.filters as any)?.to || '')
 const statusFilter = ref((props.filters as any)?.status || '')
 const searchQuery = ref(props.filters?.search || '')
+
+const autoApprovePenaltiesEnabled = ref(props.autoApprovePenalties === true)
+const penaltyAutoApprovalForm = useForm({ enabled: autoApprovePenaltiesEnabled.value })
+
+watch(
+  () => props.autoApprovePenalties,
+  (value) => {
+    autoApprovePenaltiesEnabled.value = value === true
+    penaltyAutoApprovalForm.enabled = value === true
+  }
+)
+
+const onAutoApproveToggle = (enabled) => {
+  const previous = autoApprovePenaltiesEnabled.value
+  autoApprovePenaltiesEnabled.value = enabled
+  penaltyAutoApprovalForm.enabled = enabled
+  penaltyAutoApprovalForm.put(route('attendance.penalty-auto-approval.update', props.company.id), {
+    preserveScroll: true,
+    onError: () => {
+      autoApprovePenaltiesEnabled.value = previous
+      penaltyAutoApprovalForm.enabled = previous
+    },
+  })
+}
 
 // Debounced search
 let searchTimeout

@@ -225,6 +225,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Attendance Management routes
     Route::get('companies/{company}/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
+    Route::put('companies/{company}/attendance/penalty-auto-approval', [AttendanceController::class, 'updatePenaltyAutoApproval'])->name('attendance.penalty-auto-approval.update');
     Route::get('companies/{company}/attendance/late', [AttendanceController::class, 'late'])->name('attendance.late');
     Route::get('companies/{company}/attendance/deductions', [DeductionsController::class, 'index'])->name('attendance.deductions');
     Route::post('attendance/deductions', [DeductionsController::class, 'store'])->name('attendance.deductions.store');

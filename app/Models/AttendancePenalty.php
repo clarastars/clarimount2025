@@ -124,4 +124,22 @@ class AttendancePenalty extends Model
     {
         return $this->approval_status === 'pending';
     }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function lateViolationTypes(): array
+    {
+        return ['late_0_15', 'late_15_30', 'late_30_60', 'late_over_60'];
+    }
+
+    public function isLateViolation(): bool
+    {
+        return str_starts_with((string) $this->violation_type, 'late_');
+    }
+
+    public function scopeLateViolations($query)
+    {
+        return $query->whereIn('violation_type', self::lateViolationTypes());
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\AttendancePenaltyAutoApprovalService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ use Inertia\Response;
 
 class CompanyController extends Controller
 {
+    public function __construct(
+        private AttendancePenaltyAutoApprovalService $penaltyAutoApprovalService,
+    ) {}
+
     private function userAccessibleCompanyIds(): array
     {
         $user = Auth::user();
@@ -212,6 +217,7 @@ class CompanyController extends Controller
             'fingerprint_report_name' => 'nullable|string|max:255',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'remove_logo' => 'nullable|boolean',
+            'auto_approve_attendance_penalties' => 'nullable|boolean',
         ]);
 
         // Update slug if English name changed
@@ -233,8 +239,16 @@ class CompanyController extends Controller
         }
 
         unset($validated['remove_logo']);
+        unset($validated['auto_approve_attendance_penalties']);
 
         $company->update($validated);
+
+        if ($request->has('auto_approve_attendance_penalties')) {
+            $this->penaltyAutoApprovalService->setEnabledForCompany(
+                $company->fresh(),
+                $request->boolean('auto_approve_attendance_penalties')
+            );
+        }
 
         return redirect()->route('companies.show', $company)
             ->with('success', 'Company updated successfully.');

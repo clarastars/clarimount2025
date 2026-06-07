@@ -50,6 +50,7 @@ const form = useForm({
     description_ar: props.company.description_ar || '',
     website: props.company.website || '',
     fingerprint_report_name: props.company.fingerprint_report_name || '',
+    auto_approve_attendance_penalties: Boolean(props.company.settings?.attendance?.auto_approve_penalties),
     logo: null as File | null,
     remove_logo: false as boolean,
 });
@@ -236,6 +237,21 @@ const submit = () => {
                                 {{ t('companies.fingerprint_report_name_help') }}
                             </div>
                             <InputError :message="form.errors.fingerprint_report_name" />
+                        </div>
+
+                        <div class="space-y-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900/40">
+                            <label class="inline-flex cursor-pointer items-start gap-3">
+                                <input
+                                    v-model="form.auto_approve_attendance_penalties"
+                                    type="checkbox"
+                                    class="mt-1 h-4 w-4 rounded border-gray-300"
+                                />
+                                <span class="space-y-1">
+                                    <span class="block text-sm font-medium">{{ t('companies.auto_approve_attendance_penalties') }}</span>
+                                    <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('attendance.auto_approve_penalties_description') }}</span>
+                                    <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('attendance.auto_approve_penalties_hint') }}</span>
+                                </span>
+                            </label>
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">

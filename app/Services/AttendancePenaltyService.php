@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Log;
 class AttendancePenaltyService
 {
     public function __construct(
-        private OperationalMonthService $operationalMonthService
+        private OperationalMonthService $operationalMonthService,
+        private AttendancePenaltyAutoApprovalService $autoApprovalService,
     ) {}
 
     /**
@@ -85,7 +86,7 @@ class AttendancePenaltyService
             ]
         );
 
-        return $penalty;
+        return $this->autoApprovalService->applyForPenalty($penalty);
     }
 
     /**
@@ -355,7 +356,7 @@ class AttendancePenaltyService
             ]
         );
 
-        return $penalty;
+        return $this->autoApprovalService->applyForPenalty($penalty);
     }
 
     /**

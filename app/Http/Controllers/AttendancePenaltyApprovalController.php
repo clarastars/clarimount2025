@@ -7,14 +7,12 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\AuthorizesAttendanceAccess;
 use App\Http\Requests\RejectPenaltyRequest;
 use App\Models\Company;
-use App\Mail\AttendancePenaltyApprovedMail;
 use App\Models\AttendancePenalty;
+use App\Services\AttendancePenaltyApprovalNotifier;
 use App\Services\AttendancePenaltyService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class AttendancePenaltyApprovalController extends Controller
@@ -22,7 +20,8 @@ class AttendancePenaltyApprovalController extends Controller
     use AuthorizesAttendanceAccess;
 
     public function __construct(
-        private AttendancePenaltyService $attendancePenaltyService
+        private AttendancePenaltyService $attendancePenaltyService,
+        private AttendancePenaltyApprovalNotifier $approvalNotifier,
     ) {}
 
     /**
@@ -42,19 +41,7 @@ class AttendancePenaltyApprovalController extends Controller
             'approved_at' => now(),
         ]);
 
-        $employeeEmail = $penalty->employee->work_email ?: $penalty->employee->personal_email;
-        if (! empty($employeeEmail) && filter_var($employeeEmail, FILTER_VALIDATE_EMAIL)) {
-            try {
-                Mail::to($employeeEmail)->send(new AttendancePenaltyApprovedMail($penalty));
-            } catch (\Throwable $exception) {
-                Log::error('Failed to send approved attendance penalty email.', [
-                    'penalty_id' => $penalty->id,
-                    'employee_id' => $penalty->employee_id,
-                    'employee_email' => $employeeEmail,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-        }
+        $this->approvalNotifier->notifyEmployeeOfApproval($penalty->fresh());
 
         return back()->with('success', __('Penalty approved successfully.'));
     }

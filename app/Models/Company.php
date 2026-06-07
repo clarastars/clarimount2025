@@ -14,6 +14,8 @@ class Company extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const SETTING_AUTO_APPROVE_PENALTIES = 'attendance.auto_approve_penalties';
+
     protected $fillable = [
         'name_en',
         'name_ar',
@@ -195,5 +197,10 @@ class Company extends Model
         data_set($settings, $key, $value);
         $this->settings = $settings;
         $this->save();
+    }
+
+    public function autoApproveAttendancePenalties(): bool
+    {
+        return (bool) $this->getSetting(self::SETTING_AUTO_APPROVE_PENALTIES, false);
     }
 }
