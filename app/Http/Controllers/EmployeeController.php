@@ -10,6 +10,7 @@ use App\Models\Nationality;
 use App\Models\Shift;
 use App\Models\SystemSetting;
 use App\Services\EmployeeExpiryService;
+use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\JsonResponse;
@@ -497,7 +498,30 @@ class EmployeeController extends Controller
                 : [],
             'canManageEmployees' => $this->canManageEmployees($user),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
+            'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
         ]);
+    }
+
+    public function syncFingerprintMonth(
+        Employee $employee,
+        EmployeeFingerprintMonthSyncService $monthSyncService
+    ): RedirectResponse {
+        $user = Auth::user();
+        $this->abortUnlessCanSyncEmployeeFingerprintMonth($user, $employee);
+
+        if (empty($employee->fingerprint_device_id)) {
+            return back()->with('error', __('messages.attendance.employee_no_fingerprint_device'));
+        }
+
+        try {
+            $monthSyncService->syncForEmployee($employee);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', __('messages.attendance.fingerprint_month_sync_failed'));
+        }
+
+        return back()->with('success', __('messages.attendance.fingerprint_month_sync_success'));
     }
 
     /**

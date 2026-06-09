@@ -159,6 +159,15 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($user->can('attendance.fingerprint-month.sync')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.sync-fingerprint-month',
+                'api.employees.search',
+            ]);
+        }
+
         if ($user->can('salary-runs.readonly')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',

@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Models\Employee;
 use App\Services\AttendancePresentationRebuildService;
+use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\FingerprintIclockAttendanceService;
-use App\Services\OperationalMonthService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -23,7 +23,7 @@ class SyncFingerprintIclockAttendanceEmployee extends Command
     public function handle(
         FingerprintIclockAttendanceService $service,
         AttendancePresentationRebuildService $presentationRebuild,
-        OperationalMonthService $operationalMonthService
+        EmployeeFingerprintMonthSyncService $monthSyncService
     ): int
     {
         $employeeId = (int) $this->argument('employeeId');
@@ -40,16 +40,8 @@ class SyncFingerprintIclockAttendanceEmployee extends Command
         }
 
         if ($this->option('month')) {
-            // For backfills we usually want to see what day/employee is processing right now.
-            $service->setProgressEnabled(true);
             $this->info("Syncing current operational month attendance for employee #{$employeeId} (from configured start day until today)...");
-            $service->syncCurrentMonthUntilTodayForEmployeeId($employeeId);
-            $now = Carbon::now('Asia/Riyadh');
-            $operationalRange = $operationalMonthService->resolveCurrentOperationalMonthRange($now);
-            $start = $operationalRange['start']->format('Y-m-d');
-            $end = Carbon::today('Asia/Riyadh')->min($operationalRange['end']->copy()->startOfDay())->format('Y-m-d');
-            $this->info("Rebuilding attendance presentations for company {$employee->company_id} ({$start} → {$end})...");
-            $presentationRebuild->rebuildCompanyDateRange((int) $employee->company_id, $start, $end);
+            $monthSyncService->syncForEmployee($employee);
             $this->info('Done.');
             return 0;
         }

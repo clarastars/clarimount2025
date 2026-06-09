@@ -38,7 +38,10 @@ trait AuthorizesEmployeeAccess
             return $ownedIds;
         }
 
-        if ($user->can('employees.readonly') || $user->can('employees.manage') || $user->can('employees.custody.update')) {
+        if ($user->can('employees.readonly')
+            || $user->can('employees.manage')
+            || $user->can('employees.custody.update')
+            || $user->can('attendance.fingerprint-month.sync')) {
             return collect($this->userAccessibleCompanyIds($user));
         }
 
@@ -57,7 +60,21 @@ trait AuthorizesEmployeeAccess
 
         return $user->can('employees.readonly')
             || $user->can('employees.manage')
-            || $user->can('employees.custody.update');
+            || $user->can('employees.custody.update')
+            || $user->can('attendance.fingerprint-month.sync');
+    }
+
+    protected function canSyncEmployeeFingerprintMonth(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if (! $user->can('attendance.fingerprint-month.sync')) {
+            return false;
+        }
+
+        return $this->canAccessEmployee($user, $employee);
     }
 
     protected function canUpdateEmployeeCustody(User $user): bool
@@ -110,6 +127,11 @@ trait AuthorizesEmployeeAccess
     {
         abort_unless($this->canUpdateEmployeeCustody($user), 403);
         abort_unless($this->canAccessEmployee($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanSyncEmployeeFingerprintMonth(User $user, Employee $employee): void
+    {
+        abort_unless($this->canSyncEmployeeFingerprintMonth($user, $employee), 403);
     }
 
     /**

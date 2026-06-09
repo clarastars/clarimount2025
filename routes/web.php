@@ -192,6 +192,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Employees management
     Route::put('employees/{employee}/fingerprint-link', [EmployeeController::class, 'updateFingerprintLink'])->name('employees.fingerprint-link');
+    Route::post('employees/{employee}/sync-fingerprint-month', [EmployeeController::class, 'syncFingerprintMonth'])->name('employees.sync-fingerprint-month');
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])
         ->name('employees.expiring-documents.index');
     Route::resource('employees', EmployeeController::class);

@@ -15,9 +15,17 @@
                                     <span class="text-sm font-mono text-muted-foreground">{{ displayValue(employee.employee_id) }}</span>
                                 </div>
                             </div>
-                            <div v-if="canManageEmployees || canUpdateEmployeeCustody" class="flex flex-wrap gap-2">
+                            <div v-if="canManageEmployees || canUpdateEmployeeCustody || canSyncEmployeeFingerprintMonth" class="flex flex-wrap gap-2">
                                 <Button v-if="canManageEmployees" variant="outline" asChild><Link :href="route('employees.edit', employee.id)">{{ t('employees.edit') }}</Link></Button>
                                 <Button v-if="canUpdateEmployeeCustody" variant="secondary" asChild><Link :href="route('employees.custody.show', employee.id)">{{ t('custody.update_custody') }}</Link></Button>
+                                <Button
+                                    v-if="canSyncEmployeeFingerprintMonth"
+                                    variant="secondary"
+                                    :disabled="isSyncingFingerprintMonth"
+                                    @click="syncFingerprintMonth"
+                                >
+                                    {{ isSyncingFingerprintMonth ? t('attendance.sync_fingerprint_month_processing') : t('attendance.sync_fingerprint_month') }}
+                                </Button>
                                 <Button v-if="canManageEmployees" variant="default" asChild><Link :href="route('employees.leaves.create', employee.id)">{{ t('leaves.create_leave') }}</Link></Button>
                             </div>
                         </div>
@@ -191,8 +199,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { 
@@ -222,11 +230,14 @@ interface Props {
     }>;
     canManageEmployees?: boolean;
     canUpdateEmployeeCustody?: boolean;
+    canSyncEmployeeFingerprintMonth?: boolean;
 }
 
 const props = defineProps<Props>();
 const canManageEmployees = computed(() => props.canManageEmployees ?? true);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
+const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
+const isSyncingFingerprintMonth = ref(false);
 const { t } = useI18n();
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
@@ -278,5 +289,19 @@ const displayCurrency = (value: unknown): string => {
     const n = Number(value);
     if (Number.isNaN(n)) return '-';
     return formatCurrency(n);
+};
+
+const syncFingerprintMonth = () => {
+    if (isSyncingFingerprintMonth.value) {
+        return;
+    }
+
+    isSyncingFingerprintMonth.value = true;
+    router.post(route('employees.sync-fingerprint-month', props.employee.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            isSyncingFingerprintMonth.value = false;
+        },
+    });
 };
 </script> 
