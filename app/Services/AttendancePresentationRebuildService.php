@@ -138,6 +138,10 @@ class AttendancePresentationRebuildService
             $weekday = $currentDate->dayOfWeek;
 
             foreach ($allEmployees as $employee) {
+                if (! $this->isOnOrAfterHireDate($employee, $currentDate)) {
+                    continue;
+                }
+
                 $workdays = $shiftWorkdayMaps[$employee->id] ?? [];
                 $isWorkday = in_array($weekday, $workdays, true);
                 $key = $employee->id . '_' . $dateStr;
@@ -234,14 +238,17 @@ class AttendancePresentationRebuildService
 
             $dateStr = $currentDate->format('Y-m-d');
             $weekday = $currentDate->dayOfWeek;
-            $isWorkday = in_array($weekday, $workdays, true);
-            $key = $employee->id . '_' . $dateStr;
-            $existingRecord = $existingAttendance->get($key);
 
-            if ($existingRecord) {
-                $rows[] = $this->rowFromZkRecord($existingRecord, $employee, $dateStr);
-            } elseif ($isWorkday) {
-                $rows[] = $this->rowVirtual($employee, $dateStr);
+            if ($this->isOnOrAfterHireDate($employee, $currentDate)) {
+                $isWorkday = in_array($weekday, $workdays, true);
+                $key = $employee->id . '_' . $dateStr;
+                $existingRecord = $existingAttendance->get($key);
+
+                if ($existingRecord) {
+                    $rows[] = $this->rowFromZkRecord($existingRecord, $employee, $dateStr);
+                } elseif ($isWorkday) {
+                    $rows[] = $this->rowVirtual($employee, $dateStr);
+                }
             }
 
             $currentDate->addDay();
@@ -322,7 +329,7 @@ class AttendancePresentationRebuildService
                 }
 
                 $attDate = Carbon::parse($row['att_date'], self::TZ);
-                if ($attDate->isFuture()) {
+                if ($attDate->isFuture() || ! $this->isOnOrAfterHireDate($employee, $attDate)) {
                     return false;
                 }
 
@@ -545,5 +552,18 @@ class AttendancePresentationRebuildService
         }
 
         return Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
+
+    private function isOnOrAfterHireDate(Employee $employee, Carbon $date): bool
+    {
+        if ($employee->hire_date === null) {
+            return true;
+        }
+
+        $hireDate = $employee->hire_date instanceof Carbon
+            ? $employee->hire_date->copy()->startOfDay()
+            : Carbon::parse($employee->hire_date, self::TZ)->startOfDay();
+
+        return $date->copy()->startOfDay()->gte($hireDate);
     }
 }

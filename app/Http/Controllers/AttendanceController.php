@@ -127,6 +127,10 @@ class AttendanceController extends Controller
 
         $presentationQuery
             ->join('employees', 'employees.id', '=', 'attendance_daily_presentations.employee_id')
+            ->where(function ($q) {
+                $q->whereNull('employees.hire_date')
+                    ->orWhereColumn('attendance_daily_presentations.att_date', '>=', 'employees.hire_date');
+            })
             ->orderByDesc('attendance_daily_presentations.att_date')
             ->orderBy('employees.first_name')
             ->orderBy('employees.last_name')
@@ -291,7 +295,11 @@ class AttendanceController extends Controller
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d')
             ])
-            ->where('employees.company_id', $company->id);
+            ->where('employees.company_id', $company->id)
+            ->where(function ($q) {
+                $q->whereNull('employees.hire_date')
+                    ->orWhereColumn('zk_daily_attendance.att_date', '>=', 'employees.hire_date');
+            });
 
         // Apply search filter if provided
         if (!empty($search)) {
