@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SalaryRunApprovalStep extends Model
 {
     protected $fillable = [
+        'company_id',
         'title',
         'sort_order',
         'team_id',
@@ -21,6 +22,11 @@ class SalaryRunApprovalStep extends Model
         'sort_order' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function team(): BelongsTo
     {

@@ -9,6 +9,7 @@ use App\Models\SalaryRun;
 use App\Models\SalaryRunApprovalRejection;
 use App\Models\SalaryRunApprovalStep;
 use App\Models\SalaryRunStepApproval;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,14 +20,48 @@ class SalaryRunApprovalService
     /**
      * @return Collection<int, SalaryRunApprovalStep>
      */
-    public function activeSteps(): Collection
+    public function activeStepsForCompany(int|Company $company): Collection
     {
+        $companyId = $company instanceof Company ? (int) $company->id : $company;
+
         return SalaryRunApprovalStep::query()
             ->with('team')
+            ->where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
+    }
+
+    public function seedDefaultStepsForCompany(Company $company): void
+    {
+        if (SalaryRunApprovalStep::query()->where('company_id', $company->id)->exists()) {
+            return;
+        }
+
+        $defaults = [
+            ['title' => 'اعتماد الموارد البشرية', 'sort_order' => 1, 'team_name' => 'الموارد البشرية'],
+            ['title' => 'اعتماد المحاسب', 'sort_order' => 2, 'team_name' => 'المحاسبين'],
+            ['title' => 'اعتماد المدير المالي', 'sort_order' => 3, 'team_name' => null],
+            ['title' => 'اعتماد المدير التنفيذي', 'sort_order' => 4, 'team_name' => null],
+            ['title' => 'اعتماد المدير العام', 'sort_order' => 5, 'team_name' => null],
+        ];
+
+        foreach ($defaults as $step) {
+            $teamId = null;
+
+            if ($step['team_name']) {
+                $teamId = Team::query()->where('name', $step['team_name'])->value('id');
+            }
+
+            SalaryRunApprovalStep::query()->create([
+                'company_id' => $company->id,
+                'title' => $step['title'],
+                'sort_order' => $step['sort_order'],
+                'team_id' => $teamId,
+                'is_active' => true,
+            ]);
+        }
     }
 
     /**
@@ -34,7 +69,7 @@ class SalaryRunApprovalService
      */
     public function buildApprovalPayload(SalaryRun $salaryRun, User $user, Company $company): array
     {
-        $steps = $this->activeSteps();
+        $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = SalaryRunStepApproval::query()
             ->where('salary_run_id', $salaryRun->id)
             ->with('approver')
@@ -104,7 +139,7 @@ class SalaryRunApprovalService
 
     public function allStepsApproved(SalaryRun $salaryRun): bool
     {
-        $stepCount = $this->activeSteps()->count();
+        $stepCount = $this->activeStepsForCompany((int) $salaryRun->company_id)->count();
         if ($stepCount === 0) {
             return false;
         }
@@ -118,7 +153,7 @@ class SalaryRunApprovalService
     {
         $approvedStepIds = $salaryRun->stepApprovals()->pluck('approval_step_id');
 
-        return $this->activeSteps()->first(
+        return $this->activeStepsForCompany((int) $salaryRun->company_id)->first(
             fn (SalaryRunApprovalStep $step) => ! $approvedStepIds->contains($step->id)
         );
     }
@@ -130,6 +165,10 @@ class SalaryRunApprovalService
         SalaryRunApprovalStep $step,
         bool $previousStepsApproved = true
     ): bool {
+        if ((int) $step->company_id !== (int) $company->id || (int) $salaryRun->company_id !== (int) $company->id) {
+            return false;
+        }
+
         if (! $step->is_active) {
             return false;
         }
@@ -170,6 +209,7 @@ class SalaryRunApprovalService
     public function previousStepsAreApproved(SalaryRun $salaryRun, SalaryRunApprovalStep $step): bool
     {
         $previousStepIds = SalaryRunApprovalStep::query()
+            ->where('company_id', $step->company_id)
             ->where('is_active', true)
             ->where(function ($query) use ($step) {
                 $query->where('sort_order', '<', $step->sort_order)
@@ -195,6 +235,10 @@ class SalaryRunApprovalService
     public function approveStep(User $user, SalaryRun $salaryRun, SalaryRunApprovalStep $step): SalaryRunStepApproval
     {
         return DB::transaction(function () use ($user, $salaryRun, $step) {
+            if ((int) $step->company_id !== (int) $salaryRun->company_id) {
+                throw new \RuntimeException(__('messages.salary_runs.approval_step_company_mismatch'));
+            }
+
             if ($salaryRun->stepApprovals()->where('approval_step_id', $step->id)->exists()) {
                 throw new \RuntimeException(__('messages.salary_runs.already_approved'));
             }
@@ -215,6 +259,10 @@ class SalaryRunApprovalService
     public function rejectStep(User $user, SalaryRun $salaryRun, SalaryRunApprovalStep $step, string $reason): SalaryRunApprovalRejection
     {
         return DB::transaction(function () use ($user, $salaryRun, $step, $reason) {
+            if ((int) $step->company_id !== (int) $salaryRun->company_id) {
+                throw new \RuntimeException(__('messages.salary_runs.approval_step_company_mismatch'));
+            }
+
             if ($salaryRun->stepApprovals()->where('approval_step_id', $step->id)->exists()) {
                 throw new \RuntimeException(__('messages.salary_runs.already_approved'));
             }
@@ -237,11 +285,12 @@ class SalaryRunApprovalService
         });
     }
 
-    public function reorderSteps(array $orderedIds): void
+    public function reorderStepsForCompany(int $companyId, array $orderedIds): void
     {
-        DB::transaction(function () use ($orderedIds) {
+        DB::transaction(function () use ($companyId, $orderedIds) {
             foreach (array_values($orderedIds) as $index => $stepId) {
                 SalaryRunApprovalStep::query()
+                    ->where('company_id', $companyId)
                     ->whereKey($stepId)
                     ->update(['sort_order' => $index + 1]);
             }

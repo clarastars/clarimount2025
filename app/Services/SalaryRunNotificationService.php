@@ -180,7 +180,7 @@ class SalaryRunNotificationService
      */
     public function getWorkflowStakeholders(SalaryRun $salaryRun, Company $company): Collection
     {
-        $teamIds = $this->approvalService->activeSteps()
+        $teamIds = $this->approvalService->activeStepsForCompany($company)
             ->pluck('team_id')
             ->filter()
             ->unique()

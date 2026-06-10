@@ -288,6 +288,10 @@ class SalaryRunController extends Controller
             abort(403, 'Salary run does not belong to this company.');
         }
 
+        if ((int) $salaryRunApprovalStep->company_id !== (int) $company->id) {
+            abort(403, 'This approval step does not belong to this company.');
+        }
+
         if ($salaryRun->status === 'finalized') {
             return back()->with('error', __('messages.salary_runs.cannot_update_finalized'));
         }
@@ -335,6 +339,10 @@ class SalaryRunController extends Controller
 
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
+        }
+
+        if ((int) $salaryRunApprovalStep->company_id !== (int) $company->id) {
+            abort(403, 'This approval step does not belong to this company.');
         }
 
         if ($salaryRun->status === 'finalized') {

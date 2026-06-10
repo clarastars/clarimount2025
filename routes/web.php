@@ -9,6 +9,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendancePenaltyApprovalController;
 use App\Http\Controllers\BayzatConfigController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanySalaryRunApprovalStepsController;
 use App\Http\Controllers\CustodyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeductionsController;
@@ -246,6 +247,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Attendance Penalty Approval routes
     Route::post('attendance-penalties/{penalty}/approve', [AttendancePenaltyApprovalController::class, 'approve'])->name('attendance-penalties.approve');
     Route::post('attendance-penalties/{penalty}/reject', [AttendancePenaltyApprovalController::class, 'reject'])->name('attendance-penalties.reject');
+
+    // Salary run approval steps (per company)
+    Route::get('companies/{company}/salary-run-approvals', [CompanySalaryRunApprovalStepsController::class, 'index'])->name('companies.salary-run-approvals.index');
+    Route::post('companies/{company}/salary-run-approvals', [CompanySalaryRunApprovalStepsController::class, 'store'])->name('companies.salary-run-approvals.store');
+    Route::put('companies/{company}/salary-run-approvals/{salaryRunApprovalStep}', [CompanySalaryRunApprovalStepsController::class, 'update'])->name('companies.salary-run-approvals.update');
+    Route::delete('companies/{company}/salary-run-approvals/{salaryRunApprovalStep}', [CompanySalaryRunApprovalStepsController::class, 'destroy'])->name('companies.salary-run-approvals.destroy');
+    Route::post('companies/{company}/salary-run-approvals/reorder', [CompanySalaryRunApprovalStepsController::class, 'reorder'])->name('companies.salary-run-approvals.reorder');
 
     // Salary Runs routes
     Route::get('companies/{company}/salary-runs', [SalaryRunController::class, 'index'])->name('salary-runs.index');
