@@ -123,7 +123,7 @@ return [
         'salary_run_approvals_saved' => 'Approval steps saved successfully.',
         'salary_run_approvals_reordered' => 'Approval step order updated.',
         'salary_run_approvals_deleted' => 'Approval step deleted.',
-        'salary_run_approvals_cannot_delete' => 'Cannot delete a step that has been used in previous approvals.',
+        'salary_run_approvals_cannot_delete' => 'Cannot delete a step linked to a salary run that is still in approval. Finalize that run first.',
         'salary_run_approvals_delete_confirm' => 'Are you sure you want to delete this approval step?',
         'salary_run_approvals_move_up' => 'Move up',
         'salary_run_approvals_move_down' => 'Move down',
@@ -1187,6 +1187,8 @@ return [
         'select_document_to_upload' => 'Please select a document to upload.',
         'print_document' => 'Print Document',
         'view_document' => 'View Document',
+        'uploaded_signed_document' => 'Uploaded signed document',
+        'open_uploaded_document' => 'Open uploaded file',
 
         // Status translations
         'status_pending' => 'Pending',

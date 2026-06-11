@@ -128,6 +128,7 @@ class RedirectIfEmployeePortalUser
                 'employees.custody.store',
                 'employees.custody.quick-create-asset',
                 'custody.document',
+                'custody.uploaded-document',
                 'custody.upload',
                 'api.custody.available-assets',
                 'api.custody.asset-templates.search',

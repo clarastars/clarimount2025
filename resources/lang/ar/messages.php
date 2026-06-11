@@ -123,7 +123,7 @@ return [
         'salary_run_approvals_saved' => 'تم حفظ خطوات الاعتماد بنجاح.',
         'salary_run_approvals_reordered' => 'تم تحديث ترتيب خطوات الاعتماد.',
         'salary_run_approvals_deleted' => 'تم حذف خطوة الاعتماد.',
-        'salary_run_approvals_cannot_delete' => 'لا يمكن حذف خطوة تم استخدامها في اعتمادات سابقة.',
+        'salary_run_approvals_cannot_delete' => 'لا يمكن حذف خطوة مرتبطة بمسير رواتب قيد الاعتماد. أنهِ المسير أو اعتمده بالكامل أولاً.',
         'salary_run_approvals_delete_confirm' => 'هل أنت متأكد من حذف خطوة الاعتماد هذه؟',
         'salary_run_approvals_move_up' => 'تحريك لأعلى',
         'salary_run_approvals_move_down' => 'تحريك لأسفل',
@@ -1198,6 +1198,8 @@ return [
         'select_document_to_upload' => 'يرجى اختيار وثيقة للتحميل.',
         'print_document' => 'طباعة الوثيقة',
         'view_document' => 'عرض الوثيقة',
+        'uploaded_signed_document' => 'الوثيقة الموقعة المرفوعة',
+        'open_uploaded_document' => 'فتح الملف المرفوع',
 
         // Status translations
         'status_pending' => 'معلق',

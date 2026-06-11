@@ -214,6 +214,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('employees/{employee}/custody', [CustodyController::class, 'store'])->name('employees.custody.store');
     Route::post('employees/{employee}/custody/quick-create-asset', [CustodyController::class, 'storeQuickAsset'])->name('employees.custody.quick-create-asset');
     Route::get('custody-changes/{custodyChange}/document', [CustodyController::class, 'generateDocument'])->name('custody.document');
+    Route::get('custody-changes/{custodyChange}/uploaded-document', [CustodyController::class, 'showUploadedDocument'])->name('custody.uploaded-document');
     Route::post('custody-changes/{custodyChange}/upload', [CustodyController::class, 'uploadDocument'])->name('custody.upload');
     Route::get('api/custody/available-assets', [CustodyController::class, 'getAvailableAssets'])->name('api.custody.available-assets');
     Route::get('api/custody/asset-templates/search', [AssetTemplateController::class, 'search'])->name('api.custody.asset-templates.search');

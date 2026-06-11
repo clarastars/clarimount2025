@@ -10,15 +10,49 @@
                     <p class="text-muted-foreground">{{ t('custody.document_id') }}: {{ custodyChange.id }}</p>
                 </div>
                 <div class="flex gap-2">
+                    <Button
+                        v-if="uploadedDocument"
+                        variant="outline"
+                        as-child
+                    >
+                        <a :href="uploadedDocument.url" target="_blank" rel="noopener noreferrer">
+                            <Icon name="FileText" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
+                            {{ t('custody.open_uploaded_document') }}
+                        </a>
+                    </Button>
                     <Button variant="outline" @click="goBack">
-                        <Icon name="ArrowLeft" class="mr-2 h-4 w-4" />
+                        <Icon name="ArrowLeft" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
                         {{ t('custody.back') }}
                     </Button>
                     <Button @click="printDocument">
-                        <Icon name="Printer" class="mr-2 h-4 w-4" />
+                        <Icon name="Printer" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
                         {{ t('custody.print') }}
                     </Button>
                 </div>
+            </div>
+
+            <div
+                v-if="uploadedDocument"
+                class="mb-6 rounded-lg border bg-white p-4 shadow-lg print:hidden"
+            >
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-lg font-bold">{{ t('custody.uploaded_signed_document') }}</h2>
+                    <Badge class="bg-green-100 text-green-800 hover:bg-green-100">
+                        {{ t('custody.status_' + custodyChange.status) }}
+                    </Badge>
+                </div>
+                <iframe
+                    v-if="uploadedDocument.type === 'pdf'"
+                    :src="uploadedDocument.url"
+                    class="h-[75vh] w-full rounded-md border"
+                    :title="uploadedDocument.filename"
+                />
+                <img
+                    v-else
+                    :src="uploadedDocument.url"
+                    :alt="uploadedDocument.filename"
+                    class="mx-auto max-h-[75vh] max-w-full rounded-md border object-contain"
+                />
             </div>
 
             <!-- Document Content -->
@@ -197,6 +231,12 @@ import { useI18n } from 'vue-i18n';
 import { onMounted, computed } from 'vue';
 import type { Employee, CustodyChange, Department } from '@/types';
 
+interface UploadedDocumentMeta {
+    url: string;
+    type: 'pdf' | 'image';
+    filename: string;
+}
+
 interface Props {
     custodyChange: CustodyChange;
     employee: Employee;
@@ -204,6 +244,7 @@ interface Props {
     newAssets: any[];
     generatedAt: string;
     locale?: string;
+    uploadedDocument?: UploadedDocumentMeta | null;
 }
 
 const props = defineProps<Props>();

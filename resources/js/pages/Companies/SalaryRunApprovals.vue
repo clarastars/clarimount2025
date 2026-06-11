@@ -19,7 +19,7 @@ interface StepItem {
     team_id: number | null;
     team_name: string | null;
     is_active: boolean;
-    has_approvals: boolean;
+    can_delete: boolean;
 }
 
 interface TeamItem {
@@ -265,7 +265,7 @@ const moveStep = (index: number, direction: -1 | 1) => {
                                     type="button"
                                     size="sm"
                                     variant="destructive"
-                                    :disabled="step.has_approvals"
+                                    :disabled="!step.can_delete"
                                     @click="deleteStep(step)"
                                 >
                                     {{ t('common.delete') }}

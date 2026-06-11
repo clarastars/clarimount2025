@@ -16,6 +16,7 @@ use App\Services\CustodyDocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -256,6 +257,8 @@ class CustodyController extends Controller
             ->whereIn('id', $newAssetIds)
             ->get();
 
+        $uploadedDocument = $this->uploadedDocumentMeta($custodyChange);
+
         return Inertia::render('Documents/CustodyChangeDocument', [
             'custodyChange' => $custodyChange,
             'employee' => $custodyChange->employee,
@@ -263,7 +266,46 @@ class CustodyController extends Controller
             'newAssets' => $newAssets,
             'generatedAt' => now()->format('Y-m-d H:i:s'),
             'locale' => 'ar', // Pass Arabic locale to frontend
+            'uploadedDocument' => $uploadedDocument,
         ]);
+    }
+
+    public function showUploadedDocument(CustodyChange $custodyChange): BinaryFileResponse
+    {
+        $user = Auth::user();
+        $custodyChange->loadMissing('employee');
+        $this->abortUnlessCanUpdateEmployeeCustody($user, $custodyChange->employee);
+
+        if (! $custodyChange->document_path || ! Storage::disk('public')->exists($custodyChange->document_path)) {
+            abort(404);
+        }
+
+        $fullPath = Storage::disk('public')->path($custodyChange->document_path);
+        $mimeType = Storage::disk('public')->mimeType($custodyChange->document_path) ?: 'application/octet-stream';
+
+        return response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="'.basename($custodyChange->document_path).'"',
+        ]);
+    }
+
+    /**
+     * @return array{url: string, type: string, filename: string}|null
+     */
+    private function uploadedDocumentMeta(CustodyChange $custodyChange): ?array
+    {
+        if (! $custodyChange->document_path || ! Storage::disk('public')->exists($custodyChange->document_path)) {
+            return null;
+        }
+
+        $extension = strtolower(pathinfo($custodyChange->document_path, PATHINFO_EXTENSION));
+        $type = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) ? 'image' : 'pdf';
+
+        return [
+            'url' => route('custody.uploaded-document', $custodyChange),
+            'type' => $type,
+            'filename' => basename($custodyChange->document_path),
+        ];
     }
 
     /**

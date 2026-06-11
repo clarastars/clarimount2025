@@ -72,7 +72,7 @@ trait ManagesSalaryRunApprovalSteps
                 'team_id' => $step->team_id,
                 'team_name' => $step->team?->name,
                 'is_active' => $step->is_active,
-                'has_approvals' => $step->stepApprovals()->exists(),
+                'can_delete' => ! $step->hasBlockingWorkflowUsage(),
             ])
             ->all();
     }

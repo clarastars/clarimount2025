@@ -83,7 +83,7 @@ class CompanySalaryRunApprovalStepsController extends Controller
         $this->abortUnlessCanManageSalaryRunApprovalSteps($company);
         $this->abortUnlessStepBelongsToCompany($salaryRunApprovalStep, $company);
 
-        if ($salaryRunApprovalStep->stepApprovals()->exists()) {
+        if ($salaryRunApprovalStep->hasBlockingWorkflowUsage()) {
             return back()->withErrors([
                 'step' => __('messages.settings.salary_run_approvals_cannot_delete'),
             ]);
