@@ -250,7 +250,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
         href: '/employees',
     },
     {
-        title: props.employee.full_name || `${props.employee.first_name} ${props.employee.last_name}`,
+        title: props.employee.full_name || [props.employee.first_name, props.employee.father_name, props.employee.last_name].filter(Boolean).join(' '),
         href: `/employees/${props.employee.id}`,
     },
 ]);
