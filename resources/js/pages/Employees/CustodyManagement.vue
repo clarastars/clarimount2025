@@ -52,14 +52,8 @@
                                         {{ t('custody.unsaved_changes') }}
                                     </Badge>
                                 </CardTitle>
-                                <p v-if="hasChanges" class="text-sm text-muted-foreground">
-                                    <span v-if="addedAssetsCount > 0">
-                                        {{ t('custody.assets_to_add_on_save', { count: addedAssetsCount }) }}
-                                    </span>
-                                    <span v-if="addedAssetsCount > 0 && removedAssetsCount > 0"> · </span>
-                                    <span v-if="removedAssetsCount > 0">
-                                        {{ t('custody.assets_to_remove_on_save', { count: removedAssetsCount }) }}
-                                    </span>
+                                <p v-if="hasChanges && addedAssetsCount > 0" class="text-sm text-muted-foreground">
+                                    {{ t('custody.assets_to_add_on_save', { count: addedAssetsCount }) }}
                                 </p>
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -135,12 +129,46 @@
                         </div>
 
                         <div
-                            v-else
+                            v-else-if="pendingRemovedAssets.length === 0"
                             class="rounded-lg border border-dashed py-12 text-center text-muted-foreground"
                         >
                             <Icon name="Package" class="mx-auto mb-3 h-10 w-10 opacity-40" />
                             <p>{{ t('custody.no_assets_assigned') }}</p>
                             <p class="mt-1 text-sm">{{ t('custody.add_assets_hint') }}</p>
+                        </div>
+
+                        <div
+                            v-if="pendingRemovedAssets.length > 0"
+                            class="rounded-lg border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20"
+                        >
+                            <p class="mb-3 text-sm font-medium text-red-800 dark:text-red-300">
+                                {{ t('custody.assets_pending_removal', { count: pendingRemovedAssets.length }) }}
+                            </p>
+                            <div class="space-y-2">
+                                <div
+                                    v-for="asset in pendingRemovedAssets"
+                                    :key="asset.id"
+                                    class="flex items-center justify-between gap-3 rounded-md border border-red-100 bg-white/80 px-3 py-2 text-sm dark:border-red-900 dark:bg-background/50"
+                                >
+                                    <div class="min-w-0">
+                                        <p class="font-mono font-medium">{{ asset.asset_tag }}</p>
+                                        <p class="truncate text-muted-foreground">{{ getAssetDisplayName(asset) }}</p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        class="shrink-0"
+                                        @click="restoreAsset(asset)"
+                                    >
+                                        <Icon name="Undo2" class="mr-1 h-4 w-4 rtl:mr-0 rtl:ml-1" />
+                                        {{ t('custody.undo_remove') }}
+                                    </Button>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs text-muted-foreground">
+                                {{ t('custody.removal_applies_on_save') }}
+                            </p>
                         </div>
 
                         <div v-if="hasChanges" class="rounded-lg border bg-muted/30 p-4">
@@ -606,8 +634,11 @@ watch(updatedAssets, () => {
     checkForChanges();
 }, { deep: true });
 
-// Watch for changes in currentAssets (props)
-watch(() => props.currentAssets, () => {
+// Sync list when server data changes and the user has no pending edits
+watch(() => props.currentAssets, (newAssets) => {
+    if (!hasChanges.value) {
+        updatedAssets.value = [...newAssets];
+    }
     checkForChanges();
 }, { deep: true });
 
@@ -652,11 +683,13 @@ const addedAssetsCount = computed(() =>
     updatedAssets.value.filter((asset) => isNewAsset(asset)).length
 );
 
-const removedAssetsCount = computed(() => {
+const pendingRemovedAssets = computed(() => {
     const updatedIds = new Set(updatedAssets.value.map((asset) => asset.id));
 
-    return props.currentAssets.filter((asset) => !updatedIds.has(asset.id)).length;
+    return props.currentAssets.filter((asset) => !updatedIds.has(asset.id));
 });
+
+const removedAssetsCount = computed(() => pendingRemovedAssets.value.length);
 
 // Methods
 const getStatusBadgeClass = (status: string) => {
@@ -679,7 +712,20 @@ const getStatusBadgeClass = (status: string) => {
 };
 
 const removeAsset = (asset: Asset) => {
+    if (!confirm(t('custody.confirm_remove_asset', { tag: asset.asset_tag }))) {
+        return;
+    }
+
     updatedAssets.value = updatedAssets.value.filter(a => a.id !== asset.id);
+    checkForChanges();
+};
+
+const restoreAsset = (asset: Asset) => {
+    if (updatedAssets.value.some((entry) => entry.id === asset.id)) {
+        return;
+    }
+
+    updatedAssets.value = [...updatedAssets.value, asset];
     checkForChanges();
 };
 
@@ -881,6 +927,16 @@ const saveCustodyUpdate = async () => {
     if (!hasChanges.value) {
         alert(t('custody.no_changes_to_save'));
         return;
+    }
+
+    if (removedAssetsCount.value > 0) {
+        const confirmed = confirm(
+            t('custody.confirm_save_with_removals', { count: removedAssetsCount.value })
+        );
+
+        if (!confirmed) {
+            return;
+        }
     }
     
     loading.value = true;
