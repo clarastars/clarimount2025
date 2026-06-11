@@ -36,125 +36,121 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Current Custody Section -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle class="flex items-center gap-2">
-                                <Icon name="Package" class="h-5 w-5 text-blue-600" />
-                                {{ t('custody.current_custody') }} ({{ currentAssets.length }})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div class="space-y-3">
-                                <div 
-                                    v-for="asset in currentAssets" 
-                                    :key="asset.id"
-                                    class="flex items-center justify-between p-3 border rounded-lg"
-                                >
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                            <Icon name="Package" class="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <p class="font-medium">{{ asset.model_name || asset.asset_tag }}</p>
-                                            <p class="text-sm text-muted-foreground">{{ asset.asset_tag }}</p>
-                                            <p class="text-xs text-muted-foreground">{{ asset.assetCategory?.name }}</p>
-                                        </div>
-                                    </div>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        @click="removeAsset(asset)"
-                                        :disabled="loading"
-                                    >
-                                        <Icon name="Minus" class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <div v-if="currentAssets.length === 0" class="text-center py-8 text-muted-foreground">
-                                    {{ t('custody.no_assets_assigned') }}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <!-- Updated Custody Section -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle class="flex items-center gap-2">
-                                <Icon name="Package" class="h-5 w-5 text-green-600" />
-                                {{ t('custody.updated_custody') }} ({{ updatedAssets.length }})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div class="space-y-3">
-                                <div 
-                                    v-for="asset in updatedAssets" 
-                                    :key="asset.id"
-                                    class="flex items-center justify-between p-3 border rounded-lg"
-                                >
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                                            <Icon name="Package" class="h-4 w-4 text-green-600" />
-                                        </div>
-                                        <div>
-                                            <p class="font-medium">{{ asset.model_name || asset.asset_tag }}</p>
-                                            <p class="text-sm text-muted-foreground">{{ asset.asset_tag }}</p>
-                                            <p class="text-xs text-muted-foreground">{{ asset.assetCategory?.name }}</p>
-                                        </div>
-                                    </div>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        @click="removeFromUpdated(asset)"
-                                        :disabled="loading"
-                                    >
-                                        <Icon name="X" class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    <Button 
-                                        variant="default" 
-                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                                        @click="showAssetSearch = true"
-                                        :disabled="loading"
-                                    >
-                                        <Icon name="Plus" class="mr-2 h-4 w-4" />
-                                        {{ t('custody.add_asset') }}
-                                    </Button>
-                                    <Button 
-                                        variant="outline" 
-                                        class="w-full"
-                                        @click="openQuickCreateDialog"
-                                        :disabled="loading"
-                                    >
-                                        <Icon name="PackagePlus" class="mr-2 h-4 w-4" />
-                                        {{ t('custody.create_and_assign_asset') }}
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                
-                <!-- Changes Summary -->
-                <Card v-if="hasChanges">
+                <!-- Employee Custody -->
+                <Card>
                     <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Icon name="FileText" class="h-5 w-5 text-orange-600" />
-                            {{ t('custody.changes_summary') }}
-                        </CardTitle>
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="space-y-1">
+                                <CardTitle class="flex flex-wrap items-center gap-2">
+                                    <Icon name="Package" class="h-5 w-5 text-blue-600" />
+                                    {{ t('custody.employee_custody') }} ({{ updatedAssets.length }})
+                                    <Badge
+                                        v-if="hasChanges"
+                                        variant="outline"
+                                        class="border-amber-300 bg-amber-50 text-amber-800"
+                                    >
+                                        {{ t('custody.unsaved_changes') }}
+                                    </Badge>
+                                </CardTitle>
+                                <p v-if="hasChanges" class="text-sm text-muted-foreground">
+                                    <span v-if="addedAssetsCount > 0">
+                                        {{ t('custody.assets_to_add_on_save', { count: addedAssetsCount }) }}
+                                    </span>
+                                    <span v-if="addedAssetsCount > 0 && removedAssetsCount > 0"> · </span>
+                                    <span v-if="removedAssetsCount > 0">
+                                        {{ t('custody.assets_to_remove_on_save', { count: removedAssetsCount }) }}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    @click="showAssetSearch = true"
+                                    :disabled="loading"
+                                >
+                                    <Icon name="Plus" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
+                                    {{ t('custody.add_asset') }}
+                                </Button>
+                                <Button
+                                    variant="default"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                                    @click="openQuickCreateDialog"
+                                    :disabled="loading"
+                                >
+                                    <Icon name="PackagePlus" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
+                                    {{ t('custody.create_and_assign_asset') }}
+                                </Button>
+                            </div>
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <div>
+                    <CardContent class="space-y-4">
+                        <div v-if="updatedAssets.length > 0" class="overflow-hidden rounded-lg border">
+                            <div
+                                class="hidden grid-cols-[1fr_1.2fr_1fr_1fr_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground sm:grid"
+                            >
+                                <span>{{ t('assets.asset_tag') }}</span>
+                                <span>{{ t('custody.asset_name') }}</span>
+                                <span>{{ t('assets.serial_number') }}</span>
+                                <span>{{ t('assets.category') }}</span>
+                                <span class="w-10 text-center">{{ t('common.actions') }}</span>
+                            </div>
+                            <div
+                                v-for="asset in updatedAssets"
+                                :key="asset.id"
+                                class="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0"
+                                :class="isNewAsset(asset) ? 'bg-green-50/60 dark:bg-green-950/20' : ''"
+                            >
+                                <div class="min-w-0 flex-1 sm:grid sm:grid-cols-[1fr_1.2fr_1fr_1fr] sm:gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-mono font-medium">{{ asset.asset_tag }}</p>
+                                        <Badge
+                                            v-if="isNewAsset(asset)"
+                                            class="bg-green-100 text-green-800 hover:bg-green-100"
+                                        >
+                                            {{ t('custody.new_asset_badge') }}
+                                        </Badge>
+                                    </div>
+                                    <p class="truncate text-sm">
+                                        {{ getAssetDisplayName(asset) }}
+                                    </p>
+                                    <p class="truncate font-mono text-sm text-muted-foreground">
+                                        {{ asset.serial_number || '—' }}
+                                    </p>
+                                    <p class="truncate text-sm text-muted-foreground">
+                                        {{ asset.assetCategory?.name || '—' }}
+                                        <span v-if="asset.location?.name"> · {{ asset.location.name }}</span>
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    :title="t('custody.remove_asset')"
+                                    @click="removeAsset(asset)"
+                                    :disabled="loading"
+                                >
+                                    <Icon name="Trash2" class="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div
+                            v-else
+                            class="rounded-lg border border-dashed py-12 text-center text-muted-foreground"
+                        >
+                            <Icon name="Package" class="mx-auto mb-3 h-10 w-10 opacity-40" />
+                            <p>{{ t('custody.no_assets_assigned') }}</p>
+                            <p class="mt-1 text-sm">{{ t('custody.add_assets_hint') }}</p>
+                        </div>
+
+                        <div v-if="hasChanges" class="rounded-lg border bg-muted/30 p-4">
                             <Label for="changes_summary" class="mb-2">{{ t('custody.summary_optional') }}</Label>
-                            <textarea 
+                            <textarea
                                 id="changes_summary"
                                 v-model="changesSummary"
-                                rows="3"
+                                rows="2"
                                 :placeholder="t('custody.summary_placeholder')"
-                                class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             ></textarea>
                         </div>
                     </CardContent>
@@ -246,42 +242,6 @@
                     </CardContent>
                 </Card>
                 
-                <!-- Recent Custody Changes -->
-                <Card v-if="recentCustodyChanges.length > 0">
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Icon name="History" class="h-5 w-5 text-gray-600" />
-                            {{ t('custody.recent_custody_changes') }}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="space-y-3">
-                            <div 
-                                v-for="change in recentCustodyChanges" 
-                                :key="change.id"
-                                class="flex items-center justify-between p-3 border rounded-lg"
-                            >
-                                <div>
-                                    <p class="font-medium">{{ change.changes_summary || t('custody.custody_updated') }}</p>
-                                    <p class="text-sm text-muted-foreground">
-                                        {{ new Date(change.created_at).toLocaleDateString() }} by {{ change.updatedBy?.name }}
-                                    </p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <Badge :class="change.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
-                                        {{ t('custody.status_' + change.status) }}
-                                    </Badge>
-                                    <Button variant="outline" size="sm" @click="printCustodyDocument(change)" :title="t('custody.print_document')">
-                                        <Icon name="Printer" class="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="outline" size="sm" @click="viewCustodyDocument(change)" :title="t('custody.view_document')">
-                                        <Icon name="FileText" class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
         </div>
         
@@ -573,7 +533,7 @@ const changesSummary = ref('');
 const showAssetSearch = ref(false);
 const assetSearchQuery = ref('');
 const searchResults = ref<Asset[]>([...props.availableAssets]);
-const selectedAssetIds = ref<Set<number>>(new Set());
+const selectedAssetIds = ref<Set<Asset['id']>>(new Set());
 const showDocumentUpload = ref(false);
 const showQuickCreate = ref(false);
 const selectedCustodyChange = ref<CustodyChange | null>(null);
@@ -666,6 +626,38 @@ const otherCustodyChanges = computed(() => {
     );
 });
 
+const currentAssetIds = computed(() => new Set(props.currentAssets.map((asset) => asset.id)));
+
+const isNewAsset = (asset: Asset): boolean => !currentAssetIds.value.has(asset.id);
+
+const getAssetDisplayName = (asset: Asset): string => {
+    const templateName = asset.asset_template?.name || asset.assetTemplate?.name;
+
+    if (templateName) {
+        return templateName;
+    }
+
+    if (asset.model_name && asset.model_name !== asset.asset_tag) {
+        return asset.model_name;
+    }
+
+    if (asset.manufacturer) {
+        return asset.manufacturer;
+    }
+
+    return '—';
+};
+
+const addedAssetsCount = computed(() =>
+    updatedAssets.value.filter((asset) => isNewAsset(asset)).length
+);
+
+const removedAssetsCount = computed(() => {
+    const updatedIds = new Set(updatedAssets.value.map((asset) => asset.id));
+
+    return props.currentAssets.filter((asset) => !updatedIds.has(asset.id)).length;
+});
+
 // Methods
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -687,11 +679,6 @@ const getStatusBadgeClass = (status: string) => {
 };
 
 const removeAsset = (asset: Asset) => {
-    updatedAssets.value = updatedAssets.value.filter(a => a.id !== asset.id);
-    checkForChanges();
-};
-
-const removeFromUpdated = (asset: Asset) => {
     updatedAssets.value = updatedAssets.value.filter(a => a.id !== asset.id);
     checkForChanges();
 };

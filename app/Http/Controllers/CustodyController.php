@@ -42,7 +42,7 @@ class CustodyController extends Controller
 
         // Load current assets with their categories
         $currentAssets = $employee->assets()
-            ->with(['assetCategory', 'location', 'company'])
+            ->with(['assetCategory', 'location', 'company', 'assetTemplate'])
             ->where('status', 'assigned')
             ->get();
 

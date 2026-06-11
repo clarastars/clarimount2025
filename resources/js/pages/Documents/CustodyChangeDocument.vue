@@ -74,16 +74,16 @@
                     <div class="mb-8">
                         <h2 class="text-lg font-bold mb-4">{{ t('custody.previous_custody') }} ({{ previousAssets.length }} {{ t('custody.items') }})</h2>
                         <div v-if="previousAssets.length > 0" class="overflow-x-auto">
-                            <table class="w-full border-collapse border border-gray-300 text-sm">
+                            <table class="custody-document-table w-full border-collapse border border-gray-300 text-sm text-center">
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.asset_tag') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.description') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.model_name') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.serial_number') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.category') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.location') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.condition') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.asset_tag') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.description') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.model_name') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.serial_number') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.category') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.location') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.condition') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -94,7 +94,7 @@
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.serial_number || t('custody.na') }}</td>
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.category?.name || t('custody.na') }}</td>
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.location?.name || t('custody.na') }}</td>
-                                        <td class="border border-gray-300 px-3 py-2">{{ asset.condition ? asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1) : t('custody.na') }}</td>
+                                        <td class="border border-gray-300 px-3 py-2">{{ formatAssetCondition(asset.condition) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -108,16 +108,16 @@
                     <div class="mb-8">
                         <h2 class="text-lg font-bold mb-4">{{ t('custody.new_custody') }} ({{ newAssets.length }} {{ t('custody.items') }})</h2>
                         <div v-if="newAssets.length > 0" class="overflow-x-auto">
-                            <table class="w-full border-collapse border border-gray-300 text-sm">
+                            <table class="custody-document-table w-full border-collapse border border-gray-300 text-sm text-center">
                                 <thead>
                                     <tr class="bg-gray-50">
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.asset_tag') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.description') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.model_name') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.serial_number') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.category') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.location') }}</th>
-                                        <th class="border border-gray-300 px-3 py-2 text-left">{{ t('custody.condition') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.asset_tag') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.description') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.model_name') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.serial_number') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.category') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.location') }}</th>
+                                        <th class="border border-gray-300 px-3 py-2">{{ t('custody.condition') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -128,7 +128,7 @@
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.serial_number || t('custody.na') }}</td>
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.category?.name || t('custody.na') }}</td>
                                         <td class="border border-gray-300 px-3 py-2">{{ asset.location?.name || t('custody.na') }}</td>
-                                        <td class="border border-gray-300 px-3 py-2">{{ asset.condition ? asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1) : t('custody.na') }}</td>
+                                        <td class="border border-gray-300 px-3 py-2">{{ formatAssetCondition(asset.condition) }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -253,6 +253,22 @@ onMounted(() => {
     }
 });
 
+const formatAssetCondition = (condition?: string): string => {
+    if (!condition) {
+        return t('custody.na');
+    }
+
+    if (condition === 'good') {
+        return t('custody.condition_good');
+    }
+
+    if (condition === 'damaged') {
+        return t('custody.condition_damaged');
+    }
+
+    return condition;
+};
+
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
         case 'pending':
@@ -298,10 +314,12 @@ const goBack = () => {
     .text-xs { font-size: 8px !important; }
     
     /* Table text */
-    table { font-size: 9px !important; }
-    th, td { 
-        font-size: 9px !important; 
+    .custody-document-table { font-size: 9px !important; }
+    .custody-document-table th,
+    .custody-document-table td {
+        font-size: 9px !important;
         padding: 2px 4px !important;
+        text-align: center !important;
     }
     
     /* Terms and conditions */
