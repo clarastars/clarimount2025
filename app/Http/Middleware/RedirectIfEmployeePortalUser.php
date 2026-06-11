@@ -126,9 +126,13 @@ class RedirectIfEmployeePortalUser
                 'employees.show',
                 'employees.custody.show',
                 'employees.custody.store',
+                'employees.custody.quick-create-asset',
                 'custody.document',
                 'custody.upload',
                 'api.custody.available-assets',
+                'api.custody.asset-templates.search',
+                'api.custody.asset-templates.by-category',
+                'api.custody.asset-templates.store',
                 'api.employees.search',
             ]);
         }

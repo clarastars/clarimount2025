@@ -212,9 +212,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Custody management routes
     Route::get('employees/{employee}/custody', [CustodyController::class, 'show'])->name('employees.custody.show');
     Route::post('employees/{employee}/custody', [CustodyController::class, 'store'])->name('employees.custody.store');
+    Route::post('employees/{employee}/custody/quick-create-asset', [CustodyController::class, 'storeQuickAsset'])->name('employees.custody.quick-create-asset');
     Route::get('custody-changes/{custodyChange}/document', [CustodyController::class, 'generateDocument'])->name('custody.document');
     Route::post('custody-changes/{custodyChange}/upload', [CustodyController::class, 'uploadDocument'])->name('custody.upload');
     Route::get('api/custody/available-assets', [CustodyController::class, 'getAvailableAssets'])->name('api.custody.available-assets');
+    Route::get('api/custody/asset-templates/search', [AssetTemplateController::class, 'search'])->name('api.custody.asset-templates.search');
+    Route::get('api/custody/asset-templates/by-category', [AssetTemplateController::class, 'byCategory'])->name('api.custody.asset-templates.by-category');
+    Route::post('api/custody/asset-templates', [AssetTemplateController::class, 'store'])->name('api.custody.asset-templates.store');
 
     // Print Jobs management
     Route::get('/print-available', [PrintJobController::class, 'printStation'])->name('print-station');

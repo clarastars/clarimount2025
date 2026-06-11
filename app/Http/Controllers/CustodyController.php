@@ -1,16 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Asset;
-use App\Models\AssetAssignment;
+use App\Models\AssetCategory;
+use App\Models\Company;
 use App\Models\CustodyChange;
 use App\Models\Employee;
+use App\Models\Location;
+use App\Services\CustodyAssignmentService;
 use App\Services\CustodyDocumentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +25,10 @@ use Inertia\Response;
 class CustodyController extends Controller
 {
     use AuthorizesEmployeeAccess;
+
+    public function __construct(
+        private CustodyAssignmentService $custodyAssignmentService,
+    ) {}
 
     /**
      * Show the custody management interface for an employee.
@@ -50,11 +59,30 @@ class CustodyController extends Controller
             ->limit(10)
             ->get();
 
+        $locations = Location::query()
+            ->where('company_id', $employee->company_id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'building', 'office_number']);
+
+        $categories = AssetCategory::scoped(['company_id' => $employee->company_id])
+            ->withDepth()
+            ->orderBy('_lft')
+            ->get();
+
+        $companies = Company::query()
+            ->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name_en')
+            ->get(['id', 'name_en', 'name_ar']);
+
         return Inertia::render('Employees/CustodyManagement', [
             'employee' => $employee->load(['company', 'nationality', 'residenceCountry']),
             'currentAssets' => $currentAssets,
             'availableAssets' => $availableAssets,
             'recentCustodyChanges' => $recentCustodyChanges,
+            'locations' => $locations,
+            'categories' => $categories,
+            'companies' => $companies,
         ]);
     }
 
@@ -68,7 +96,10 @@ class CustodyController extends Controller
             return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
         }
 
-        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
+        $accessibleCompanyIds = $this->employeeQueryableCompanyIds($user)
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
 
         $validated = $request->validate([
             'new_asset_ids' => 'present|array',
@@ -77,172 +108,116 @@ class CustodyController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
-
-            // Get current asset state
-            $currentAssets = $employee->assets()
-                ->with(['assetCategory', 'location', 'company'])
-                ->where('status', 'assigned')
-                ->get();
-
-            // Get new assets
-            $newAssets = !empty($validated['new_asset_ids']) 
-                ? Asset::whereIn('id', $validated['new_asset_ids'])
-                    ->whereIn('company_id', $ownedCompanyIds)
-                    ->with(['assetCategory', 'location', 'company'])
-                    ->get()
-                : collect(); // Empty collection when no assets selected
-
-            // Get IDs of currently assigned assets
-            $currentAssetIds = $currentAssets->pluck('id')->toArray();
-            
-            // Only validate availability for assets that are truly new (not currently assigned to this employee)
-            $assetsToAdd = $newAssets->filter(function ($asset) use ($currentAssetIds) {
-                return !in_array($asset->id, $currentAssetIds);
-            });
-            
-            // Validate that new assets are available
-            foreach ($assetsToAdd as $asset) {
-                if ($asset->status !== 'available') {
-                    return response()->json([
-                        'error' => "Asset {$asset->asset_tag} is not available for assignment."
-                    ], 422);
-                }
-            }
-
-            // Prepare state data
-            $previousState = [
-                'assets' => $currentAssets->map(function ($asset) {
-                    return [
-                        'id' => $asset->id,
-                        'asset_tag' => $asset->asset_tag,
-                        'model_name' => $asset->model_name,
-                        'model_number' => $asset->model_number,
-                        'serial_number' => $asset->serial_number,
-                        'category_name' => $asset->assetCategory->name ?? null,
-                        'location_name' => $asset->location->name ?? null,
-                        'status' => $asset->status,
-                        'condition' => $asset->condition,
-                    ];
-                })->toArray(),
-                'count' => $currentAssets->count(),
-            ];
-
-            $newState = [
-                'assets' => $newAssets->map(function ($asset) {
-                    return [
-                        'id' => $asset->id,
-                        'asset_tag' => $asset->asset_tag,
-                        'model_name' => $asset->model_name,
-                        'model_number' => $asset->model_number,
-                        'serial_number' => $asset->serial_number,
-                        'category_name' => $asset->assetCategory->name ?? null,
-                        'location_name' => $asset->location->name ?? null,
-                        'status' => 'assigned',
-                        'condition' => $asset->condition,
-                    ];
-                })->toArray(),
-                'count' => $newAssets->count(),
-            ];
-
-            // Create custody change record
-            $custodyChange = CustodyChange::create([
-                'employee_id' => $employee->id,
-                'updated_by' => $user->id,
-                'previous_state' => $previousState,
-                'new_state' => $newState,
-                'changes_summary' => $validated['changes_summary'],
-                'document_path' => null, // Document will be uploaded later
-                'status' => 'pending',
-            ]);
-
-            // Update asset assignments
-            // Get IDs of new assets
-            $newAssetIds = $newAssets->pluck('id')->toArray();
-            
-            // Find assets to return (in current but not in new)
-            $assetsToReturn = $currentAssets->filter(function ($asset) use ($newAssetIds) {
-                return !in_array($asset->id, $newAssetIds);
-            });
-            
-            // Find assets to add (in new but not in current)
-            $assetsToAdd = $newAssets->filter(function ($asset) use ($currentAssetIds) {
-                return !in_array($asset->id, $currentAssetIds);
-            });
-            
-            // Return assets that were removed
-            foreach ($assetsToReturn as $asset) {
-                // Get the current active assignment
-                $activeAssignment = AssetAssignment::where('asset_id', $asset->id)
-                    ->where('employee_id', $employee->id)
-                    ->where('status', 'active')
-                    ->first();
-                
-                if ($activeAssignment) {
-                    // Update existing assignment to returned
-                    $activeAssignment->update([
-                        'returned_date' => now(),
-                        'returned_by' => $user->id,
-                        'status' => 'returned',
-                        'return_notes' => 'Returned due to custody change',
-                        'custody_change_id' => $custodyChange->id,
-                    ]);
-                } else {
-                    // Create return assignment record if no active assignment found
-                    AssetAssignment::create([
-                        'asset_id' => $asset->id,
-                        'employee_id' => $employee->id,
-                        'assigned_by' => $user->id,
-                        'assigned_date' => $asset->assigned_date ?? now(),
-                        'returned_date' => now(),
-                        'returned_by' => $user->id,
-                        'status' => 'returned',
-                        'return_notes' => 'Returned due to custody change',
-                        'custody_change_id' => $custodyChange->id,
-                    ]);
-                }
-
-                // Update asset status
-                $asset->update([
-                    'assigned_to' => null,
-                    'assigned_date' => null,
-                    'status' => 'available',
-                ]);
-            }
-
-            // Add new assets (only those not currently assigned)
-            foreach ($assetsToAdd as $asset) {
-                // Create assignment record
-                AssetAssignment::create([
-                    'asset_id' => $asset->id,
-                    'employee_id' => $employee->id,
-                    'assigned_by' => $user->id,
-                    'assigned_date' => now(),
-                    'status' => 'active',
-                    'assignment_notes' => 'Assigned due to custody change',
-                    'custody_change_id' => $custodyChange->id,
-                ]);
-
-                // Update asset status
-                $asset->update([
-                    'assigned_to' => $employee->id,
-                    'assigned_date' => now(),
-                    'status' => 'assigned',
-                ]);
-            }
-
-            DB::commit();
+            $custodyChange = $this->custodyAssignmentService->updateEmployeeCustody(
+                $employee,
+                $user,
+                $validated['new_asset_ids'],
+                $validated['changes_summary'] ?? null,
+                $accessibleCompanyIds
+            );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Custody updated successfully.',
-                'custody_change' => $custodyChange->load(['updatedBy']),
+                'message' => __('messages.custody.custody_updated_successfully'),
+                'custody_change' => $custodyChange,
             ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\RuntimeException $exception) {
             return response()->json([
-                'error' => 'Failed to update custody: ' . $e->getMessage()
+                'error' => $exception->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => __('messages.custody.failed_to_update_custody').': '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function storeQuickAsset(Request $request, Employee $employee): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $employee)) {
+            return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
+        }
+
+        if (! $employee->company_id) {
+            return response()->json(['error' => __('messages.custody.employee_missing_company')], 422);
+        }
+
+        $accessibleCompanyIds = $this->employeeQueryableCompanyIds($user)
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if (! in_array((int) $employee->company_id, $accessibleCompanyIds, true)) {
+            return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
+        }
+
+        $validated = $request->validate([
+            'assets' => ['required', 'array', 'min:1', 'max:50'],
+            'assets.*.asset_template_id' => ['required', 'exists:asset_templates,id'],
+            'assets.*.location_id' => ['required', 'exists:locations,id'],
+            'assets.*.serial_number' => ['nullable', 'string', 'max:255'],
+            'assets.*.condition' => ['required', 'in:good,damaged'],
+        ]);
+
+        try {
+            $createdAssets = DB::transaction(function () use ($employee, $user, $validated, $accessibleCompanyIds) {
+                $assets = [];
+
+                foreach ($validated['assets'] as $assetData) {
+                    $assets[] = $this->custodyAssignmentService->createAvailableAssetForCompany(
+                        (int) $employee->company_id,
+                        $assetData
+                    );
+                }
+
+                $currentAssetIds = $employee->assets()
+                    ->where('status', 'assigned')
+                    ->pluck('id')
+                    ->map(fn ($id): string => (string) $id)
+                    ->all();
+
+                $createdAssetIds = array_map(fn (Asset $asset): string => (string) $asset->id, $assets);
+                $newAssetIds = array_values(array_unique([...$currentAssetIds, ...$createdAssetIds]));
+
+                $count = count($assets);
+                $summary = $count === 1
+                    ? __('messages.custody.quick_create_summary', ['tag' => $assets[0]->asset_tag])
+                    : __('messages.custody.quick_create_multiple_summary', ['count' => $count]);
+
+                $custodyChange = $this->custodyAssignmentService->updateEmployeeCustody(
+                    $employee,
+                    $user,
+                    $newAssetIds,
+                    $summary,
+                    $accessibleCompanyIds
+                );
+
+                return [
+                    'assets' => $assets,
+                    'custody_change' => $custodyChange,
+                ];
+            });
+
+            $count = count($createdAssets['assets']);
+            $message = $count === 1
+                ? __('messages.custody.quick_create_success', ['tag' => $createdAssets['assets'][0]->asset_tag])
+                : __('messages.custody.quick_create_multiple_success', ['count' => $count]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'assets' => $createdAssets['assets'],
+                'asset' => $createdAssets['assets'][0] ?? null,
+                'custody_change' => $createdAssets['custody_change'],
+            ]);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'error' => $exception->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => __('messages.custody.quick_create_failed').': '.$e->getMessage(),
             ], 500);
         }
     }

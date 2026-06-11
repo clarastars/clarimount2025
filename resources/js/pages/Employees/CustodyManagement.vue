@@ -113,16 +113,26 @@
                                     </Button>
                                 </div>
                                 
-                                <!-- Add Asset Button -->
-                                <Button 
-                                    variant="default" 
-                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                                    @click="showAssetSearch = true"
-                                    :disabled="loading"
-                                >
-                                    <Icon name="Plus" class="mr-2 h-4 w-4" />
-                                    {{ t('custody.add_asset') }}
-                                </Button>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <Button 
+                                        variant="default" 
+                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                                        @click="showAssetSearch = true"
+                                        :disabled="loading"
+                                    >
+                                        <Icon name="Plus" class="mr-2 h-4 w-4" />
+                                        {{ t('custody.add_asset') }}
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        class="w-full"
+                                        @click="openQuickCreateDialog"
+                                        :disabled="loading"
+                                    >
+                                        <Icon name="PackagePlus" class="mr-2 h-4 w-4" />
+                                        {{ t('custody.create_and_assign_asset') }}
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -339,6 +349,127 @@
             </DialogContent>
         </Dialog>
         
+        <!-- Quick Create Asset Dialog -->
+        <Dialog v-model:open="showQuickCreate">
+            <DialogContent class="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>{{ t('custody.create_and_assign_asset') }}</DialogTitle>
+                </DialogHeader>
+
+                <p class="text-sm text-muted-foreground">
+                    {{ t('custody.create_and_assign_asset_description') }}
+                </p>
+
+                <div class="space-y-4">
+                    <AssetTemplatePicker
+                        v-model="selectedTemplate"
+                        :categories="assetCategories"
+                        :companies="companies"
+                        :default-company-id="employee.company_id"
+                        search-url="/api/custody/asset-templates/search"
+                        by-category-url="/api/custody/asset-templates/by-category"
+                        store-url="/api/custody/asset-templates"
+                        input-id="custody-template-search"
+                    />
+                    <p v-if="selectedTemplate" class="text-sm text-green-700 dark:text-green-400">
+                        {{ t('custody.selected_template') }}: {{ selectedTemplate.display_name || selectedTemplate.name }}
+                    </p>
+
+                    <div class="space-y-2">
+                        <Label for="quick-location">{{ t('custody.select_location') }}</Label>
+                        <select
+                            id="quick-location"
+                            v-model="quickCreateForm.location_id"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            :disabled="locations.length === 0"
+                        >
+                            <option value="">{{ t('custody.select_location_placeholder') }}</option>
+                            <option v-for="location in locations" :key="location.id" :value="location.id">
+                                {{ location.name }}
+                            </option>
+                        </select>
+                        <p v-if="locations.length === 0" class="text-sm text-amber-600">
+                            {{ t('custody.no_locations_for_company') }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="quick-serial">{{ t('custody.serial_number_optional') }}</Label>
+                        <Input id="quick-serial" v-model="quickCreateForm.serial_number" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="quick-condition">{{ t('custody.asset_condition') }}</Label>
+                        <select
+                            id="quick-condition"
+                            v-model="quickCreateForm.condition"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                            <option value="good">{{ t('custody.condition_good') }}</option>
+                            <option value="damaged">{{ t('custody.condition_damaged') }}</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            :disabled="!canAddCurrentToQuickCreateList"
+                            @click="addToQuickCreateList"
+                        >
+                            <Icon name="Plus" class="mr-2 h-4 w-4 rtl:mr-0 rtl:ml-2" />
+                            {{ t('custody.add_to_create_list') }}
+                        </Button>
+                    </div>
+
+                    <div v-if="pendingQuickCreateItems.length > 0" class="space-y-2">
+                        <Label>{{ t('custody.assets_to_create') }} ({{ pendingQuickCreateItems.length }})</Label>
+                        <div class="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
+                            <div
+                                v-for="(item, index) in pendingQuickCreateItems"
+                                :key="item.id"
+                                class="flex items-start justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-medium">{{ item.template_name }}</p>
+                                    <p class="text-muted-foreground">
+                                        {{ item.location_name }}
+                                        <span v-if="item.serial_number"> · {{ item.serial_number }}</span>
+                                        · {{ item.condition === 'good' ? t('custody.condition_good') : t('custody.condition_damaged') }}
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    class="shrink-0 text-red-600 hover:text-red-700"
+                                    :title="t('custody.remove_from_create_list')"
+                                    @click="removeFromQuickCreateList(index)"
+                                >
+                                    <Icon name="Trash2" class="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter class="gap-2 sm:gap-0">
+                    <Button variant="outline" @click="closeQuickCreateDialog">{{ t('common.cancel') }}</Button>
+                    <Button
+                        @click="submitQuickCreate"
+                        :disabled="quickCreateSubmitting || quickCreateSubmitCount === 0"
+                        class="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                        {{
+                            quickCreateSubmitting
+                                ? t('custody.creating_asset')
+                                : t('custody.create_and_assign_count', { count: quickCreateSubmitCount })
+                        }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
         <!-- Document Upload Dialog -->
         <Dialog v-model:open="showDocumentUpload">
             <DialogContent class="max-w-md">
@@ -396,20 +527,44 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/Icon.vue';
 import Heading from '@/components/Heading.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import AssetTemplatePicker, { type AssetTemplateOption } from '@/components/AssetTemplatePicker.vue';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, onMounted, watch } from 'vue';
-import type { Employee, Asset, CustodyChange, BreadcrumbItem } from '@/types';
+import type { Employee, Asset, AssetCategory, Company, CustodyChange, BreadcrumbItem } from '@/types';
 
 const { t } = useI18n();
+
+interface LocationOption {
+    id: number;
+    name: string;
+    building?: string | null;
+    office_number?: string | null;
+}
+
+interface QuickCreateAssetItem {
+    id: string;
+    asset_template_id: number;
+    template_name: string;
+    location_id: number;
+    location_name: string;
+    serial_number: string;
+    condition: 'good' | 'damaged';
+}
 
 interface Props {
     employee: Employee;
     currentAssets: Asset[];
     availableAssets: Asset[];
     recentCustodyChanges: CustodyChange[];
+    locations?: LocationOption[];
+    categories?: AssetCategory[];
+    companies?: Company[];
 }
 
 const props = defineProps<Props>();
+const locations = computed(() => props.locations ?? []);
+const assetCategories = computed(() => props.categories ?? []);
+const companies = computed(() => props.companies ?? []);
 
 // Reactive state
 const loading = ref(false);
@@ -420,9 +575,18 @@ const assetSearchQuery = ref('');
 const searchResults = ref<Asset[]>([...props.availableAssets]);
 const selectedAssetIds = ref<Set<number>>(new Set());
 const showDocumentUpload = ref(false);
+const showQuickCreate = ref(false);
 const selectedCustodyChange = ref<CustodyChange | null>(null);
 const selectedDocument = ref<File | null>(null);
 const hasChanges = ref(false);
+const selectedTemplate = ref<AssetTemplateOption | null>(null);
+const quickCreateSubmitting = ref(false);
+const pendingQuickCreateItems = ref<QuickCreateAssetItem[]>([]);
+const quickCreateForm = ref({
+    location_id: '' as string | number,
+    serial_number: '',
+    condition: 'good' as 'good' | 'damaged',
+});
 
 // Computed properties
 const breadcrumbs = computed((): BreadcrumbItem[] => [
@@ -566,6 +730,142 @@ const toggleAssetSelection = (asset: Asset) => {
         selectedAssetIds.value.delete(asset.id);
     } else {
         selectedAssetIds.value.add(asset.id);
+    }
+};
+
+const getLocationName = (locationId: string | number): string => {
+    const location = locations.value.find((entry) => entry.id === Number(locationId));
+    return location?.name ?? '';
+};
+
+const buildQuickCreateItemFromForm = (): QuickCreateAssetItem | null => {
+    if (!selectedTemplate.value || !quickCreateForm.value.location_id) {
+        return null;
+    }
+
+    return {
+        id: crypto.randomUUID(),
+        asset_template_id: selectedTemplate.value.id,
+        template_name: selectedTemplate.value.display_name || selectedTemplate.value.name,
+        location_id: Number(quickCreateForm.value.location_id),
+        location_name: getLocationName(quickCreateForm.value.location_id),
+        serial_number: quickCreateForm.value.serial_number.trim(),
+        condition: quickCreateForm.value.condition,
+    };
+};
+
+const canAddCurrentToQuickCreateList = computed(() => buildQuickCreateItemFromForm() !== null);
+
+const quickCreateSubmitCount = computed(() => {
+    if (pendingQuickCreateItems.value.length > 0) {
+        return pendingQuickCreateItems.value.length;
+    }
+
+    return buildQuickCreateItemFromForm() ? 1 : 0;
+});
+
+const getQuickCreateItemsToSubmit = (): QuickCreateAssetItem[] => {
+    if (pendingQuickCreateItems.value.length > 0) {
+        return [...pendingQuickCreateItems.value];
+    }
+
+    const currentItem = buildQuickCreateItemFromForm();
+
+    return currentItem ? [currentItem] : [];
+};
+
+const resetQuickCreateFormFields = () => {
+    selectedTemplate.value = null;
+    quickCreateForm.value = {
+        location_id: locations.value.length === 1 ? locations.value[0].id : quickCreateForm.value.location_id,
+        serial_number: '',
+        condition: 'good',
+    };
+};
+
+const openQuickCreateDialog = () => {
+    showQuickCreate.value = true;
+
+    if (locations.value.length === 1) {
+        quickCreateForm.value.location_id = locations.value[0].id;
+    }
+};
+
+const closeQuickCreateDialog = () => {
+    showQuickCreate.value = false;
+    pendingQuickCreateItems.value = [];
+    resetQuickCreateFormFields();
+    quickCreateForm.value.location_id = locations.value.length === 1 ? locations.value[0].id : '';
+};
+
+const addToQuickCreateList = () => {
+    const item = buildQuickCreateItemFromForm();
+
+    if (!item) {
+        return;
+    }
+
+    pendingQuickCreateItems.value = [...pendingQuickCreateItems.value, item];
+    resetQuickCreateFormFields();
+};
+
+const removeFromQuickCreateList = (index: number) => {
+    pendingQuickCreateItems.value = pendingQuickCreateItems.value.filter((_, itemIndex) => itemIndex !== index);
+};
+
+const submitQuickCreate = async () => {
+    const items = getQuickCreateItemsToSubmit();
+
+    if (items.length === 0) {
+        alert(t('custody.no_assets_in_create_list'));
+        return;
+    }
+
+    quickCreateSubmitting.value = true;
+
+    try {
+        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
+        const response = await fetch(route('employees.custody.quick-create-asset', props.employee.id), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                assets: items.map((item) => ({
+                    asset_template_id: item.asset_template_id,
+                    location_id: item.location_id,
+                    serial_number: item.serial_number || null,
+                    condition: item.condition,
+                })),
+            }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            const fallbackMessage = items.length === 1
+                ? t('custody.quick_create_success', { tag: result.asset?.asset_tag || '' })
+                : t('custody.quick_create_multiple_success', { count: items.length });
+
+            alert(result.message || fallbackMessage);
+            closeQuickCreateDialog();
+            router.reload();
+            return;
+        }
+
+        const validationError = result.errors
+            ? Object.values(result.errors).flat()[0]
+            : null;
+
+        alert(result.error || validationError || result.message || t('custody.quick_create_failed'));
+    } catch (error) {
+        console.error('Quick create asset failed:', error);
+        alert(t('custody.quick_create_failed'));
+    } finally {
+        quickCreateSubmitting.value = false;
     }
 };
 

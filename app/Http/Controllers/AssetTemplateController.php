@@ -14,6 +14,21 @@ use Inertia\Response;
 
 class AssetTemplateController extends Controller
 {
+    private function authorizeTemplateApiAccess(): void
+    {
+        $user = Auth::user();
+
+        if (
+            $user->hasRole('super-admin')
+            || $user->can('asset-inventory.access')
+            || $user->can('employees.custody.update')
+        ) {
+            return;
+        }
+
+        abort(403);
+    }
+
     /**
      * Display a listing of asset templates.
      */
@@ -59,6 +74,8 @@ class AssetTemplateController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
+        $this->authorizeTemplateApiAccess();
+
         $query = $request->get('q', '');
         $categoryId = $request->get('category_id');
         
@@ -104,6 +121,8 @@ class AssetTemplateController extends Controller
      */
     public function byCategory(Request $request): JsonResponse
     {
+        $this->authorizeTemplateApiAccess();
+
         $templates = AssetTemplate::query()
             ->with(['assetCategory'])
             ->orderBy('usage_count', 'desc')
@@ -174,6 +193,8 @@ class AssetTemplateController extends Controller
      */
     public function store(Request $request): RedirectResponse|JsonResponse
     {
+        $this->authorizeTemplateApiAccess();
+
         $user = Auth::user();
         
         $validated = $request->validate([
