@@ -2,7 +2,7 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText } from 'lucide-vue-next';
+import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText, CalendarDays } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ const { t, locale } = useI18n();
 const auth = usePage().props.auth as {
     can_view_employees_readonly?: boolean;
     can_manage_employees?: boolean;
+    can_view_company_leaves?: boolean;
     can_view_attendance_readonly?: boolean;
     can_manage_attendance_adjustments?: boolean;
     can_view_salary_runs_readonly?: boolean;
@@ -99,6 +100,12 @@ const formatLastSync = (lastSync: string | null) => {
                         <Link :href="route('employees.index', { company_id: company.id })">
                             <Users class="mr-2 h-4 w-4" />
                             {{ t('nav.employees') }}
+                        </Link>
+                    </Button>
+                    <Button v-if="auth?.can_view_company_leaves" variant="outline" as-child>
+                        <Link :href="route('companies.leaves.index', company.id)">
+                            <CalendarDays class="mr-2 h-4 w-4" />
+                            {{ t('leaves.company_leaves_title') }}
                         </Link>
                     </Button>
                     <Button v-if="auth?.can_view_attendance_readonly || auth?.can_manage_attendance_adjustments" variant="outline" as-child>

@@ -19,3 +19,9 @@ Schedule::job(new \App\Jobs\SyncFingerprintIclockAttendanceJob())->everyTenMinut
 Schedule::job(new \App\Jobs\RebuildAttendancePresentationJob(null, true))
     ->dailyAt('01:15')
     ->description('Rebuild attendance_daily_presentations for current month (all companies)');
+
+// Monthly leave accrual: annual entitlement ÷ 12 per active employee (e.g. 21 → 1.75/month)
+Schedule::job(new \App\Jobs\AccrueMonthlyLeaveBalanceJob())
+    ->monthlyOn(1, '02:00')
+    ->timezone('Asia/Riyadh')
+    ->description('Accrue monthly leave balance for active employees');

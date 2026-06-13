@@ -15,7 +15,7 @@
                                     <span class="text-sm font-mono text-muted-foreground">{{ displayValue(employee.employee_id) }}</span>
                                 </div>
                             </div>
-                            <div v-if="canManageEmployees || canUpdateEmployeeCustody || canSyncEmployeeFingerprintMonth" class="flex flex-wrap gap-2">
+                            <div v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSyncEmployeeFingerprintMonth" class="flex flex-wrap gap-2">
                                 <Button v-if="canManageEmployees" variant="outline" asChild><Link :href="route('employees.edit', employee.id)">{{ t('employees.edit') }}</Link></Button>
                                 <Button v-if="canUpdateEmployeeCustody" variant="secondary" asChild><Link :href="route('employees.custody.show', employee.id)">{{ t('custody.update_custody') }}</Link></Button>
                                 <Button
@@ -26,7 +26,7 @@
                                 >
                                     {{ isSyncingFingerprintMonth ? t('attendance.sync_fingerprint_month_processing') : t('attendance.sync_fingerprint_month') }}
                                 </Button>
-                                <Button v-if="canManageEmployees" variant="default" asChild><Link :href="route('employees.leaves.create', employee.id)">{{ t('leaves.create_leave') }}</Link></Button>
+                                <Button v-if="canCreateLeaves" variant="default" asChild><Link :href="route('employees.leaves.create', employee.id)">{{ t('leaves.create_leave') }}</Link></Button>
                             </div>
                         </div>
                     </CardContent>
@@ -94,9 +94,20 @@
 
                 <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('leaves.annual_leave_section') }}</CardTitle></CardHeader>
-                    <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><Label class="text-sm text-muted-foreground">{{ t('leaves.annual_leave_balance') }}</Label><p>{{ displayValue(employee.annual_leave_balance) }}</p></div>
-                        <div><Label class="text-sm text-muted-foreground">{{ t('leaves.remaining_balance') }}</Label><p>{{ displayValue(employee.remaining_annual_leave_balance) }}</p></div>
+                    <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('leaves.annual_leave_balance') }}</Label>
+                            <p>{{ displayValue(employee.annual_leave_balance) }}</p>
+                            <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.monthly_leave_accrual') }}: {{ monthlyAccrualLabel }}</p>
+                        </div>
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('leaves.accrued_leave_balance') }}</Label>
+                            <p>{{ displayValue(employee.leave_accrued_balance) }}</p>
+                        </div>
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('leaves.remaining_balance') }}</Label>
+                            <p class="font-medium">{{ displayValue(employee.remaining_annual_leave_balance) }}</p>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -229,16 +240,28 @@ interface Props {
         name: string
     }>;
     canManageEmployees?: boolean;
+    canCreateLeaves?: boolean;
     canUpdateEmployeeCustody?: boolean;
     canSyncEmployeeFingerprintMonth?: boolean;
 }
 
 const props = defineProps<Props>();
 const canManageEmployees = computed(() => props.canManageEmployees ?? true);
+const canCreateLeaves = computed(() => props.canCreateLeaves ?? false);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const isSyncingFingerprintMonth = ref(false);
 const { t } = useI18n();
+
+const monthlyAccrualLabel = computed(() => {
+    const entitlement = Number(props.employee.annual_leave_balance ?? 0);
+
+    if (entitlement <= 0) {
+        return '—';
+    }
+
+    return `${(entitlement / 12).toFixed(2)} ${t('leaves.days')}`;
+});
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     {

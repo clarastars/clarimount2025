@@ -1339,6 +1339,7 @@ const formatCurrency = (amount: number) => {
                                         <div v-if="form.errors.annual_leave_balance" class="text-red-500 text-sm mt-1">
                                             {{ translateValidationError(form.errors.annual_leave_balance || "") }}
                                         </div>
+                                        <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.annual_leave_balance_hint') }}</p>
                                     </div>
                                 </div>
                             </CardContent>

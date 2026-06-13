@@ -39,6 +39,7 @@ class Employee extends Model
         'allowance_personal_car',
         'social_insurance_deduction_rate',
         'annual_leave_balance',
+        'leave_accrued_balance',
         'manager',
         'direct_manager',
         'additional_approver_2',
@@ -88,6 +89,7 @@ class Employee extends Model
         'allowance_personal_car' => 'decimal:2',
         'social_insurance_deduction_rate' => 'decimal:2',
         'annual_leave_balance' => 'integer',
+        'leave_accrued_balance' => 'decimal:2',
     ];
 
     protected $appends = [
@@ -101,6 +103,11 @@ class Employee extends Model
     public function leaves(): HasMany
     {
         return $this->hasMany(Leave::class);
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
     }
 
     /**
@@ -210,16 +217,27 @@ class Employee extends Model
     }
 
     /**
-     * Get remaining annual leave balance (annual_leave_balance minus deducted days).
+     * Get remaining annual leave balance (accrued balance minus deducted leave days).
      */
-    public function getRemainingAnnualLeaveBalanceAttribute(): int
+    public function getRemainingAnnualLeaveBalanceAttribute(): float
     {
-        $balance = (int) ($this->attributes['annual_leave_balance'] ?? 0);
+        $accrued = (float) ($this->attributes['leave_accrued_balance'] ?? 0);
         $deducted = (int) $this->leaves()
             ->where('deduct_from_balance', true)
             ->sum('days');
 
-        return max(0, $balance - $deducted);
+        return max(0, round($accrued - $deducted, 2));
+    }
+
+    public function monthlyLeaveAccrualDays(): float
+    {
+        $entitlement = (int) ($this->annual_leave_balance ?? 0);
+
+        if ($entitlement <= 0) {
+            return 0.0;
+        }
+
+        return round($entitlement / 12, 2);
     }
 
     /**

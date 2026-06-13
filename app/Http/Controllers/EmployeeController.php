@@ -497,6 +497,7 @@ class EmployeeController extends Controller
                 ? app(EmployeeUserRoleService::class)->assignedTeamsForUi($employee->user)
                 : [],
             'canManageEmployees' => $this->canManageEmployees($user),
+            'canCreateLeaves' => $this->canCreateLeaves($user),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
         ]);

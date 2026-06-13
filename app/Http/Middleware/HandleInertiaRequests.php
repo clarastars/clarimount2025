@@ -65,6 +65,12 @@ class HandleInertiaRequests extends Middleware
                 'can_manage_employees' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.manage', $permissionNames, true),
+                'can_view_company_leaves' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('leaves.company.view', $permissionNames, true),
+                'can_create_leaves' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('leaves.create', $permissionNames, true),
                 'can_update_employee_custody' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.custody.update', $permissionNames, true),
@@ -91,6 +97,12 @@ class HandleInertiaRequests extends Middleware
                     || $user->ownedCompanies()->exists()
                     || in_array('salary-runs.readonly', $permissionNames, true)
                     || in_array('salary-runs.approve', $permissionNames, true)
+                ),
+                'can_view_leave_request_notifications' => $user !== null && (
+                    $isSuperAdmin
+                    || $user->ownedCompanies()->exists()
+                    || in_array('leaves.requests.receive-email', $permissionNames, true)
+                    || in_array('leaves.create', $permissionNames, true)
                 ),
                 'unread_notifications_count' => $user?->unreadNotifications()->count() ?? 0,
             ],

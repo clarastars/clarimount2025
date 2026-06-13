@@ -16,9 +16,11 @@ use App\Http\Controllers\DeductionsController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
+use App\Http\Controllers\EmployeePortalLeaveController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
+use App\Http\Controllers\CompanyLeaveController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PrintJobController;
@@ -201,6 +203,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Employee Leaves routes
     Route::get('employees/{employee}/leaves/create', [LeaveController::class, 'create'])->name('employees.leaves.create');
     Route::post('employees/{employee}/leaves', [LeaveController::class, 'store'])->name('employees.leaves.store');
+
+    // Company Leaves routes
+    Route::get('companies/{company}/leaves', [CompanyLeaveController::class, 'index'])->name('companies.leaves.index');
+    Route::post('companies/{company}/leaves', [CompanyLeaveController::class, 'store'])->name('companies.leaves.store');
+    Route::post('companies/{company}/leave-requests/{leaveRequest}/approve', [CompanyLeaveController::class, 'approveRequest'])->name('companies.leave-requests.approve');
+    Route::post('companies/{company}/leave-requests/{leaveRequest}/reject', [CompanyLeaveController::class, 'rejectRequest'])->name('companies.leave-requests.reject');
+
+    // Employee portal — self-service leaves
+    Route::get('my/leaves', [EmployeePortalLeaveController::class, 'index'])->name('employee.leaves.index');
+    Route::post('my/leaves', [EmployeePortalLeaveController::class, 'store'])->name('employee.leaves.store');
+    Route::delete('my/leaves/{leaveRequest}', [EmployeePortalLeaveController::class, 'destroy'])->name('employee.leaves.destroy');
 
     // Employee Debts routes
     Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {

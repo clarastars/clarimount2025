@@ -23,7 +23,6 @@ class DashboardController extends Controller
             if (! $employee) {
                 return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
             }
-            $employee->append('remaining_annual_leave_balance');
             $roleService = app(EmployeeUserRoleService::class);
             $primaryTeamName = $roleService->primaryTeamNameFor($user);
 
@@ -32,7 +31,7 @@ class DashboardController extends Controller
                 : __('messages.dashboard.employee_subtitle');
 
             return Inertia::render('DashboardEmployee', [
-                'employee' => $employee->only(['id', 'first_name', 'last_name', 'full_name', 'annual_leave_balance', 'remaining_annual_leave_balance']),
+                'employee' => $employee->only(['id', 'first_name', 'last_name', 'full_name']),
                 'dashboardSubtitle' => $dashboardSubtitle,
             ]);
         }

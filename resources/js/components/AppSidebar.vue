@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Scale, Clock, Mail } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Scale, Clock, Mail, CalendarDays } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -32,6 +32,11 @@ const mainNavItems = computed((): NavItem[] => [
         title: t('nav.dashboard'),
         href: '/dashboard',
         icon: LayoutGrid,
+    },
+    {
+        title: t('leaves.my_leaves'),
+        href: '/my/leaves',
+        icon: CalendarDays,
     },
     {
         title: t('nav.companies'),
@@ -144,9 +149,10 @@ const footerNavItems = computed((): NavItem[] => [
                 :items="isEmployee
                     ? mainNavItems.filter((item) =>
                         item.href === '/dashboard'
+                        || item.href === '/my/leaves'
                         || (item.href === '/companies' && canViewCompanyReadOnly)
                         || (item.href === '/employees' && canViewEmployees))
-                    : mainNavItems"
+                    : mainNavItems.filter((item) => item.href !== '/my/leaves')"
             />
             <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
             <NavMain v-if="canAccessSettings" :items="settingsNavItems" :label="t('nav.settings')" />

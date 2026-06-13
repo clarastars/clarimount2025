@@ -103,6 +103,86 @@ trait AuthorizesEmployeeAccess
         return $user->can('employees.manage');
     }
 
+    protected function canViewCompanyLeaves(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $user->can('leaves.company.view');
+    }
+
+    protected function canCreateLeaves(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $user->can('leaves.create');
+    }
+
+    protected function canCreateLeaveForEmployee(User $user, Employee $employee): bool
+    {
+        if (! $this->canCreateLeaves($user)) {
+            return false;
+        }
+
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return in_array((int) $employee->company_id, $this->userAccessibleCompanyIds($user), true);
+    }
+
+    protected function canAccessCompanyLeaves(User $user, Company $company): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        if ($user->can('leaves.company.view') || $user->can('leaves.create')) {
+            return in_array((int) $company->id, $this->userAccessibleCompanyIds($user), true);
+        }
+
+        return false;
+    }
+
+    protected function abortUnlessCanViewCompanyLeaves(User $user): void
+    {
+        abort_unless($this->canViewCompanyLeaves($user), 403);
+    }
+
+    protected function abortUnlessCanCreateLeaves(User $user): void
+    {
+        abort_unless($this->canCreateLeaves($user), 403);
+    }
+
+    protected function abortUnlessCanCreateLeaveForEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canCreateLeaveForEmployee($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanAccessCompanyLeaves(User $user, Company $company): void
+    {
+        abort_unless($this->canAccessCompanyLeaves($user, $company), 403);
+    }
+
     protected function canAccessEmployee(User $user, Employee $employee): bool
     {
         return $this->employeeQueryableCompanyIds($user)->contains($employee->company_id);

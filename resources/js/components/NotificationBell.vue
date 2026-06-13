@@ -13,6 +13,12 @@ import { useI18n } from 'vue-i18n';
 interface NotificationData {
     event_type: string;
     salary_run_id?: number;
+    leave_request_id?: number;
+    employee_name?: string;
+    leave_type?: string;
+    start_date?: string;
+    end_date?: string;
+    days?: number;
     company_id?: number;
     company_name?: string;
     year?: number;
@@ -21,6 +27,7 @@ interface NotificationData {
     actor_name?: string;
     reason?: string;
     after_rejection?: boolean;
+    review_notes?: string;
     url?: string;
 }
 
@@ -37,10 +44,16 @@ const page = usePage();
 
 const authProps = computed(() => (page.props.auth as {
     can_view_salary_run_notifications?: boolean;
+    can_view_leave_request_notifications?: boolean;
+    is_employee?: boolean;
     unread_notifications_count?: number;
 }) ?? {});
 
-const showBell = computed(() => authProps.value.can_view_salary_run_notifications === true);
+const showBell = computed(() =>
+    authProps.value.can_view_salary_run_notifications === true
+    || authProps.value.can_view_leave_request_notifications === true
+    || authProps.value.is_employee === true,
+);
 const unreadCount = ref(authProps.value.unread_notifications_count ?? 0);
 const notifications = ref<NotificationItem[]>([]);
 const loading = ref(false);
@@ -79,6 +92,42 @@ const periodLabel = (notification: NotificationItem): string => {
 
 const formatNotificationMessage = (notification: NotificationItem): string => {
     const data = notification.data;
+
+    if (data.event_type === 'leave_request_submitted') {
+        const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
+        const leaveType = t(leaveTypeKey);
+        return t('notifications.leave_request_submitted', {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            type: leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType,
+            start: data.start_date ?? '',
+            end: data.end_date ?? '',
+            days: data.days ?? '',
+        });
+    }
+
+    if (data.event_type === 'leave_request_approved' || data.event_type === 'leave_request_rejected') {
+        const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
+        const leaveType = t(leaveTypeKey);
+        const messageKey = data.event_type === 'leave_request_approved'
+            ? 'notifications.leave_request_approved'
+            : 'notifications.leave_request_rejected';
+
+        let message = t(messageKey, {
+            company: data.company_name ?? '',
+            type: leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType,
+            start: data.start_date ?? '',
+            end: data.end_date ?? '',
+            days: data.days ?? '',
+        });
+
+        if (data.review_notes) {
+            message += ` ${t('notifications.leave_request_decision_notes', { notes: data.review_notes })}`;
+        }
+
+        return message;
+    }
+
     const params = {
         company: data.company_name ?? '',
         period: periodLabel(notification),

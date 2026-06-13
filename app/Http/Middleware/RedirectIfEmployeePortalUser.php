@@ -43,6 +43,12 @@ class RedirectIfEmployeePortalUser
             'profile.edit',
             'profile.update',
             'appearance',
+            'employee.leaves.index',
+            'employee.leaves.store',
+            'employee.leaves.destroy',
+            'api.notifications.index',
+            'api.notifications.read',
+            'api.notifications.read-all',
         ];
 
         // Allow employees to access only the sections explicitly granted by team permissions.
@@ -117,6 +123,33 @@ class RedirectIfEmployeePortalUser
                 'employee-debts.store',
                 'employee-debts.update',
                 'employee-debts.destroy',
+            ]);
+        }
+
+        if ($user->can('leaves.company.view')) {
+            $allowed = array_merge($allowed, [
+                'companies.leaves.index',
+            ]);
+        }
+
+        if ($user->can('leaves.requests.receive-email')) {
+            $allowed = array_merge($allowed, [
+                'companies.leaves.index',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($user->can('leaves.create')) {
+            $allowed = array_merge($allowed, [
+                'companies.leaves.index',
+                'companies.leaves.store',
+                'companies.leave-requests.approve',
+                'companies.leave-requests.reject',
+                'employees.leaves.create',
+                'employees.leaves.store',
+                'employees.show',
             ]);
         }
 
