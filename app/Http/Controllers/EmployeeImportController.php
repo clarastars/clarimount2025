@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\EmployeesExport;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Employee;
 use App\Models\Company;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EmployeeImportController extends Controller
 {
@@ -108,9 +111,9 @@ class EmployeeImportController extends Controller
     }
 
     /**
-     * Export existing employees to CSV.
+     * Export existing employees to Excel (active records only; soft-deleted excluded).
      */
-    public function exportCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportCsv(Request $request): BinaryFileResponse
     {
         $user = Auth::user();
         $this->abortUnlessCanManageEmployees($user);
@@ -130,16 +133,20 @@ class EmployeeImportController extends Controller
             abort(403, 'Invalid company selection.');
         }
 
-        $employees = Employee::where('company_id', $company->id)
+        $employees = Employee::query()
+            ->where('company_id', $company->id)
+            ->withoutTrashed()
             ->with(['nationality', 'residenceCountry', 'department'])
+            ->orderBy('employee_id')
             ->get();
 
-        $csv = $this->importService->exportEmployeesToCsv($employees);
-        $filename = 'employees-export-' . $company->slug . '-' . date('Y-m-d') . '.csv';
-        
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        $filename = 'employees-export-' . $company->slug . '-' . date('Y-m-d') . '.xlsx';
+
+        return Excel::download(
+            new EmployeesExport($employees, $this->importService),
+            $filename,
+            \Maatwebsite\Excel\Excel::XLSX
+        );
     }
 
     /**

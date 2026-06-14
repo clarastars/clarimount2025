@@ -234,11 +234,13 @@ class EmployeeImportService
     }
 
     /**
-     * Export existing employees to CSV.
+     * CSV / Excel column headers for employee export and import template.
+     *
+     * @return list<string>
      */
-    public function exportEmployeesToCsv(Collection $employees): string
+    public function exportColumnHeaders(): array
     {
-        $headers = [
+        return [
             'id',
             'employee_id',
             'first_name',
@@ -290,65 +292,85 @@ class EmployeeImportService
             'leave_accrued_balance',
             'notes',
         ];
+    }
+
+    /**
+     * @return list<string|int|float|null>
+     */
+    public function mapEmployeeToExportRow(Employee $employee): array
+    {
+        $departmentName = $employee->department_id && $employee->relationLoaded('department')
+            ? ($employee->getRelation('department')?->name ?? '')
+            : (string) ($employee->getAttributes()['department'] ?? '');
+
+        return [
+            $employee->id,
+            $employee->employee_id,
+            $employee->first_name,
+            $employee->last_name,
+            $employee->father_name,
+            $employee->nationality ? $employee->nationality->name : '',
+            $employee->residenceCountry ? $employee->residenceCountry->name : '',
+            $employee->birth_date ? $employee->birth_date->format('Y-m-d') : '',
+            $employee->personal_email,
+            $employee->work_email,
+            $employee->personal_phone,
+            $employee->work_phone,
+            $employee->fingerprint_device_id,
+            $employee->work_address,
+            $departmentName,
+            $employee->job_title,
+            $employee->shift_id,
+            $employee->basic_salary ?? '',
+            $employee->allowances ?? '',
+            $employee->allowance_housing ?? '',
+            $employee->allowance_transportation ?? '',
+            $employee->allowance_other ?? '',
+            $employee->allowance_food ?? '',
+            $employee->allowance_personal_car ?? '',
+            $employee->social_insurance_deduction_rate ?? '',
+            $employee->manager,
+            $employee->direct_manager,
+            $employee->additional_approver_2,
+            $employee->additional_approver_3,
+            $employee->hire_date ? $employee->hire_date->format('Y-m-d') : '',
+            $employee->probation_end_date ? $employee->probation_end_date->format('Y-m-d') : '',
+            $employee->employment_status,
+            $employee->termination_date ? $employee->termination_date->format('Y-m-d') : '',
+            $employee->departure_date ? $employee->departure_date->format('Y-m-d') : '',
+            $employee->departure_reason,
+            $employee->id_number,
+            $employee->residence_expiry_date ? $employee->residence_expiry_date->format('Y-m-d') : '',
+            $employee->contract_end_date ? $employee->contract_end_date->format('Y-m-d') : '',
+            $employee->exit_reentry_visa_expiry ? $employee->exit_reentry_visa_expiry->format('Y-m-d') : '',
+            $employee->passport_number,
+            $employee->passport_expiry_date ? $employee->passport_expiry_date->format('Y-m-d') : '',
+            $employee->insurance_policy,
+            $employee->insurance_expiry_date ? $employee->insurance_expiry_date->format('Y-m-d') : '',
+            $employee->emergency_contact_name,
+            $employee->emergency_contact_phone,
+            $employee->emergency_contact_email,
+            $employee->emergency_contact_address,
+            $employee->annual_leave_balance ?? 21,
+            $employee->leave_accrued_balance ?? 0,
+            $employee->notes,
+        ];
+    }
+
+    /**
+     * Export existing employees to CSV.
+     */
+    public function exportEmployeesToCsv(Collection $employees): string
+    {
+        $headers = $this->exportColumnHeaders();
 
         $csv = implode(',', $headers) . "\n";
 
         foreach ($employees as $employee) {
-            $row = [
-                $employee->id,
-                $employee->employee_id,
-                $employee->first_name,
-                $employee->last_name,
-                $employee->father_name,
-                $employee->nationality ? $employee->nationality->name : '',
-                $employee->residenceCountry ? $employee->residenceCountry->name : '',
-                $employee->birth_date ? $employee->birth_date->format('Y-m-d') : '',
-                $employee->personal_email,
-                $employee->work_email,
-                $employee->personal_phone,
-                $employee->work_phone,
-                $employee->fingerprint_device_id,
-                $employee->work_address,
-                $employee->department,
-                $employee->job_title,
-                $employee->shift_id,
-                $employee->basic_salary ?? '',
-                $employee->allowances ?? '',
-                $employee->allowance_housing ?? '',
-                $employee->allowance_transportation ?? '',
-                $employee->allowance_other ?? '',
-                $employee->allowance_food ?? '',
-                $employee->allowance_personal_car ?? '',
-                $employee->social_insurance_deduction_rate ?? '',
-                $employee->manager,
-                $employee->direct_manager,
-                $employee->additional_approver_2,
-                $employee->additional_approver_3,
-                $employee->hire_date ? $employee->hire_date->format('Y-m-d') : '',
-                $employee->probation_end_date ? $employee->probation_end_date->format('Y-m-d') : '',
-                $employee->employment_status,
-                $employee->termination_date ? $employee->termination_date->format('Y-m-d') : '',
-                $employee->departure_date ? $employee->departure_date->format('Y-m-d') : '',
-                $employee->departure_reason,
-                $employee->id_number,
-                $employee->residence_expiry_date ? $employee->residence_expiry_date->format('Y-m-d') : '',
-                $employee->contract_end_date ? $employee->contract_end_date->format('Y-m-d') : '',
-                $employee->exit_reentry_visa_expiry ? $employee->exit_reentry_visa_expiry->format('Y-m-d') : '',
-                $employee->passport_number,
-                $employee->passport_expiry_date ? $employee->passport_expiry_date->format('Y-m-d') : '',
-                $employee->insurance_policy,
-                $employee->insurance_expiry_date ? $employee->insurance_expiry_date->format('Y-m-d') : '',
-                $employee->emergency_contact_name,
-                $employee->emergency_contact_phone,
-                $employee->emergency_contact_email,
-                $employee->emergency_contact_address,
-                $employee->annual_leave_balance ?? 21,
-                $employee->leave_accrued_balance ?? 0,
-                $employee->notes,
-            ];
+            $row = $this->mapEmployeeToExportRow($employee);
 
-            $csv .= implode(',', array_map(function($field) {
-                return '"' . str_replace('"', '""', (string)$field) . '"';
+            $csv .= implode(',', array_map(function ($field) {
+                return '"' . str_replace('"', '""', (string) $field) . '"';
             }, $row)) . "\n";
         }
 
