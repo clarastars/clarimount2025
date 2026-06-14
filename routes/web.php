@@ -20,6 +20,7 @@ use App\Http\Controllers\EmployeePortalLeaveController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
+use App\Http\Controllers\CompanyLeaveApprovalStepsController;
 use App\Http\Controllers\CompanyLeaveController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
@@ -209,6 +210,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/leaves', [CompanyLeaveController::class, 'store'])->name('companies.leaves.store');
     Route::post('companies/{company}/leave-requests/{leaveRequest}/approve', [CompanyLeaveController::class, 'approveRequest'])->name('companies.leave-requests.approve');
     Route::post('companies/{company}/leave-requests/{leaveRequest}/reject', [CompanyLeaveController::class, 'rejectRequest'])->name('companies.leave-requests.reject');
+    Route::post('companies/{company}/leave-requests/{leaveRequest}/approval-steps/{leaveApprovalStep}/approve', [CompanyLeaveController::class, 'approveWorkflowStep'])->name('companies.leave-requests.approve-step');
+    Route::post('companies/{company}/leave-requests/{leaveRequest}/approval-steps/{leaveApprovalStep}/reject', [CompanyLeaveController::class, 'rejectWorkflowStep'])->name('companies.leave-requests.reject-step');
+
+    // Leave approval steps (per company)
+    Route::get('companies/{company}/leave-approvals', [CompanyLeaveApprovalStepsController::class, 'index'])->name('companies.leave-approvals.index');
+    Route::post('companies/{company}/leave-approvals', [CompanyLeaveApprovalStepsController::class, 'store'])->name('companies.leave-approvals.store');
+    Route::put('companies/{company}/leave-approvals/{leaveApprovalStep}', [CompanyLeaveApprovalStepsController::class, 'update'])->name('companies.leave-approvals.update');
+    Route::delete('companies/{company}/leave-approvals/{leaveApprovalStep}', [CompanyLeaveApprovalStepsController::class, 'destroy'])->name('companies.leave-approvals.destroy');
+    Route::post('companies/{company}/leave-approvals/reorder', [CompanyLeaveApprovalStepsController::class, 'reorder'])->name('companies.leave-approvals.reorder');
 
     // Employee portal — self-service leaves
     Route::get('my/leaves', [EmployeePortalLeaveController::class, 'index'])->name('employee.leaves.index');

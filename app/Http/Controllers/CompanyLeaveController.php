@@ -8,7 +8,11 @@ use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\LeaveApprovalStep;
 use App\Models\LeaveRequest;
+use App\Models\User;
+use App\Services\LeaveApprovalNotificationService;
+use App\Services\LeaveApprovalService;
 use App\Services\LeaveRequestService;
 use App\Services\LeaveStoreService;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +29,8 @@ class CompanyLeaveController extends Controller
     public function __construct(
         private LeaveStoreService $leaveStoreService,
         private LeaveRequestService $leaveRequestService,
+        private LeaveApprovalService $leaveApprovalService,
+        private LeaveApprovalNotificationService $leaveApprovalNotificationService,
     ) {}
 
     public function index(Company $company): Response
@@ -35,6 +41,7 @@ class CompanyLeaveController extends Controller
         $this->abortUnlessCanViewCompanyLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
 
+        $hasLeaveApprovalWorkflow = $this->leaveApprovalService->hasActiveStepsForCompany($company);
         $today = now()->toDateString();
 
         $currentLeaves = Leave::query()
@@ -60,9 +67,15 @@ class CompanyLeaveController extends Controller
             ->values()
             ->all();
 
-        $pendingRequests = $this->getCompanyLeaveRequestsByStatus($company, LeaveRequest::STATUS_PENDING, 'created_at');
-        $approvedRequests = $this->getCompanyLeaveRequestsByStatus($company, LeaveRequest::STATUS_APPROVED, 'reviewed_at', descending: true);
-        $rejectedRequests = $this->getCompanyLeaveRequestsByStatus($company, LeaveRequest::STATUS_REJECTED, 'reviewed_at', descending: true);
+        $pendingRequests = $this->getCompanyLeaveRequestsByStatus(
+            $company,
+            $user,
+            LeaveRequest::STATUS_PENDING,
+            'created_at',
+            includeWorkflow: $hasLeaveApprovalWorkflow,
+        );
+        $approvedRequests = $this->getCompanyLeaveRequestsByStatus($company, $user, LeaveRequest::STATUS_APPROVED, 'reviewed_at', descending: true);
+        $rejectedRequests = $this->getCompanyLeaveRequestsByStatus($company, $user, LeaveRequest::STATUS_REJECTED, 'reviewed_at', descending: true);
 
         $canCreateLeaves = $this->canCreateLeaves($user);
 
@@ -89,8 +102,11 @@ class CompanyLeaveController extends Controller
             'rejectedRequests' => $rejectedRequests,
             'employees' => $employees,
             'canCreateLeaves' => $canCreateLeaves,
-            'canReviewLeaveRequests' => $canCreateLeaves,
-            'isReadOnly' => ! $canCreateLeaves,
+            'canReviewLeaveRequests' => $hasLeaveApprovalWorkflow
+                ? $this->canApproveLeaveWorkflow($user)
+                : $canCreateLeaves,
+            'hasLeaveApprovalWorkflow' => $hasLeaveApprovalWorkflow,
+            'isReadOnly' => ! $canCreateLeaves && ! $this->canApproveLeaveWorkflow($user),
             'leaveTypes' => Leave::TYPES,
         ]);
     }
@@ -122,6 +138,10 @@ class CompanyLeaveController extends Controller
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
+        if ($this->leaveApprovalService->hasActiveStepsForCompany($company)) {
+            abort(403);
+        }
+
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
@@ -142,6 +162,10 @@ class CompanyLeaveController extends Controller
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
+        if ($this->leaveApprovalService->hasActiveStepsForCompany($company)) {
+            abort(403);
+        }
+
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
@@ -157,6 +181,118 @@ class CompanyLeaveController extends Controller
             ->with('success', __('messages.leaves.request_rejected_success'));
     }
 
+    public function approveWorkflowStep(
+        Company $company,
+        LeaveRequest $leaveRequest,
+        LeaveApprovalStep $leaveApprovalStep
+    ): RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $this->abortUnlessCanAccessCompanyLeaves($user, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+
+        if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
+            abort(403);
+        }
+
+        if (! $leaveApprovalStep->is_active) {
+            abort(403);
+        }
+
+        if (! $this->leaveApprovalService->canUserApproveStep($user, $company, $leaveRequest, $leaveApprovalStep)) {
+            abort(403);
+        }
+
+        try {
+            $this->leaveApprovalService->approveStep($user, $leaveRequest, $leaveApprovalStep);
+        } catch (\RuntimeException $exception) {
+            return back()->with('info', $exception->getMessage());
+        }
+
+        $leaveRequest->refresh();
+
+        if ($this->leaveApprovalService->allStepsApproved($leaveRequest)) {
+            $this->leaveRequestService->approve($leaveRequest, $user, null, skipEmployeeNotification: true);
+            $this->leaveApprovalNotificationService->notifyWorkflowFinalized($leaveRequest->fresh(), $company, $user);
+
+            return back()->with('success', __('messages.leaves.request_approved_success'));
+        }
+
+        $this->leaveApprovalNotificationService->notifyStepApproved(
+            $leaveRequest,
+            $company,
+            $leaveApprovalStep,
+            $user,
+        );
+
+        return back()->with('success', __('messages.leaves.approval_saved'));
+    }
+
+    public function rejectWorkflowStep(
+        Request $request,
+        Company $company,
+        LeaveRequest $leaveRequest,
+        LeaveApprovalStep $leaveApprovalStep
+    ): RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $this->abortUnlessCanAccessCompanyLeaves($user, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+
+        if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
+            abort(403);
+        }
+
+        if (! $leaveApprovalStep->is_active) {
+            abort(403);
+        }
+
+        if (! $this->leaveApprovalService->canUserApproveStep($user, $company, $leaveRequest, $leaveApprovalStep)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+
+        try {
+            $this->leaveApprovalService->rejectStep(
+                $user,
+                $leaveRequest,
+                $leaveApprovalStep,
+                $validated['reason']
+            );
+        } catch (\RuntimeException $exception) {
+            return back()->with('info', $exception->getMessage());
+        }
+
+        $leaveRequest->refresh();
+        $this->leaveApprovalNotificationService->notifyStepRejected(
+            $leaveRequest,
+            $company,
+            $leaveApprovalStep,
+            $user,
+            $validated['reason'],
+        );
+
+        return back()->with('success', __('messages.leaves.approval_rejection_saved'));
+    }
+
+    private function canApproveLeaveWorkflow(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return $user->can('leaves.approve') || $user->can('leaves.create');
+    }
+
     private function abortUnlessLeaveRequestBelongsToCompany(LeaveRequest $leaveRequest, Company $company): void
     {
         abort_unless(
@@ -170,9 +306,11 @@ class CompanyLeaveController extends Controller
      */
     private function getCompanyLeaveRequestsByStatus(
         Company $company,
+        User $user,
         string $status,
         string $orderColumn,
         bool $descending = false,
+        bool $includeWorkflow = false,
     ): array {
         $query = LeaveRequest::query()
             ->where('status', $status)
@@ -190,7 +328,12 @@ class CompanyLeaveController extends Controller
 
         return $query
             ->get()
-            ->map(fn (LeaveRequest $leaveRequest): array => $this->mapLeaveRequest($leaveRequest))
+            ->map(fn (LeaveRequest $leaveRequest): array => $this->mapLeaveRequest(
+                $leaveRequest,
+                $company,
+                $user,
+                $includeWorkflow,
+            ))
             ->values()
             ->all();
     }
@@ -198,9 +341,13 @@ class CompanyLeaveController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function mapLeaveRequest(LeaveRequest $leaveRequest): array
-    {
-        return [
+    private function mapLeaveRequest(
+        LeaveRequest $leaveRequest,
+        Company $company,
+        User $user,
+        bool $includeWorkflow = false,
+    ): array {
+        $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
@@ -222,5 +369,12 @@ class CompanyLeaveController extends Controller
                 'full_name' => $leaveRequest->employee->full_name,
             ],
         ];
+
+        if ($includeWorkflow && $leaveRequest->isPending()) {
+            $payload['approval_steps'] = $this->leaveApprovalService->buildApprovalPayload($leaveRequest, $user, $company);
+            $payload['latest_rejection'] = $this->leaveApprovalService->buildLatestRejectionPayload($leaveRequest);
+        }
+
+        return $payload;
     }
 }

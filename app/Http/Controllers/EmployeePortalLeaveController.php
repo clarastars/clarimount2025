@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\Leave;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\LeaveApprovalService;
 use App\Services\LeaveRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +20,7 @@ class EmployeePortalLeaveController extends Controller
 {
     public function __construct(
         private LeaveRequestService $leaveRequestService,
+        private LeaveApprovalService $leaveApprovalService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -40,7 +43,7 @@ class EmployeePortalLeaveController extends Controller
         $leaveRequests = $employee->leaveRequests()
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (LeaveRequest $request): array => $this->mapLeaveRequest($request))
+            ->map(fn (LeaveRequest $request): array => $this->mapLeaveRequest($request, $employee->company))
             ->values()
             ->all();
 
@@ -117,9 +120,9 @@ class EmployeePortalLeaveController extends Controller
         ];
     }
 
-    private function mapLeaveRequest(LeaveRequest $leaveRequest): array
+    private function mapLeaveRequest(LeaveRequest $leaveRequest, ?Company $company = null): array
     {
-        return [
+        $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
@@ -133,5 +136,14 @@ class EmployeePortalLeaveController extends Controller
             'created_at' => $leaveRequest->created_at?->toIso8601String(),
             'reviewed_at' => $leaveRequest->reviewed_at?->toIso8601String(),
         ];
+
+        if ($company !== null) {
+            $payload['approval_progress'] = $this->leaveApprovalService->buildEmployeeProgressPayload(
+                $leaveRequest,
+                $company,
+            );
+        }
+
+        return $payload;
     }
 }

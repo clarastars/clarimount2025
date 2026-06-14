@@ -62,6 +62,16 @@ class LeaveRequest extends Model
         return $this->belongsTo(User::class, 'reviewed_by');
     }
 
+    public function stepApprovals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeaveRequestStepApproval::class);
+    }
+
+    public function approvalRejections(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeaveRequestApprovalRejection::class);
+    }
+
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;

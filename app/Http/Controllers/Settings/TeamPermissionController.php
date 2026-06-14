@@ -28,6 +28,7 @@ class TeamPermissionController extends Controller
         ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
         ['name' => 'leaves.company.view', 'label' => 'الاطلاع على إجازات الشركة (قراءة فقط — عرض من في إجازة)'],
         ['name' => 'leaves.create', 'label' => 'إنشاء الإجازات'],
+        ['name' => 'leaves.approve', 'label' => 'اعتماد طلبات الإجازة (سلسلة الاعتمادات)'],
         ['name' => 'leaves.requests.receive-email', 'label' => 'استقبال إيميلات طلب الإجازة من موظفين الشركة'],
         ['name' => 'employees.custody.update', 'label' => 'إمكانية تحديث العهدة'],
         ['name' => 'employees.global-search', 'label' => 'البحث العلوي عن الموظفين (شركات الدور فقط)'],

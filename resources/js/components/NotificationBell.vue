@@ -28,6 +28,7 @@ interface NotificationData {
     reason?: string;
     after_rejection?: boolean;
     review_notes?: string;
+    remaining_steps?: number;
     url?: string;
 }
 
@@ -106,7 +107,7 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         });
     }
 
-    if (data.event_type === 'leave_request_approved' || data.event_type === 'leave_request_rejected') {
+    if (data.event_type === 'leave_request_approved' || (data.event_type === 'leave_request_rejected' && !data.step_title)) {
         const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
         const leaveType = t(leaveTypeKey);
         const messageKey = data.event_type === 'leave_request_approved'
@@ -126,6 +127,51 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         }
 
         return message;
+    }
+
+    const leaveWorkflowTypes = [
+        'leave_request_your_turn',
+        'leave_request_step_approved',
+        'leave_request_step_progress',
+        'leave_request_workflow_rejected',
+        'leave_request_finalized',
+    ];
+
+    if (leaveWorkflowTypes.includes(data.event_type) || (data.event_type === 'leave_request_rejected' && data.step_title)) {
+        const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
+        const leaveType = t(leaveTypeKey);
+        const typeLabel = leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType;
+
+        const params = {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            type: typeLabel,
+            start: data.start_date ?? '',
+            end: data.end_date ?? '',
+            days: data.days ?? '',
+            step: data.step_title ?? '',
+            name: data.actor_name ?? '',
+            reason: data.reason ?? '',
+            remaining: data.remaining_steps ?? '',
+        };
+
+        if (data.event_type === 'leave_request_your_turn' && data.after_rejection) {
+            return t('notifications.leave_request_workflow_your_turn_after_rejection', params);
+        }
+
+        const keyMap: Record<string, string> = {
+            leave_request_your_turn: 'notifications.leave_request_workflow_your_turn',
+            leave_request_step_approved: 'notifications.leave_request_workflow_step_approved',
+            leave_request_step_progress: 'notifications.leave_request_workflow_step_progress',
+            leave_request_workflow_rejected: 'notifications.leave_request_workflow_employee_rejected',
+            leave_request_finalized: 'notifications.leave_request_workflow_finalized',
+            leave_request_rejected: 'notifications.leave_request_workflow_rejected',
+            leave_request_approved: 'notifications.leave_request_workflow_finalized',
+        };
+
+        const messageKey = keyMap[data.event_type] ?? 'notifications.leave_request_workflow_your_turn';
+
+        return t(messageKey, params);
     }
 
     const params = {

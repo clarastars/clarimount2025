@@ -63,6 +63,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 title: t('settings.salary_run_approvals'),
                 href: '/settings/salary-run-approvals',
             },
+            {
+                title: t('settings.leave_approvals'),
+                href: '/settings/leave-approvals',
+            },
         );
     }
 

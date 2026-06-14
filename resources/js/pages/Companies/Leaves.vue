@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Calendar, CalendarPlus } from 'lucide-vue-next';
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import LeaveFormFields from '@/components/leaves/LeaveFormFields.vue';
 import type { BreadcrumbItem } from '@/types';
 
@@ -31,6 +33,28 @@ interface EmployeeOption {
     full_name: string;
 }
 
+interface ApprovalStepState {
+    id: number;
+    title: string;
+    sort_order: number;
+    team_id: number | null;
+    team_name: string | null;
+    approved_at: string | null;
+    approver_name: string | null;
+    can_approve: boolean;
+    can_reject: boolean;
+    waiting_previous: boolean;
+}
+
+interface LatestRejectionState {
+    id: number;
+    reason: string;
+    rejected_at: string;
+    rejector_name: string | null;
+    step_title: string | null;
+    cleared_approvals_count: number;
+}
+
 interface LeaveRequestItem {
     id: number;
     leave_type: string;
@@ -50,6 +74,8 @@ interface LeaveRequestItem {
         id: number;
         full_name: string;
     };
+    approval_steps?: ApprovalStepState[];
+    latest_rejection?: LatestRejectionState | null;
 }
 
 interface CompanyItem {
@@ -67,6 +93,7 @@ const props = withDefaults(defineProps<{
     employees: EmployeeOption[];
     canCreateLeaves: boolean;
     canReviewLeaveRequests?: boolean;
+    hasLeaveApprovalWorkflow?: boolean;
     isReadOnly?: boolean;
     leaveTypes: string[];
 }>(), {
@@ -74,6 +101,7 @@ const props = withDefaults(defineProps<{
     approvedRequests: () => [],
     rejectedRequests: () => [],
     canReviewLeaveRequests: false,
+    hasLeaveApprovalWorkflow: false,
 });
 
 const { t, locale } = useI18n();
@@ -112,7 +140,10 @@ const form = useForm({
 
 const createFormOpen = ref(false);
 const detailsDialogOpen = ref(false);
+const rejectDialogOpen = ref(false);
 const selectedRequest = ref<LeaveRequestItem | null>(null);
+const rejectingStepId = ref<number | null>(null);
+const approvingStepId = ref<number | null>(null);
 const requestsTab = ref<'pending' | 'approved' | 'rejected'>('pending');
 
 const activeRequests = computed(() => {
@@ -182,6 +213,17 @@ const reviewForm = useForm({
     review_notes: '',
 });
 
+const rejectForm = useForm({
+    reason: '',
+});
+
+const showDirectReviewActions = computed(() =>
+    props.canReviewLeaveRequests && ! props.hasLeaveApprovalWorkflow,
+);
+
+const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
+const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
+
 const approveRequest = (requestId: number) => {
     reviewForm.post(route('companies.leave-requests.approve', [props.company.id, requestId]), {
         preserveScroll: true,
@@ -222,6 +264,91 @@ function openRequestDetails(request: LeaveRequestItem) {
 function closeRequestDetails() {
     detailsDialogOpen.value = false;
     selectedRequest.value = null;
+    rejectDialogOpen.value = false;
+    rejectingStepId.value = null;
+    approvingStepId.value = null;
+}
+
+function formatApprovalDate(iso: string | null): string {
+    if (!iso) {
+        return '—';
+    }
+
+    try {
+        return new Date(iso).toLocaleDateString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    } catch {
+        return iso;
+    }
+}
+
+function formatApprovalTime(iso: string | null): string {
+    if (!iso) {
+        return '—';
+    }
+
+    try {
+        return new Date(iso).toLocaleTimeString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    } catch {
+        return iso;
+    }
+}
+
+function approveWorkflowStep(stepId: number) {
+    if (!selectedRequest.value) {
+        return;
+    }
+
+    approvingStepId.value = stepId;
+    router.post(
+        route('companies.leave-requests.approve-step', [props.company.id, selectedRequest.value.id, stepId]),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                approvingStepId.value = null;
+            },
+            onSuccess: () => closeRequestDetails(),
+        },
+    );
+}
+
+function openRejectDialog(stepId: number) {
+    rejectingStepId.value = stepId;
+    rejectForm.clearErrors();
+    rejectForm.reason = '';
+    rejectDialogOpen.value = true;
+}
+
+function closeRejectDialog() {
+    rejectDialogOpen.value = false;
+    rejectingStepId.value = null;
+    rejectForm.reset();
+    rejectForm.clearErrors();
+}
+
+function submitRejectStep() {
+    if (!selectedRequest.value || rejectingStepId.value === null) {
+        return;
+    }
+
+    const stepId = rejectingStepId.value;
+    rejectForm.post(
+        route('companies.leave-requests.reject-step', [props.company.id, selectedRequest.value.id, stepId]),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeRejectDialog();
+                closeRequestDetails();
+            },
+        },
+    );
 }
 </script>
 
@@ -379,7 +506,7 @@ function closeRequestDetails() {
                                     <Button size="sm" variant="outline" @click="openRequestDetails(request)">
                                         {{ t('leaves.request_details') }}
                                     </Button>
-                                    <template v-if="requestsTab === 'pending' && canReviewLeaveRequests">
+                                    <template v-if="requestsTab === 'pending' && showDirectReviewActions">
                                         <Button size="sm" :disabled="reviewForm.processing" @click="approveRequest(request.id)">
                                             {{ t('leaves.approve_request') }}
                                         </Button>
@@ -470,11 +597,131 @@ function closeRequestDetails() {
                         </div>
                     </div>
 
+                    <div
+                        v-if="hasLeaveApprovalWorkflow && selectedRequest?.approval_steps?.length"
+                        class="sm:col-span-2 space-y-4 border-t pt-4"
+                    >
+                        <p class="font-medium">{{ t('leaves.approvals_section') }}</p>
+
+                        <div
+                            v-if="latestRejection"
+                            class="rounded-lg border border-red-200 bg-red-50/50 p-4 space-y-2 dark:border-red-800 dark:bg-red-950/20"
+                        >
+                            <p class="font-medium text-red-800 dark:text-red-300">
+                                {{ t('salary_runs.approval_rejection_notice_title') }}
+                            </p>
+                            <p class="text-sm text-red-700 dark:text-red-300">
+                                {{ t('salary_runs.approval_rejection_notice_message', {
+                                    name: latestRejection.rejector_name ?? '—',
+                                    step: latestRejection.step_title ?? '—',
+                                    date: formatApprovalDate(latestRejection.rejected_at),
+                                    time: formatApprovalTime(latestRejection.rejected_at),
+                                }) }}
+                            </p>
+                            <p v-if="latestRejection.cleared_approvals_count > 0" class="text-sm text-red-700 dark:text-red-300">
+                                {{ t('salary_runs.approval_rejection_cleared_count', { count: latestRejection.cleared_approvals_count }) }}
+                            </p>
+                            <div class="text-sm">
+                                <span class="font-medium text-red-800 dark:text-red-300">{{ t('salary_runs.approval_rejection_reason_label') }}:</span>
+                                <span class="text-red-700 dark:text-red-300">{{ latestRejection.reason }}</span>
+                            </div>
+                            <p class="text-sm text-red-600 dark:text-red-400">
+                                {{ t('salary_runs.approval_rejection_restart_hint') }}
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div
+                                v-for="approval in approvalList"
+                                :key="approval.id"
+                                class="rounded-lg border p-4 flex flex-col justify-between"
+                                :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
+                            >
+                                <div class="font-medium text-sm mb-1">{{ approval.title }}</div>
+                                <div v-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
+                                    {{ approval.team_name }}
+                                </div>
+                                <div v-if="approval.approved_at" class="text-sm space-y-1">
+                                    <div class="text-muted-foreground">
+                                        <span>{{ t('salary_runs.approval_date_label') }}:</span>
+                                        {{ formatApprovalDate(approval.approved_at) }}
+                                    </div>
+                                    <div class="text-muted-foreground">
+                                        <span>{{ t('salary_runs.approval_time_label') }}:</span>
+                                        {{ formatApprovalTime(approval.approved_at) }}
+                                    </div>
+                                    <div class="font-medium pt-0.5">
+                                        <span class="text-muted-foreground">{{ t('salary_runs.approval_by_label') }}:</span>
+                                        {{ approval.approver_name || '—' }}
+                                    </div>
+                                </div>
+                                <div v-else class="space-y-2">
+                                    <p v-if="approval.waiting_previous" class="text-sm text-amber-600 dark:text-amber-400">
+                                        {{ t('salary_runs.approval_waiting_previous') }}
+                                    </p>
+                                    <p v-else class="text-sm text-amber-600 dark:text-amber-400">
+                                        {{ t('salary_runs.approval_pending') }}
+                                    </p>
+                                    <div v-if="approval.can_approve || approval.can_reject" class="flex gap-2">
+                                        <Button
+                                            v-if="approval.can_approve"
+                                            size="sm"
+                                            class="flex-1"
+                                            :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
+                                            @click="approveWorkflowStep(approval.id)"
+                                        >
+                                            {{ approvingStepId === approval.id ? '...' : t('salary_runs.approval_approve') }}
+                                        </Button>
+                                        <Button
+                                            v-if="approval.can_reject"
+                                            size="sm"
+                                            variant="destructive"
+                                            class="flex-1"
+                                            :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
+                                            @click="openRejectDialog(approval.id)"
+                                        >
+                                            {{ rejectingStepId === approval.id ? '...' : t('salary_runs.approval_reject') }}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <DialogFooter>
                         <Button variant="outline" @click="closeRequestDetails">
                             {{ t('common.close') }}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog :open="rejectDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeRejectDialog())">
+                <DialogContent class="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{{ t('salary_runs.approval_reject_confirm_title') }}</DialogTitle>
+                        <DialogDescription>{{ t('salary_runs.approval_reject_confirm_message') }}</DialogDescription>
+                    </DialogHeader>
+                    <form class="space-y-4" @submit.prevent="submitRejectStep">
+                        <div class="space-y-2">
+                            <Label for="reject-reason">{{ t('salary_runs.approval_reject_reason_label') }}</Label>
+                            <Input
+                                id="reject-reason"
+                                v-model="rejectForm.reason"
+                                :placeholder="t('salary_runs.approval_reject_reason_placeholder')"
+                                required
+                            />
+                            <p v-if="rejectForm.errors.reason" class="text-sm text-red-600">{{ rejectForm.errors.reason }}</p>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" @click="closeRejectDialog">
+                                {{ t('common.cancel') }}
+                            </Button>
+                            <Button type="submit" variant="destructive" :disabled="rejectForm.processing">
+                                {{ rejectForm.processing ? '...' : t('salary_runs.approval_reject') }}
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
 

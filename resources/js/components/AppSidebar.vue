@@ -114,6 +114,11 @@ const settingsNavItems = computed((): NavItem[] => [
         href: '/settings/salary-run-approvals',
         icon: Users,
     },
+    {
+        title: t('settings.leave_approvals'),
+        href: '/settings/leave-approvals',
+        icon: Users,
+    },
 ]);
 
 const footerNavItems = computed((): NavItem[] => [

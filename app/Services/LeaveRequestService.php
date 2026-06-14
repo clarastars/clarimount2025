@@ -17,6 +17,8 @@ class LeaveRequestService
 {
     public function __construct(
         private LeaveRequestNotificationService $notificationService,
+        private LeaveApprovalService $leaveApprovalService,
+        private LeaveApprovalNotificationService $leaveApprovalNotificationService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request): LeaveRequest
@@ -71,13 +73,24 @@ class LeaveRequestService
         ]);
 
         $leaveRequest->load(['employee.company']);
-        $this->notificationService->notifySubmitted($leaveRequest);
+        $company = $leaveRequest->employee->company;
+        $actor = $leaveRequest->employee->user ?? User::make(['name' => $leaveRequest->employee->full_name]);
+
+        if ($company !== null && $this->leaveApprovalService->hasActiveStepsForCompany($company)) {
+            $this->leaveApprovalNotificationService->notifyWorkflowStarted($leaveRequest, $company, $actor);
+        } else {
+            $this->notificationService->notifySubmitted($leaveRequest);
+        }
 
         return $leaveRequest;
     }
 
-    public function approve(LeaveRequest $leaveRequest, User $reviewer, ?string $reviewNotes = null): Leave
-    {
+    public function approve(
+        LeaveRequest $leaveRequest,
+        User $reviewer,
+        ?string $reviewNotes = null,
+        bool $skipEmployeeNotification = false,
+    ): Leave {
         if (! $leaveRequest->isPending()) {
             throw ValidationException::withMessages([
                 'status' => [__('messages.leaves.request_already_processed')],
@@ -125,7 +138,9 @@ class LeaveRequestService
             return $leave;
         });
 
-        $this->notificationService->notifyEmployeeApproved($leaveRequest->fresh());
+        if (! $skipEmployeeNotification) {
+            $this->notificationService->notifyEmployeeApproved($leaveRequest->fresh());
+        }
 
         return $leave;
     }
@@ -164,6 +179,8 @@ class LeaveRequestService
         $leaveRequest->update([
             'status' => LeaveRequest::STATUS_CANCELLED,
         ]);
+
+        $leaveRequest->stepApprovals()->delete();
     }
 
     private function pendingDeductibleDaysForEmployee(Employee $employee, ?int $excludeRequestId = null): int

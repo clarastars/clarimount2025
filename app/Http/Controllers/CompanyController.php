@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Services\AttendancePenaltyAutoApprovalService;
+use App\Services\LeaveApprovalService;
 use App\Services\SalaryRunApprovalService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -157,6 +158,7 @@ class CompanyController extends Controller
         $company = Company::create($validated);
 
         app(SalaryRunApprovalService::class)->seedDefaultStepsForCompany($company);
+        app(LeaveApprovalService::class)->seedDefaultStepsForCompany($company);
 
         return redirect()->route('companies.show', $company)
             ->with('success', 'Company created successfully.');

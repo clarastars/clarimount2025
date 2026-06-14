@@ -103,6 +103,7 @@ class HandleInertiaRequests extends Middleware
                     || $user->ownedCompanies()->exists()
                     || in_array('leaves.requests.receive-email', $permissionNames, true)
                     || in_array('leaves.create', $permissionNames, true)
+                    || in_array('leaves.approve', $permissionNames, true)
                 ),
                 'unread_notifications_count' => $user?->unreadNotifications()->count() ?? 0,
             ],

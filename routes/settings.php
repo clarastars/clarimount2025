@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\LeaveApprovalStepsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
@@ -46,6 +47,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('settings/salary-run-approvals', [SalaryRunApprovalStepsController::class, 'index'])->name('settings.salary-run-approvals.index');
+    Route::get('settings/leave-approvals', [LeaveApprovalStepsController::class, 'index'])->name('settings.leave-approvals.index');
 
     Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {
         Route::get('settings/employee-reference-data', [EmployeeReferenceDataController::class, 'index'])->name('settings.employee-reference-data.index');

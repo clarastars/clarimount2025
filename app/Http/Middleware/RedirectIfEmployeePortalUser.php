@@ -141,9 +141,24 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('leaves.create')) {
+        if ($user->can('leaves.create') || $user->can('leaves.approve')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
+                'companies.leave-requests.approve-step',
+                'companies.leave-requests.reject-step',
+            ]);
+        }
+
+        if ($user->can('leaves.approve')) {
+            $allowed = array_merge($allowed, [
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($user->can('leaves.create')) {
+            $allowed = array_merge($allowed, [
                 'companies.leaves.store',
                 'companies.leave-requests.approve',
                 'companies.leave-requests.reject',
