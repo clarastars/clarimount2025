@@ -7,6 +7,8 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
 import { updateI18nMessages } from './i18n';
+import { syncCsrfMetaToken } from './lib/csrf';
+import { router } from '@inertiajs/vue3';
 // Removed Echo import - using database polling instead
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -43,6 +45,12 @@ createInertiaApp({
     progress: {
         color: '#4B5563',
     },
+});
+
+// Keep the meta CSRF token in sync after Inertia navigations (session may rotate the token).
+router.on('success', (event) => {
+    const token = (event.detail.page.props as { csrf_token?: string }).csrf_token;
+    syncCsrfMetaToken(token);
 });
 
 // This will set light / dark mode on page load...

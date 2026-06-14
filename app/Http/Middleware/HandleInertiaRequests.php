@@ -113,6 +113,7 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'csrf_token' => csrf_token(),
             'ui' => [
                 'show_employee_global_search' => $globalEmployeeSearchEnabled,
             ],

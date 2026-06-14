@@ -516,6 +516,7 @@ import Icon from '@/components/Icon.vue';
 import Heading from '@/components/Heading.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import AssetTemplatePicker, { type AssetTemplateOption } from '@/components/AssetTemplatePicker.vue';
+import { csrfHeaders } from '@/lib/csrf';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, onMounted, watch } from 'vue';
 import type { Employee, Asset, AssetCategory, Company, CustodyChange, BreadcrumbItem } from '@/types';
@@ -857,14 +858,12 @@ const submitQuickCreate = async () => {
     quickCreateSubmitting.value = true;
 
     try {
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
         const response = await fetch(route('employees.custody.quick-create-asset', props.employee.id), {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
+                ...csrfHeaders(),
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken || '',
-                'X-Requested-With': 'XMLHttpRequest',
             },
             body: JSON.stringify({
                 assets: items.map((item) => ({
@@ -875,6 +874,11 @@ const submitQuickCreate = async () => {
                 })),
             }),
         });
+
+        if (response.status === 419) {
+            alert(t('custody.session_expired_reload'));
+            return;
+        }
 
         const result = await response.json();
 
@@ -942,7 +946,6 @@ const saveCustodyUpdate = async () => {
     loading.value = true;
     
     try {
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
         const url = route('employees.custody.store', props.employee.id);
         
         const requestData = {
@@ -952,14 +955,18 @@ const saveCustodyUpdate = async () => {
         
         const response = await fetch(url, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
+                ...csrfHeaders(),
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrfToken || '',
-                'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify(requestData)
         });
+
+        if (response.status === 419) {
+            alert(t('custody.session_expired_reload'));
+            return;
+        }
         
         // Check if response is actually JSON
         const contentType = response.headers.get('content-type');
@@ -1022,11 +1029,15 @@ const uploadDocument = async () => {
 
         const response = await fetch(route('custody.upload', selectedCustodyChange.value.id), {
             method: 'POST',
+            credentials: 'same-origin',
             body: formData,
-            headers: {
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-            },
+            headers: csrfHeaders(),
         });
+
+        if (response.status === 419) {
+            alert(t('custody.session_expired_reload'));
+            return;
+        }
 
         if (response.ok) {
             const result = await response.json();

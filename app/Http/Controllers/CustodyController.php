@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -156,7 +157,10 @@ class CustodyController extends Controller
         $validated = $request->validate([
             'assets' => ['required', 'array', 'min:1', 'max:50'],
             'assets.*.asset_template_id' => ['required', 'exists:asset_templates,id'],
-            'assets.*.location_id' => ['required', 'exists:locations,id'],
+            'assets.*.location_id' => [
+                'required',
+                Rule::exists('locations', 'id')->where('company_id', $employee->company_id),
+            ],
             'assets.*.serial_number' => ['nullable', 'string', 'max:255'],
             'assets.*.condition' => ['required', 'in:good,damaged'],
         ]);

@@ -1233,6 +1233,7 @@ return [
         'creating_asset' => 'جارٍ الإنشاء...',
         'quick_create_success' => 'تم إنشاء الأصل :tag وتعيينه للموظف بنجاح.',
         'quick_create_failed' => 'فشل إنشاء الأصل وتعيينه',
+        'session_expired_reload' => 'انتهت صلاحية الجلسة. يرجى تحديث الصفحة والمحاولة مرة أخرى.',
         'quick_create_summary' => 'إنشاء أصل جديد وتعيينه (:tag)',
         'employee_missing_company' => 'لا يمكن إنشاء أصل لموظف غير مرتبط بشركة.',
         'template_missing_category' => 'القالب المحدد لا يحتوي على فئة. يرجى تحديث القالب أولاً.',

@@ -1222,6 +1222,7 @@ return [
         'creating_asset' => 'Creating...',
         'quick_create_success' => 'Asset :tag was created and assigned to the employee successfully.',
         'quick_create_failed' => 'Failed to create and assign asset',
+        'session_expired_reload' => 'Your session has expired. Please refresh the page and try again.',
         'quick_create_summary' => 'Created and assigned new asset (:tag)',
         'employee_missing_company' => 'Cannot create an asset for an employee without a company.',
         'template_missing_category' => 'The selected template has no category. Please update the template first.',
