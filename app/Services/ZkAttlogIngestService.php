@@ -138,8 +138,8 @@ class ZkAttlogIngestService
                     $dailyAttendance->first_verify_mode = $verifyMode;
                 }
 
-                // Update last_punch if this is later
-                if ($punchTime->gt($dailyAttendance->last_punch)) {
+                // Update last_punch if this is later (only meaningful when 2+ punches)
+                if ($dailyAttendance->last_punch === null || $punchTime->gt($dailyAttendance->last_punch)) {
                     $dailyAttendance->last_punch = $punchTime;
                     $dailyAttendance->last_verify_mode = $verifyMode;
                 }
@@ -147,14 +147,15 @@ class ZkAttlogIngestService
                 // Increment punch count
                 $dailyAttendance->punch_count = ($dailyAttendance->punch_count ?? 0) + 1;
             } else {
-                // Create new record
+                // Create new record (single punch = check-in only)
                 $dailyAttendance->first_punch = $punchTime;
-                $dailyAttendance->last_punch = $punchTime;
                 $dailyAttendance->first_verify_mode = $verifyMode;
-                $dailyAttendance->last_verify_mode = $verifyMode;
+                $dailyAttendance->last_punch = null;
+                $dailyAttendance->last_verify_mode = null;
                 $dailyAttendance->punch_count = 1;
             }
 
+            $dailyAttendance->syncCheckoutWithPunchCount();
             $dailyAttendance->save();
 
             // If employee has a punch, delete any absence penalty (employee came to work)

@@ -286,6 +286,12 @@
                           <div v-if="record.last_punch" class="text-base font-semibold text-gray-900 dark:text-white">
                             {{ formatDateTime(record.last_punch) }}
                           </div>
+                          <span
+                            v-else-if="record.first_punch && (record.punch_count || 0) <= 1"
+                            class="text-sm font-medium text-amber-600 dark:text-amber-400"
+                          >
+                            {{ $t('attendance.checkout_pending') }}
+                          </span>
                           <span v-else class="text-sm text-gray-500 dark:text-gray-400">-</span>
                           <Badge v-if="record.last_verify_mode !== null" variant="outline" class="text-xs mt-1">
                             {{ $t('attendance.verify_mode') }}: {{ getVerifyModeName(record.last_verify_mode) }}

@@ -154,7 +154,7 @@ class BayzatFingerprintAttendancePushService
                 continue;
             }
 
-            $checkOut = $this->punchToRiyadhFromModel($row, 'last_punch') ?? $checkIn;
+            $checkOut = $this->punchToRiyadhFromModel($row, 'last_punch');
 
             $pairs[] = [
                 'empId' => $empId,
@@ -218,7 +218,7 @@ class BayzatFingerprintAttendancePushService
                     'type' => 'checkIn',
                     'time' => $p['checkIn'],
                 ];
-                if ($p['checkOut'] !== $p['checkIn']) {
+                if ($p['checkOut'] !== null && $p['checkOut'] !== $p['checkIn']) {
                     $records[] = [
                         'empId' => $p['empId'],
                         'type' => 'checkOut',

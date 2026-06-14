@@ -276,16 +276,20 @@ class AttendancePresentationRebuildService
      */
     private function rowFromZkRecord(object $r, Employee $employee, string $dateStr): array
     {
+        $punchCount = (int) ($r->punch_count ?? 0);
+        $lastPunch = $punchCount > 1 ? $r->last_punch : null;
+        $lastVerifyMode = $punchCount > 1 ? $r->last_verify_mode : null;
+
         return [
             'employee_id' => $employee->id,
             'company_id' => $employee->company_id,
             'att_date' => $dateStr,
             'zk_daily_attendance_id' => $r->id,
             'first_punch' => $r->first_punch,
-            'last_punch' => $r->last_punch,
-            'punch_count' => (int) ($r->punch_count ?? 0),
+            'last_punch' => $lastPunch,
+            'punch_count' => $punchCount,
             'first_verify_mode' => $r->first_verify_mode,
-            'last_verify_mode' => $r->last_verify_mode,
+            'last_verify_mode' => $lastVerifyMode,
             'device_pin' => $r->device_pin ?? $employee->fingerprint_device_id,
             'device_name' => $r->device_name ?? null,
             'serial_number' => $r->serial_number ?? null,

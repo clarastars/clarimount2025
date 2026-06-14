@@ -49,4 +49,15 @@ class ZkDailyAttendance extends Model
     {
         return $this->belongsTo(Employee::class, 'device_pin', 'fingerprint_device_id');
     }
+
+    /**
+     * One punch = check-in only; check-out is set only when there are 2+ punches.
+     */
+    public function syncCheckoutWithPunchCount(): void
+    {
+        if (($this->punch_count ?? 0) <= 1) {
+            $this->last_punch = null;
+            $this->last_verify_mode = null;
+        }
+    }
 }

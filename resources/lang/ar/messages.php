@@ -1421,6 +1421,7 @@ return [
         'fingerprint_table' => 'سجلات حضور البصمة',
         'check_in' => 'وقت الحضور',
         'check_out' => 'وقت الانصراف',
+        'checkout_pending' => 'معلق',
         'device_pin' => 'رقم معرف البصمة',
         'punch_count' => 'عدد البصمات',
         'present_today' => 'الحاضرون اليوم',

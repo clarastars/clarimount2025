@@ -1409,6 +1409,7 @@ return [
         'fingerprint_table' => 'Fingerprint Attendance Records',
         'check_in' => 'Check In',
         'check_out' => 'Check Out',
+        'checkout_pending' => 'Pending',
         'device_pin' => 'Device PIN',
         'punch_count' => 'Punch Count',
         'present_today' => 'Present Today',

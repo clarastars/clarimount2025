@@ -239,8 +239,11 @@ class FingerprintIclockAttendanceService
         }
 
         sort($punchTimes);
+        $punchCount = count($punchTimes);
         $firstPunch = Carbon::parse($punchTimes[0], 'Asia/Riyadh')->utc();
-        $lastPunch = Carbon::parse($punchTimes[count($punchTimes) - 1], 'Asia/Riyadh')->utc();
+        $lastPunch = $punchCount > 1
+            ? Carbon::parse($punchTimes[$punchCount - 1], 'Asia/Riyadh')->utc()
+            : null;
 
         $attendance = ZkDailyAttendance::updateOrCreate(
             [
@@ -253,7 +256,7 @@ class FingerprintIclockAttendanceService
                 'last_punch' => $lastPunch,
                 'first_verify_mode' => null,
                 'last_verify_mode' => null,
-                'punch_count' => count($punchTimes),
+                'punch_count' => $punchCount,
             ]
         );
 
