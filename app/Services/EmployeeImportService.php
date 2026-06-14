@@ -82,6 +82,8 @@ class EmployeeImportService
         'emergency_contact_phone',
         'emergency_contact_email',
         'emergency_contact_address',
+        'annual_leave_balance',
+        'leave_accrued_balance',
         'notes',
     ];
 
@@ -164,6 +166,8 @@ class EmployeeImportService
             'emergency_contact_phone',
             'emergency_contact_email',
             'emergency_contact_address',
+            'annual_leave_balance',
+            'leave_accrued_balance',
             'notes',
         ];
 
@@ -216,6 +220,8 @@ class EmployeeImportService
             '+9876543210',
             'emergency@example.com',
             '456 Emergency St, City',
+            '21',
+            '15.75',
             'Sample employee record',
         ];
 
@@ -280,6 +286,8 @@ class EmployeeImportService
             'emergency_contact_phone',
             'emergency_contact_email',
             'emergency_contact_address',
+            'annual_leave_balance',
+            'leave_accrued_balance',
             'notes',
         ];
 
@@ -334,6 +342,8 @@ class EmployeeImportService
                 $employee->emergency_contact_phone,
                 $employee->emergency_contact_email,
                 $employee->emergency_contact_address,
+                $employee->annual_leave_balance ?? 21,
+                $employee->leave_accrued_balance ?? 0,
                 $employee->notes,
             ];
 
@@ -446,6 +456,8 @@ class EmployeeImportService
         $setIfBlank('emergency_contact_phone', $employee->emergency_contact_phone);
         $setIfBlank('emergency_contact_email', $employee->emergency_contact_email);
         $setIfBlank('emergency_contact_address', $employee->emergency_contact_address);
+        $setIfBlank('annual_leave_balance', $employee->annual_leave_balance !== null ? (string) $employee->annual_leave_balance : null);
+        $setIfBlank('leave_accrued_balance', $employee->leave_accrued_balance !== null ? (string) $employee->leave_accrued_balance : null);
         $setIfBlank('notes', $employee->notes);
 
         return $rowData;
@@ -934,6 +946,7 @@ class EmployeeImportService
         $numericFields = [
             'basic_salary', 'allowances', 'allowance_housing', 'allowance_transportation',
             'allowance_other', 'allowance_food', 'allowance_personal_car', 'social_insurance_deduction_rate',
+            'annual_leave_balance', 'leave_accrued_balance',
         ];
         foreach ($numericFields as $field) {
             if (isset($rowData[$field]) && $rowData[$field] !== '' && $rowData[$field] !== null) {
@@ -951,6 +964,36 @@ class EmployeeImportService
             ((float) $rowData['social_insurance_deduction_rate'] < 0 || (float) $rowData['social_insurance_deduction_rate'] > 100)
         ) {
             $errors[] = "Row {$rowNumber}: social_insurance_deduction_rate must be between 0 and 100.";
+        }
+
+        if (
+            isset($rowData['annual_leave_balance'])
+            && $rowData['annual_leave_balance'] !== ''
+            && $rowData['annual_leave_balance'] !== null
+            && is_numeric($rowData['annual_leave_balance'])
+            && (float) $rowData['annual_leave_balance'] < 0
+        ) {
+            $errors[] = "Row {$rowNumber}: annual_leave_balance must be zero or greater.";
+        }
+
+        if (
+            isset($rowData['annual_leave_balance'])
+            && $rowData['annual_leave_balance'] !== ''
+            && $rowData['annual_leave_balance'] !== null
+            && is_numeric($rowData['annual_leave_balance'])
+            && (float) $rowData['annual_leave_balance'] != (int) $rowData['annual_leave_balance']
+        ) {
+            $errors[] = "Row {$rowNumber}: annual_leave_balance must be a whole number.";
+        }
+
+        if (
+            isset($rowData['leave_accrued_balance'])
+            && $rowData['leave_accrued_balance'] !== ''
+            && $rowData['leave_accrued_balance'] !== null
+            && is_numeric($rowData['leave_accrued_balance'])
+            && (float) $rowData['leave_accrued_balance'] < 0
+        ) {
+            $errors[] = "Row {$rowNumber}: leave_accrued_balance must be zero or greater.";
         }
 
         if (! empty($errors)) {
@@ -1009,6 +1052,8 @@ class EmployeeImportService
             'emergency_contact_phone' => $rowData['emergency_contact_phone'] ?? null,
             'emergency_contact_email' => $rowData['emergency_contact_email'] ?? null,
             'emergency_contact_address' => $rowData['emergency_contact_address'] ?? null,
+            'annual_leave_balance' => $this->resolveImportedAnnualLeaveBalance($rowData),
+            'leave_accrued_balance' => $this->resolveImportedLeaveAccruedBalance($rowData),
             'notes' => $rowData['notes'] ?? null,
         ]);
 
@@ -1349,5 +1394,33 @@ class EmployeeImportService
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $rowData
+     */
+    protected function resolveImportedAnnualLeaveBalance(array $rowData): int
+    {
+        $raw = trim((string) ($rowData['annual_leave_balance'] ?? ''));
+
+        if ($raw === '') {
+            return 21;
+        }
+
+        return max(0, (int) $raw);
+    }
+
+    /**
+     * @param  array<string, mixed>  $rowData
+     */
+    protected function resolveImportedLeaveAccruedBalance(array $rowData): float
+    {
+        $raw = trim((string) ($rowData['leave_accrued_balance'] ?? ''));
+
+        if ($raw === '') {
+            return 0.0;
+        }
+
+        return max(0, round((float) $raw, 2));
     }
 } 
