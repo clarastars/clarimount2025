@@ -8,13 +8,14 @@ use App\Services\BayzatFingerprintAttendancePushService;
 use App\Services\FingerprintIclockAttendanceService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class SyncFingerprintIclockAttendanceJob implements ShouldQueue
+class SyncFingerprintIclockAttendanceJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -22,9 +23,17 @@ class SyncFingerprintIclockAttendanceJob implements ShouldQueue
 
     public int $timeout = 600; // 10 minutes (many employees × API call each)
 
+    /** Slightly longer than the 10-minute schedule interval to block duplicate dispatches. */
+    public int $uniqueFor = 660;
+
     public function __construct()
     {
         $this->onQueue('default');
+    }
+
+    public function uniqueId(): string
+    {
+        return 'sync-fingerprint-iclock-attendance';
     }
 
     public function handle(

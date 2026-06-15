@@ -18,17 +18,15 @@ class AttendancePenaltyApprovedMail extends Mailable
     use Queueable;
     use SerializesModels;
 
-    public string $locale;
-
     public function __construct(public AttendancePenalty $penalty)
     {
         $this->penalty->loadMissing('employee.user');
 
         $employeeLanguage = $this->penalty->employee?->user?->language;
 
-        $this->locale = in_array($employeeLanguage, ['ar', 'en'], true)
+        $this->locale(in_array($employeeLanguage, ['ar', 'en'], true)
             ? $employeeLanguage
-            : 'ar';
+            : 'ar');
     }
 
     public function envelope(): Envelope
