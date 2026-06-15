@@ -464,38 +464,7 @@ class AttendancePresentationRebuildService
                 ->whereBetween('att_date', [$startStr, $endStr])
                 ->delete();
 
-            if ($rows === []) {
-                return;
-            }
-
-            $now = now();
-            $insert = [];
-
-            foreach ($rows as $row) {
-                $insert[] = [
-                    'company_id' => $companyId,
-                    'employee_id' => $row['employee_id'],
-                    'att_date' => $row['att_date'],
-                    'status_ar' => $row['status_ar'],
-                    'late_minutes' => $row['late_minutes'],
-                    'is_virtual_absence' => $row['is_virtual_absence'] ? 1 : 0,
-                    'zk_daily_attendance_id' => $row['zk_daily_attendance_id'],
-                    'first_punch' => $this->formatDateTimeForDb($row['first_punch']),
-                    'last_punch' => $this->formatDateTimeForDb($row['last_punch']),
-                    'punch_count' => $row['punch_count'],
-                    'first_verify_mode' => $row['first_verify_mode'],
-                    'last_verify_mode' => $row['last_verify_mode'],
-                    'device_pin' => $row['device_pin'],
-                    'device_name' => $row['device_name'],
-                    'serial_number' => $row['serial_number'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-
-            foreach (array_chunk($insert, 400) as $chunk) {
-                DB::table('attendance_daily_presentations')->insert($chunk);
-            }
+            $this->upsertPresentationRows($this->buildInsertRows($companyId, $rows));
         });
     }
 
@@ -510,39 +479,96 @@ class AttendancePresentationRebuildService
                 ->whereBetween('att_date', [$startStr, $endStr])
                 ->delete();
 
-            if ($rows === []) {
-                return;
-            }
-
-            $now = now();
-            $insert = [];
-
-            foreach ($rows as $row) {
-                $insert[] = [
-                    'company_id' => $companyId,
-                    'employee_id' => $row['employee_id'],
-                    'att_date' => $row['att_date'],
-                    'status_ar' => $row['status_ar'],
-                    'late_minutes' => $row['late_minutes'],
-                    'is_virtual_absence' => $row['is_virtual_absence'] ? 1 : 0,
-                    'zk_daily_attendance_id' => $row['zk_daily_attendance_id'],
-                    'first_punch' => $this->formatDateTimeForDb($row['first_punch']),
-                    'last_punch' => $this->formatDateTimeForDb($row['last_punch']),
-                    'punch_count' => $row['punch_count'],
-                    'first_verify_mode' => $row['first_verify_mode'],
-                    'last_verify_mode' => $row['last_verify_mode'],
-                    'device_pin' => $row['device_pin'],
-                    'device_name' => $row['device_name'],
-                    'serial_number' => $row['serial_number'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-
-            foreach (array_chunk($insert, 400) as $chunk) {
-                DB::table('attendance_daily_presentations')->insert($chunk);
-            }
+            $this->upsertPresentationRows($this->buildInsertRows($companyId, $rows));
         });
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildInsertRows(int $companyId, array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $now = now();
+        $insert = [];
+
+        foreach ($rows as $row) {
+            $insert[] = [
+                'company_id' => $companyId,
+                'employee_id' => $row['employee_id'],
+                'att_date' => $row['att_date'],
+                'status_ar' => $row['status_ar'],
+                'late_minutes' => $row['late_minutes'],
+                'is_virtual_absence' => $row['is_virtual_absence'] ? 1 : 0,
+                'zk_daily_attendance_id' => $row['zk_daily_attendance_id'],
+                'first_punch' => $this->formatDateTimeForDb($row['first_punch']),
+                'last_punch' => $this->formatDateTimeForDb($row['last_punch']),
+                'punch_count' => $row['punch_count'],
+                'first_verify_mode' => $row['first_verify_mode'],
+                'last_verify_mode' => $row['last_verify_mode'],
+                'device_pin' => $row['device_pin'],
+                'device_name' => $row['device_name'],
+                'serial_number' => $row['serial_number'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        return $this->deduplicateInsertRows($insert);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $insert
+     * @return array<int, array<string, mixed>>
+     */
+    private function deduplicateInsertRows(array $insert): array
+    {
+        $deduped = [];
+
+        foreach ($insert as $row) {
+            $deduped[$row['employee_id'] . '-' . $row['att_date']] = $row;
+        }
+
+        return array_values($deduped);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $insert
+     */
+    private function upsertPresentationRows(array $insert): void
+    {
+        if ($insert === []) {
+            return;
+        }
+
+        $updateColumns = [
+            'company_id',
+            'status_ar',
+            'late_minutes',
+            'is_virtual_absence',
+            'zk_daily_attendance_id',
+            'first_punch',
+            'last_punch',
+            'punch_count',
+            'first_verify_mode',
+            'last_verify_mode',
+            'device_pin',
+            'device_name',
+            'serial_number',
+            'updated_at',
+        ];
+
+        foreach (array_chunk($insert, 400) as $chunk) {
+            DB::table('attendance_daily_presentations')->upsert(
+                $chunk,
+                ['employee_id', 'att_date'],
+                $updateColumns,
+            );
+        }
     }
 
     private function formatDateTimeForDb(mixed $value): ?string

@@ -19,7 +19,8 @@ class RebuildAttendancePresentationJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 1200;
 
-    public int $uniqueFor = 600;
+    /** Slightly longer than job timeout so overlapping rebuilds cannot run in parallel. */
+    public int $uniqueFor = 1260;
 
     /**
      * @param  string|null  $dateYmd  When set, rebuild this day for all companies (Asia/Riyadh).
@@ -34,13 +35,7 @@ class RebuildAttendancePresentationJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        if ($this->fullCurrentMonth) {
-            return 'rebuild-attendance-presentation-full-month';
-        }
-
-        $date = $this->dateYmd ?? Carbon::today('Asia/Riyadh')->format('Y-m-d');
-
-        return 'rebuild-attendance-presentation-' . $date;
+        return 'rebuild-attendance-presentation';
     }
 
     public function handle(AttendancePresentationRebuildService $service): void
