@@ -40,6 +40,7 @@ class Employee extends Model
         'social_insurance_deduction_rate',
         'annual_leave_balance',
         'leave_accrued_balance',
+        'leave_days_used',
         'manager',
         'direct_manager',
         'additional_approver_2',
@@ -90,6 +91,7 @@ class Employee extends Model
         'social_insurance_deduction_rate' => 'decimal:2',
         'annual_leave_balance' => 'integer',
         'leave_accrued_balance' => 'decimal:2',
+        'leave_days_used' => 'decimal:2',
     ];
 
     protected $appends = [
@@ -217,16 +219,17 @@ class Employee extends Model
     }
 
     /**
-     * Get remaining annual leave balance (accrued balance minus deducted leave days).
+     * Get remaining annual leave balance (accrued minus pre-system used days minus approved leave deductions).
      */
     public function getRemainingAnnualLeaveBalanceAttribute(): float
     {
         $accrued = (float) ($this->attributes['leave_accrued_balance'] ?? 0);
+        $previouslyUsed = (float) ($this->attributes['leave_days_used'] ?? 0);
         $deducted = (int) $this->leaves()
             ->where('deduct_from_balance', true)
             ->sum('days');
 
-        return max(0, round($accrued - $deducted, 2));
+        return max(0, round($accrued - $previouslyUsed - $deducted, 2));
     }
 
     public function monthlyLeaveAccrualDays(): float

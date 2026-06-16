@@ -386,6 +386,7 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+            'leave_days_used' => 'nullable|numeric|min:0',
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
             ...$this->portalRoleValidationRules(),
@@ -436,6 +437,9 @@ class EmployeeController extends Controller
         $validated['allowance_food'] = $validated['allowance_food'] ?? null;
         $validated['allowance_personal_car'] = $validated['allowance_personal_car'] ?? null;
         $validated['social_insurance_deduction_rate'] = $validated['social_insurance_deduction_rate'] ?? null;
+        $validated['leave_days_used'] = isset($validated['leave_days_used']) && $validated['leave_days_used'] !== ''
+            ? (float) $validated['leave_days_used']
+            : 0;
 
         try {
             \Log::info('Creating employee...');
@@ -661,6 +665,7 @@ class EmployeeController extends Controller
             'emergency_contact_address' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'annual_leave_balance' => 'nullable|integer|min:0',
+            'leave_days_used' => 'nullable|numeric|min:0',
             'portal_password' => 'nullable|string|min:8|confirmed',
             'portal_password_reset' => 'nullable|boolean',
             ...$this->portalRoleValidationRules(),
@@ -696,6 +701,9 @@ class EmployeeController extends Controller
         // Ensure non-nullable salary columns have default 0 (DB does not allow null)
         $validated['basic_salary'] = $validated['basic_salary'] ?? 0;
         $validated['allowances'] = $validated['allowances'] ?? 0;
+        $validated['leave_days_used'] = isset($validated['leave_days_used']) && $validated['leave_days_used'] !== ''
+            ? (float) $validated['leave_days_used']
+            : 0;
 
         $employee->update($validated);
 

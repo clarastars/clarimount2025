@@ -586,6 +586,19 @@
                                         <div v-if="form.errors.annual_leave_balance" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.annual_leave_balance || "") }}</div>
                                         <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.annual_leave_balance_hint') }}</p>
                                     </div>
+                                    <div>
+                                        <Label for="leave_days_used" class="mb-2">{{ t('leaves.leave_days_used') }}</Label>
+                                        <Input
+                                            id="leave_days_used"
+                                            v-model="form.leave_days_used"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            :placeholder="t('leaves.leave_days_used_placeholder')"
+                                        />
+                                        <div v-if="form.errors.leave_days_used" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.leave_days_used || "") }}</div>
+                                        <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.leave_days_used_hint') }}</p>
+                                    </div>
                                 </div>
                             </CardContent>
                         </CollapsibleContent>
@@ -1194,6 +1207,7 @@ const form = useForm({
     allowance_personal_car: props.employee.allowance_personal_car ?? '',
     social_insurance_deduction_rate: props.employee.social_insurance_deduction_rate ?? '',
     annual_leave_balance: props.employee.annual_leave_balance ?? 21,
+    leave_days_used: props.employee.leave_days_used ?? '',
 
     // Legal Information
     id_number: props.employee.id_number || '',

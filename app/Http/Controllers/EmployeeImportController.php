@@ -390,6 +390,7 @@ class EmployeeImportController extends Controller
             'emergency_contact_address' => 'Emergency Contact Address',
             'annual_leave_balance' => 'Annual Leave Entitlement (days per year, default 21)',
             'leave_accrued_balance' => 'Accrued Leave Balance (earned days to date; remaining = accrued minus approved leave deductions)',
+            'leave_days_used' => 'Leave Days Already Used (optional; deducted from accrued balance for legacy/pre-system leave)',
             'notes' => 'Notes',
         ];
     }

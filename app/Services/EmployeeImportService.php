@@ -85,6 +85,7 @@ class EmployeeImportService
         'emergency_contact_address',
         'annual_leave_balance',
         'leave_accrued_balance',
+        'leave_days_used',
         'notes',
     ];
 
@@ -169,6 +170,7 @@ class EmployeeImportService
             'emergency_contact_address',
             'annual_leave_balance',
             'leave_accrued_balance',
+            'leave_days_used',
             'notes',
         ];
 
@@ -223,6 +225,7 @@ class EmployeeImportService
             '456 Emergency St, City',
             '21',
             '15.75',
+            '5',
             'Sample employee record',
         ];
 
@@ -291,6 +294,7 @@ class EmployeeImportService
             'emergency_contact_address',
             'annual_leave_balance',
             'leave_accrued_balance',
+            'leave_days_used',
             'notes',
         ];
     }
@@ -354,6 +358,7 @@ class EmployeeImportService
             $employee->emergency_contact_address,
             $employee->annual_leave_balance ?? 21,
             $employee->leave_accrued_balance ?? 0,
+            $employee->leave_days_used ?? 0,
             $employee->notes,
         ];
     }
@@ -481,6 +486,7 @@ class EmployeeImportService
         $setIfBlank('emergency_contact_address', $employee->emergency_contact_address);
         $setIfBlank('annual_leave_balance', $employee->annual_leave_balance !== null ? (string) $employee->annual_leave_balance : null);
         $setIfBlank('leave_accrued_balance', $employee->leave_accrued_balance !== null ? (string) $employee->leave_accrued_balance : null);
+        $setIfBlank('leave_days_used', $employee->leave_days_used !== null ? (string) $employee->leave_days_used : null);
         $setIfBlank('notes', $employee->notes);
 
         return $rowData;
@@ -512,7 +518,7 @@ class EmployeeImportService
             }
 
             $headers = array_map(
-                fn ($h) => strtolower($this->cleanCsvCell((string) $h)),
+                fn ($h) => $this->normalizeImportHeaderName($this->cleanCsvCell((string) $h)),
                 $rawHeaders
             );
 
@@ -969,7 +975,7 @@ class EmployeeImportService
         $numericFields = [
             'basic_salary', 'allowances', 'allowance_housing', 'allowance_transportation',
             'allowance_other', 'allowance_food', 'allowance_personal_car', 'social_insurance_deduction_rate',
-            'annual_leave_balance', 'leave_accrued_balance',
+            'annual_leave_balance', 'leave_accrued_balance', 'leave_days_used',
         ];
         foreach ($numericFields as $field) {
             if (isset($rowData[$field]) && $rowData[$field] !== '' && $rowData[$field] !== null) {
@@ -1017,6 +1023,16 @@ class EmployeeImportService
             && (float) $rowData['leave_accrued_balance'] < 0
         ) {
             $errors[] = "Row {$rowNumber}: leave_accrued_balance must be zero or greater.";
+        }
+
+        if (
+            isset($rowData['leave_days_used'])
+            && $rowData['leave_days_used'] !== ''
+            && $rowData['leave_days_used'] !== null
+            && is_numeric($rowData['leave_days_used'])
+            && (float) $rowData['leave_days_used'] < 0
+        ) {
+            $errors[] = "Row {$rowNumber}: leave_days_used must be zero or greater.";
         }
 
         if (! empty($errors)) {
@@ -1077,6 +1093,7 @@ class EmployeeImportService
             'emergency_contact_address' => $rowData['emergency_contact_address'] ?? null,
             'annual_leave_balance' => $this->resolveImportedAnnualLeaveBalance($rowData),
             'leave_accrued_balance' => $this->resolveImportedLeaveAccruedBalance($rowData),
+            'leave_days_used' => $this->resolveImportedLeaveDaysUsed($rowData),
             'notes' => $rowData['notes'] ?? null,
         ]);
 
@@ -1458,5 +1475,26 @@ class EmployeeImportService
         }
 
         return max(0, round((float) $raw, 2));
+    }
+
+    protected function resolveImportedLeaveDaysUsed(array $rowData): float
+    {
+        $raw = trim((string) ($rowData['leave_days_used'] ?? ''));
+
+        if ($raw === '') {
+            return 0.0;
+        }
+
+        return max(0, round((float) $raw, 2));
+    }
+
+    protected function normalizeImportHeaderName(string $header): string
+    {
+        $header = trim($header);
+
+        return match ($header) {
+            'المستخدم', 'used', 'used_leave_days', 'leave_used' => 'leave_days_used',
+            default => strtolower($header),
+        };
     }
 }

@@ -53,6 +53,7 @@ class EmployeePortalLeaveController extends Controller
                 'full_name' => $employee->full_name,
                 'annual_leave_balance' => $employee->annual_leave_balance,
                 'leave_accrued_balance' => $employee->leave_accrued_balance,
+                'leave_days_used' => $employee->leave_days_used,
                 'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
                 'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
                 'company_name' => $employee->company?->name_ar ?: $employee->company?->name_en,

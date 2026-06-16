@@ -94,7 +94,7 @@
 
                 <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('leaves.annual_leave_section') }}</CardTitle></CardHeader>
-                    <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <CardContent class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div>
                             <Label class="text-sm text-muted-foreground">{{ t('leaves.annual_leave_balance') }}</Label>
                             <p>{{ displayValue(employee.annual_leave_balance) }}</p>
@@ -103,6 +103,10 @@
                         <div>
                             <Label class="text-sm text-muted-foreground">{{ t('leaves.accrued_leave_balance') }}</Label>
                             <p>{{ displayValue(employee.leave_accrued_balance) }}</p>
+                        </div>
+                        <div>
+                            <Label class="text-sm text-muted-foreground">{{ t('leaves.leave_days_used') }}</Label>
+                            <p>{{ displayValue(employee.leave_days_used) }}</p>
                         </div>
                         <div>
                             <Label class="text-sm text-muted-foreground">{{ t('leaves.remaining_balance') }}</Label>

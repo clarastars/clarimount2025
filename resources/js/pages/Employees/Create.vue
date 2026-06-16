@@ -84,6 +84,7 @@ const form = useForm({
     allowance_personal_car: '',
     social_insurance_deduction_rate: '',
     annual_leave_balance: 21,
+    leave_days_used: '' as number | string,
     
     // Legal Information
     id_number: '',
@@ -380,6 +381,8 @@ const getFieldLabel = (field: string) => {
             return t('employees.emergency_contact_address')
         case 'annual_leave_balance':
             return t('leaves.annual_leave_balance')
+        case 'leave_days_used':
+            return t('leaves.leave_days_used')
         case 'notes':
             return t('employees.notes')
         case 'error':
@@ -1340,6 +1343,21 @@ const formatCurrency = (amount: number) => {
                                             {{ translateValidationError(form.errors.annual_leave_balance || "") }}
                                         </div>
                                         <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.annual_leave_balance_hint') }}</p>
+                                    </div>
+                                    <div>
+                                        <Label for="leave_days_used" class="mb-2">{{ t('leaves.leave_days_used') }}</Label>
+                                        <Input
+                                            id="leave_days_used"
+                                            v-model="form.leave_days_used"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            :placeholder="t('leaves.leave_days_used_placeholder')"
+                                        />
+                                        <div v-if="form.errors.leave_days_used" class="text-red-500 text-sm mt-1">
+                                            {{ translateValidationError(form.errors.leave_days_used || "") }}
+                                        </div>
+                                        <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.leave_days_used_hint') }}</p>
                                     </div>
                                 </div>
                             </CardContent>

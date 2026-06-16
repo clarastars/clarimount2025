@@ -169,6 +169,7 @@ export interface Employee {
     display_name?: string;
     annual_leave_balance?: number;
     leave_accrued_balance?: number | string;
+    leave_days_used?: number | string;
     remaining_annual_leave_balance?: number | string;
 }
 
