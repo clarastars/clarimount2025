@@ -17,6 +17,59 @@ use Spatie\Permission\PermissionRegistrar;
 
 class LeaveApprovalService
 {
+    /** @var list<string> Steps auto-created by migration / seedDefaultStepsForCompany. */
+    public const DEFAULT_STEP_TITLES = [
+        'مراجعة الموارد البشرية',
+        'اعتماد المدير المباشر',
+        'اعتماد الإدارة',
+    ];
+
+    /**
+     * @return array{deleted: int, skipped: int, skipped_titles: list<string>}
+     */
+    public function deleteDefaultStepsForCompany(int $companyId, bool $force = false): array
+    {
+        $deleted = 0;
+        $skipped = 0;
+        $skippedTitles = [];
+
+        $steps = LeaveApprovalStep::query()
+            ->where('company_id', $companyId)
+            ->whereIn('title', self::DEFAULT_STEP_TITLES)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($steps as $step) {
+            if (! $force && $step->hasBlockingWorkflowUsage()) {
+                $skipped++;
+                $skippedTitles[] = $step->title;
+
+                continue;
+            }
+
+            $step->delete();
+            $deleted++;
+        }
+
+        $remaining = LeaveApprovalStep::query()
+            ->where('company_id', $companyId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        if ($remaining !== []) {
+            $this->reorderStepsForCompany($companyId, $remaining);
+        }
+
+        return [
+            'deleted' => $deleted,
+            'skipped' => $skipped,
+            'skipped_titles' => $skippedTitles,
+        ];
+    }
+
     /**
      * @return Collection<int, LeaveApprovalStep>
      */
