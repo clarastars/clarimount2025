@@ -1,0 +1,1 @@
+import{d as a,a as t,o as s,f as n,m as r,t as o}from"./app-6QLHmFp6.js";const i={class:"mb-0.5 text-base font-medium"},m={key:0,class:"text-sm text-muted-foreground"},l=a({__name:"HeadingSmall",props:{title:{},description:{}},setup(c){return(e,d)=>(s(),t("header",null,[n("h3",i,o(e.title),1),e.description?(s(),t("p",m,o(e.description),1)):r("",!0)]))}});export{l as _};

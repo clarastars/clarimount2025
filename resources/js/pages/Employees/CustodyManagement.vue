@@ -372,12 +372,22 @@
                             :disabled="locations.length === 0"
                         >
                             <option value="">{{ t('custody.select_location_placeholder') }}</option>
-                            <option v-for="location in locations" :key="location.id" :value="location.id">
-                                {{ location.name }}
-                            </option>
+                            <optgroup
+                                v-for="group in locationsByCompany"
+                                :key="group.companyId"
+                                :label="group.companyName"
+                            >
+                                <option
+                                    v-for="location in group.locations"
+                                    :key="location.id"
+                                    :value="location.id"
+                                >
+                                    {{ location.name }}
+                                </option>
+                            </optgroup>
                         </select>
                         <p v-if="locations.length === 0" class="text-sm text-amber-600">
-                            {{ t('custody.no_locations_for_company') }}
+                            {{ t('custody.no_locations_available') }}
                         </p>
                     </div>
 
@@ -516,18 +526,21 @@ import Icon from '@/components/Icon.vue';
 import Heading from '@/components/Heading.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import AssetTemplatePicker, { type AssetTemplateOption } from '@/components/AssetTemplatePicker.vue';
-import { csrfHeaders } from '@/lib/csrf';
+import { fetchWithCsrf } from '@/lib/csrf';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, onMounted, watch } from 'vue';
 import type { Employee, Asset, AssetCategory, Company, CustodyChange, BreadcrumbItem } from '@/types';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 interface LocationOption {
     id: number;
     name: string;
     building?: string | null;
     office_number?: string | null;
+    company_id?: number;
+    company_name_en?: string | null;
+    company_name_ar?: string | null;
 }
 
 interface QuickCreateAssetItem {
@@ -552,6 +565,24 @@ interface Props {
 
 const props = defineProps<Props>();
 const locations = computed(() => props.locations ?? []);
+const locationsByCompany = computed(() => {
+    const groups = new Map<number, { companyId: number; companyName: string; locations: LocationOption[] }>();
+
+    for (const location of locations.value) {
+        const companyId = location.company_id ?? 0;
+        const companyName = locale.value === 'ar'
+            ? (location.company_name_ar || location.company_name_en || t('custody.na'))
+            : (location.company_name_en || location.company_name_ar || t('custody.na'));
+
+        if (!groups.has(companyId)) {
+            groups.set(companyId, { companyId, companyName, locations: [] });
+        }
+
+        groups.get(companyId)!.locations.push(location);
+    }
+
+    return [...groups.values()].sort((a, b) => a.companyName.localeCompare(b.companyName, locale.value));
+});
 const assetCategories = computed(() => props.categories ?? []);
 const companies = computed(() => props.companies ?? []);
 
@@ -769,7 +800,23 @@ const toggleAssetSelection = (asset: Asset) => {
 
 const getLocationName = (locationId: string | number): string => {
     const location = locations.value.find((entry) => entry.id === Number(locationId));
-    return location?.name ?? '';
+    if (!location) {
+        return '';
+    }
+
+    return formatLocationOptionLabel(location);
+};
+
+const formatLocationOptionLabel = (location: LocationOption): string => {
+    const companyName = locale.value === 'ar'
+        ? (location.company_name_ar || location.company_name_en || '')
+        : (location.company_name_en || location.company_name_ar || '');
+
+    if (!companyName) {
+        return location.name;
+    }
+
+    return `${location.name} (${companyName})`;
 };
 
 const buildQuickCreateItemFromForm = (): QuickCreateAssetItem | null => {
@@ -858,11 +905,9 @@ const submitQuickCreate = async () => {
     quickCreateSubmitting.value = true;
 
     try {
-        const response = await fetch(route('employees.custody.quick-create-asset', props.employee.id), {
+        const response = await fetchWithCsrf(route('employees.custody.quick-create-asset', props.employee.id), {
             method: 'POST',
-            credentials: 'same-origin',
             headers: {
-                ...csrfHeaders(),
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -877,6 +922,14 @@ const submitQuickCreate = async () => {
 
         if (response.status === 419) {
             alert(t('custody.session_expired_reload'));
+            return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Quick create non-JSON response:', text);
+            alert(t('custody.quick_create_failed'));
             return;
         }
 
@@ -953,18 +1006,15 @@ const saveCustodyUpdate = async () => {
             changes_summary: changesSummary.value || ''
         };
         
-        const response = await fetch(url, {
+        const response = await fetchWithCsrf(url, {
             method: 'POST',
-            credentials: 'same-origin',
             headers: {
-                ...csrfHeaders(),
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(requestData),
         });
 
         if (response.status === 419) {
-            alert(t('custody.session_expired_reload'));
             return;
         }
         
@@ -1027,15 +1077,12 @@ const uploadDocument = async () => {
         formData.append('document', selectedDocument.value);
         formData.append('type', 'signed');
 
-        const response = await fetch(route('custody.upload', selectedCustodyChange.value.id), {
+        const response = await fetchWithCsrf(route('custody.upload', selectedCustodyChange.value.id), {
             method: 'POST',
-            credentials: 'same-origin',
             body: formData,
-            headers: csrfHeaders(),
         });
 
         if (response.status === 419) {
-            alert(t('custody.session_expired_reload'));
             return;
         }
 

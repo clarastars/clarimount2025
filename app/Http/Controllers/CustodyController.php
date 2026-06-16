@@ -62,10 +62,21 @@ class CustodyController extends Controller
             ->get();
 
         $locations = Location::query()
-            ->where('company_id', $employee->company_id)
+            ->with(['company:id,name_en,name_ar'])
+            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'building', 'office_number']);
+            ->get(['id', 'name', 'building', 'office_number', 'company_id'])
+            ->map(static fn (Location $location): array => [
+                'id' => $location->id,
+                'name' => $location->name,
+                'building' => $location->building,
+                'office_number' => $location->office_number,
+                'company_id' => $location->company_id,
+                'company_name_en' => $location->company?->name_en,
+                'company_name_ar' => $location->company?->name_ar,
+            ])
+            ->values();
 
         $categories = AssetCategory::scoped(['company_id' => $employee->company_id])
             ->withDepth()
@@ -150,8 +161,12 @@ class CustodyController extends Controller
             ->values()
             ->all();
 
+        if ($accessibleCompanyIds === []) {
+            return response()->json(['error' => __('messages.custody.unauthorized_employee_access')], 403);
+        }
+
         if (! in_array((int) $employee->company_id, $accessibleCompanyIds, true)) {
-            return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
+            return response()->json(['error' => __('messages.custody.unauthorized_employee_access')], 403);
         }
 
         $validated = $request->validate([
@@ -159,10 +174,16 @@ class CustodyController extends Controller
             'assets.*.asset_template_id' => ['required', 'exists:asset_templates,id'],
             'assets.*.location_id' => [
                 'required',
-                Rule::exists('locations', 'id')->where('company_id', $employee->company_id),
+                Rule::exists('locations', 'id')
+                    ->where('is_active', true)
+                    ->whereIn('company_id', $accessibleCompanyIds),
             ],
             'assets.*.serial_number' => ['nullable', 'string', 'max:255'],
             'assets.*.condition' => ['required', 'in:good,damaged'],
+        ], [
+            'assets.*.asset_template_id.exists' => __('messages.custody.invalid_template'),
+            'assets.*.location_id.exists' => __('messages.custody.invalid_location'),
+            'assets.*.condition.in' => __('messages.custody.invalid_asset_condition'),
         ]);
 
         try {

@@ -111,7 +111,7 @@ class CustodyAssignmentService
 
         $location = Location::query()
             ->whereKey($data['location_id'])
-            ->where('company_id', $companyId)
+            ->where('is_active', true)
             ->first();
 
         if (! $location) {
