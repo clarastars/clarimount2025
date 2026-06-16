@@ -15,11 +15,14 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user()) {
-            $userLanguage = $request->user()->language ?? 'ar';
-            app()->setLocale($userLanguage);
+        $locale = $request->user()?->language ?? 'ar';
+
+        if (! in_array($locale, ['ar', 'en'], true)) {
+            $locale = 'ar';
         }
-        
+
+        app()->setLocale($locale);
+
         return $next($request);
     }
 } 

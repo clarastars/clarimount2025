@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class EmployeePortalUserService
@@ -18,7 +19,7 @@ class EmployeePortalUserService
 
     /**
      * Create or get portal user for the employee. Assigns role "employee" and links employee.user_id.
-     * Uses work_email or email; password defaults to 12345678.
+     * Uses work_email; OTP users get a random password unless one is provided.
      */
     public function createOrSyncPortalUser(
         Employee $employee,
@@ -62,9 +63,15 @@ class EmployeePortalUserService
             }
 
             if ($plainPassword !== null && trim($plainPassword) !== '') {
-                $user->update(['password' => Hash::make($plainPassword)]);
+                $user->update([
+                    'password' => Hash::make($plainPassword),
+                    'uses_password_login' => true,
+                ]);
             } elseif ($forcePasswordReset) {
-                $user->update(['password' => Hash::make(self::DEFAULT_PASSWORD)]);
+                $user->update([
+                    'password' => Hash::make(self::DEFAULT_PASSWORD),
+                    'uses_password_login' => true,
+                ]);
             }
 
             $hasEmployeeRole = $user->roles()->where('roles.id', $role->id)->wherePivot('team_id', null)->exists();
@@ -80,12 +87,13 @@ class EmployeePortalUserService
         $name = trim($employee->first_name . ' ' . $employee->last_name) ?: $email;
         $passwordToUse = $plainPassword !== null && trim($plainPassword) !== ''
             ? $plainPassword
-            : self::DEFAULT_PASSWORD;
+            : $this->generateRandomPassword();
 
         $user = User::create([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($passwordToUse),
+            'uses_password_login' => $plainPassword !== null && trim($plainPassword) !== '',
             'language' => 'ar',
         ]);
 
@@ -98,7 +106,13 @@ class EmployeePortalUserService
 
     private function getLoginEmail(Employee $employee): ?string
     {
-        $email = $employee->work_email ?? $employee->personal_email ?? null;
+        $email = $employee->work_email ?? null;
+
         return $email ? trim((string) $email) : null;
+    }
+
+    private function generateRandomPassword(): string
+    {
+        return Str::password(32);
     }
 }

@@ -36,8 +36,6 @@ class RedirectIfEmployeePortalUser
             'password.request',
             'password.email',
             'password.reset',
-            'password.edit',
-            'password.update',
             'verification.notice',
             'profile.show',
             'profile.edit',

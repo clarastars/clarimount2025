@@ -23,15 +23,19 @@ const sidebarNavItems = computed((): NavItem[] => {
             title: t('settings.profile'),
             href: '/settings/profile',
         },
-        {
+    ];
+
+    if (! isEmployeePortal.value || canAccessSettings.value) {
+        personal.push({
             title: t('settings.password'),
             href: '/settings/password',
-        },
-        {
-            title: t('settings.appearance'),
-            href: '/settings/appearance',
-        },
-    ];
+        });
+    }
+
+    personal.push({
+        title: t('settings.appearance'),
+        href: '/settings/appearance',
+    });
 
     if (isEmployeePortal.value && ! canAccessSettings.value) {
         return personal;
@@ -67,6 +71,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 title: t('settings.leave_approvals'),
                 href: '/settings/leave-approvals',
             },
+            {
+                title: t('settings.user_login'),
+                href: '/settings/user-login',
+            },
         );
     }
 
@@ -74,24 +82,14 @@ const sidebarNavItems = computed((): NavItem[] => {
 });
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
-
-const compactLayout = computed(
-    () => isEmployeePortal.value && ! canAccessSettings.value && currentPath === '/settings/password',
-);
 </script>
 
 <template>
     <div class="px-4 py-6">
-        <template v-if="!compactLayout">
-            <Heading :title="t('settings.title')" :description="t('settings.description')" />
-        </template>
+        <Heading :title="t('settings.title')" :description="t('settings.description')" />
 
-        <div
-            :class="[
-                compactLayout ? 'max-w-md' : 'flex flex-col space-y-8 md:space-y-0 lg:flex-row lg:space-y-0 lg:space-x-12',
-            ]"
-        >
-            <aside v-if="!compactLayout" class="w-full max-w-xl lg:w-48">
+        <div class="flex flex-col space-y-8 md:space-y-0 lg:flex-row lg:space-y-0 lg:space-x-12">
+            <aside class="w-full max-w-xl lg:w-48">
                 <nav class="flex flex-col space-y-1 space-x-0">
                     <Button
                         v-for="item in sidebarNavItems"
@@ -107,10 +105,10 @@ const compactLayout = computed(
                 </nav>
             </aside>
 
-            <Separator v-if="!compactLayout" class="my-6 md:hidden" />
+            <Separator class="my-6 md:hidden" />
 
-            <div :class="compactLayout ? '' : 'flex-1 md:max-w-2xl'">
-                <section :class="compactLayout ? '' : 'max-w-xl space-y-12'">
+            <div class="flex-1 md:max-w-2xl">
+                <section class="max-w-xl space-y-12">
                     <slot />
                 </section>
             </div>

@@ -36,6 +36,7 @@ class UsersTableSeeder extends Seeder
             'name' => 'Super Admin',
             'email' => 'admin@clarimount.com',
             'password' => Hash::make('password'),
+            'uses_password_login' => false,
             'email_verified_at' => now(),
             'language' => 'en',
         ]);
@@ -49,7 +50,7 @@ class UsersTableSeeder extends Seeder
 
         $this->command->info('✅ Super admin user created successfully!');
         $this->command->info('📧 Email: admin@clarimount.com');
-        $this->command->info('🔑 Password: password');
+        $this->command->info('🔐 Login: OTP via work email (password login can be enabled in settings)');
         $this->command->info('🌐 Login at: ' . url('/login'));
         
         // Check if company and asset categories were created

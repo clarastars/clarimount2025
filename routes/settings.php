@@ -9,6 +9,7 @@ use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SalaryRunApprovalStepsController;
 use App\Http\Controllers\Settings\TeamPermissionController;
+use App\Http\Controllers\Settings\UserLoginSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -21,7 +22,7 @@ Route::middleware('auth')->group(function () {
         );
 
         if ($isEmployee && ! $user->hasRole('super-admin') && ! $user->can('settings.access')) {
-            return redirect()->route('password.edit');
+            return redirect()->route('profile.edit');
         }
 
         return redirect()->route('profile.edit');
@@ -63,6 +64,9 @@ Route::middleware('auth')->group(function () {
         Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
         Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
+
+        Route::get('settings/user-login', [UserLoginSettingsController::class, 'index'])->name('settings.user-login.index');
+        Route::put('settings/user-login/{user}', [UserLoginSettingsController::class, 'update'])->name('settings.user-login.update');
 
     });
 });

@@ -27,6 +27,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'uses_password_login',
         'language',
         'team_id',
         'joined_team_at',
@@ -53,6 +54,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'joined_team_at' => 'datetime',
             'password' => 'hashed',
+            'uses_password_login' => 'boolean',
         ];
     }
 
