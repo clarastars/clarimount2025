@@ -1390,7 +1390,7 @@ return [
         'employee_signature' => 'Employee Signature',
         'admin_manager_signature' => 'Admin/Manager Signature',
         'it_administrator' => 'IT Administrator',
-        'document_generated_on' => 'This document was generated automatically on :date',
+        'document_generated_on' => 'This document was generated automatically on {date}',
         'back' => 'Back',
         'print' => 'Print',
 
