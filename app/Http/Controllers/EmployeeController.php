@@ -13,6 +13,7 @@ use App\Services\EmployeeExpiryService;
 use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
+use App\Services\LeaveAccrualService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -441,6 +442,8 @@ class EmployeeController extends Controller
             $employee = Employee::create($validated);
             \Log::info('Employee created successfully', ['employee_id' => $employee->id]);
 
+            app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
+
             app(EmployeePortalUserService::class)->createOrSyncPortalUser(
                 $employee,
                 $isSuperAdmin ? ($validated['portal_password'] ?? null) : null,
@@ -695,6 +698,10 @@ class EmployeeController extends Controller
         $validated['allowances'] = $validated['allowances'] ?? 0;
 
         $employee->update($validated);
+
+        if ($employee->wasChanged(['hire_date', 'annual_leave_balance'])) {
+            app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
+        }
 
         app(EmployeePortalUserService::class)->createOrSyncPortalUser(
             $employee->fresh(),

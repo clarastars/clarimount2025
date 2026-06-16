@@ -11,6 +11,7 @@ use App\Models\Nationality;
 use App\Models\Department;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\LeaveAccrualService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -1122,13 +1123,26 @@ class EmployeeImportService
                         $payload = $this->normalizePersistedEmployeeAttributes($updateData);
                         $payload = $this->ensureValidEmployeeImportForeignKeys($company, $payload);
                         $employee->update($payload);
+
+                        if (
+                            trim((string) ($data['leave_accrued_balance'] ?? '')) === ''
+                            && trim((string) ($data['hire_date'] ?? '')) !== ''
+                        ) {
+                            app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
+                        }
+
                         $updated++;
                     } else {
                         $createData = $data;
                         unset($createData['id']);
                         $payload = $this->normalizePersistedEmployeeAttributes($createData);
                         $payload = $this->ensureValidEmployeeImportForeignKeys($company, $payload);
-                        Employee::create($payload);
+                        $employee = Employee::create($payload);
+
+                        if (trim((string) ($data['leave_accrued_balance'] ?? '')) === '') {
+                            app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
+                        }
+
                         $created++;
                     }
                 } catch (\Throwable $e) {
@@ -1435,14 +1449,14 @@ class EmployeeImportService
     /**
      * @param  array<string, mixed>  $rowData
      */
-    protected function resolveImportedLeaveAccruedBalance(array $rowData): float
+    protected function resolveImportedLeaveAccruedBalance(array $rowData): ?float
     {
         $raw = trim((string) ($rowData['leave_accrued_balance'] ?? ''));
 
         if ($raw === '') {
-            return 0.0;
+            return null;
         }
 
         return max(0, round((float) $raw, 2));
     }
-} 
+}
