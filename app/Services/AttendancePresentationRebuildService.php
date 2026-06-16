@@ -426,7 +426,8 @@ class AttendancePresentationRebuildService
     /**
      * Keep late penalties consistent with the computed presentation row.
      * - If late_minutes > 0, create/update late penalty.
-     * - If late_minutes is null/0, remove any stale late_* penalty for that day.
+     * - If late_minutes is null/0, remove any stale late_* penalty for that day
+     *   and clear leftover late_minutes_deduction_amount (e.g. after day became absence).
      *
      * @param  array<string, mixed>  $row
      */
@@ -452,6 +453,11 @@ class AttendancePresentationRebuildService
             ->where('attendance_date', $attDate)
             ->whereIn('violation_type', $lateViolationTypes)
             ->delete();
+
+        AttendancePenalty::where('employee_id', $employeeId)
+            ->where('attendance_date', $attDate)
+            ->whereNotNull('late_minutes_deduction_amount')
+            ->update(['late_minutes_deduction_amount' => null]);
     }
 
     /**

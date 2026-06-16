@@ -353,6 +353,7 @@ class AttendancePenaltyService
                 'action_value_basic_days' => $rule->action_value_basic_days,
                 'action_text' => $actionText,
                 'reason_text' => $rule->reason_text,
+                'late_minutes_deduction_amount' => null,
             ]
         );
 
