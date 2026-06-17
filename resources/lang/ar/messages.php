@@ -617,6 +617,7 @@ return [
         'job_title' => 'المسمى الوظيفي',
         'job_title_placeholder' => 'مطور برامج',
         'basic_salary' => 'الراتب الأساسي',
+        'compensation' => 'التعويضات والراتب',
         'basic_salary_placeholder' => '0.00',
         'allowances' => 'البدلات',
         'allowances_placeholder' => '0.00',

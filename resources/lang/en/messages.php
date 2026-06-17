@@ -620,6 +620,7 @@ return [
         'job_title' => 'Job Title',
         'job_title_placeholder' => 'Software Engineer',
         'basic_salary' => 'Basic Salary',
+        'compensation' => 'Compensation & Salary',
         'basic_salary_placeholder' => '0.00',
         'allowances' => 'Allowances',
         'allowances_placeholder' => '0.00',

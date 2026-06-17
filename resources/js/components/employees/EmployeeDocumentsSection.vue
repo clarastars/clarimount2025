@@ -37,7 +37,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const sectionOpen = ref(props.mode !== 'show');
+const sectionOpen = ref(props.mode === 'edit');
 
 const localDocuments = ref<EmployeeDocumentItem[]>([...props.documents]);
 const pendingFiles = ref<Partial<Record<EmployeeDocumentType, File | null>>>({});
