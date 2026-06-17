@@ -17,6 +17,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cloud Disk
+    |--------------------------------------------------------------------------
+    |
+    | Disk used for cloud file storage (DigitalOcean Spaces / S3).
+    |
+    */
+
+    'cloud' => env('FILESYSTEM_CLOUD', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -56,7 +67,8 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'visibility' => env('AWS_VISIBILITY', 'public'),
+            'throw' => env('AWS_THROW_ERRORS', true),
             'report' => false,
         ],
 

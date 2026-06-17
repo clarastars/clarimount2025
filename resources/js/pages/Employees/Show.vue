@@ -49,6 +49,11 @@
                     </CardContent>
                 </Card>
 
+                <EmployeeDocumentsSection
+                    :documents="documents"
+                    mode="show"
+                />
+
                 <Card class="border-border/60 shadow-sm">
                     <CardHeader><CardTitle>{{ t('settings.permissions_teams') }}</CardTitle></CardHeader>
                     <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -230,11 +235,14 @@ import { Label } from '@/components/ui/label';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import Heading from '@/components/Heading.vue';
 import Icon from '@/components/Icon.vue';
+import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
+import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import type { Employee } from '@/types';
 import type { BreadcrumbItem } from '@/types';
 
 interface Props {
     employee: Employee;
+    documents?: EmployeeDocumentItem[];
     portalAccount?: {
         exists: boolean;
         email?: string | null;

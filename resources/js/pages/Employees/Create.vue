@@ -12,6 +12,9 @@ import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import Icon from '@/components/Icon.vue'
 import EmployeeTeamAssignmentsFields from '@/components/employees/EmployeeTeamAssignmentsFields.vue'
+import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue'
+import { EMPLOYEE_DOCUMENT_TYPES, type EmployeeDocumentType } from '@/constants/employeeDocuments'
+import { fetchWithCsrf } from '@/lib/csrf'
 
 const { t } = useI18n()
 
@@ -270,15 +273,43 @@ const handleDepartmentBlur = () => {
     }, 200)
 }
 
+const pendingEmployeeDocuments = ref<Partial<Record<EmployeeDocumentType, File | null>>>({})
+
+const onPendingDocumentsChange = (pending: Partial<Record<EmployeeDocumentType, File | null>>) => {
+    pendingEmployeeDocuments.value = pending
+}
+
+const uploadPendingEmployeeDocuments = async (employeeId: number) => {
+    for (const type of EMPLOYEE_DOCUMENT_TYPES) {
+        const file = pendingEmployeeDocuments.value[type]
+        if (!file) {
+            continue
+        }
+
+        const formData = new FormData()
+        formData.append('type', type)
+        formData.append('file', file)
+
+        await fetchWithCsrf(route('employees.documents.store', employeeId), {
+            method: 'POST',
+            body: formData,
+        })
+    }
+}
+
 // Remove the unused toggleSection function since we're using direct refs now
 
 const submit = () => {
     form.post('/employees', {
-        onSuccess: (page) => {
-            // After employee is created, add debts if any
-            const employeeId = page.props.employee?.id || page.props.flash?.employee_id
+        onSuccess: async (page) => {
+            const employeeId = (page.props as { employee?: { id?: number }; flash?: { employee_id?: number } }).employee?.id
+                || (page.props as { flash?: { employee_id?: number } }).flash?.employee_id
+
+            if (employeeId) {
+                await uploadPendingEmployeeDocuments(employeeId)
+            }
+
             if (employeeId && debts.value.length > 0) {
-                // Add each debt
                 debts.value.forEach((debt) => {
                     router.post(`/employees/${employeeId}/debts`, {
                         amount: debt.amount,
@@ -906,6 +937,11 @@ const formatCurrency = (amount: number) => {
                         </div>
                     </CardContent>
                 </Card>
+
+                <EmployeeDocumentsSection
+                    mode="create"
+                    @pending-change="onPendingDocumentsChange"
+                />
 
                 <Card v-if="props.canManagePortalAccount">
                     <Collapsible v-model:open="sectionEmployeeAccount">

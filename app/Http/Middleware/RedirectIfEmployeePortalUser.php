@@ -110,6 +110,8 @@ class RedirectIfEmployeePortalUser
                 'employees.fingerprint-link',
                 'employees.fingerprint-device',
                 'employees.expiring-documents.index',
+                'employees.documents.store',
+                'employees.documents.destroy',
                 'employees.import',
                 'employees.import.upload',
                 'employees.import.sample-csv',

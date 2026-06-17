@@ -179,6 +179,13 @@
                             </CardContent>
                         </Card>
 
+                <EmployeeDocumentsSection
+                    :employee-id="employee.id"
+                    :documents="employeeDocuments"
+                    mode="edit"
+                    @update:documents="employeeDocuments = $event"
+                />
+
                 <Card v-if="props.canManagePortalAccount">
                     <Collapsible v-model:open="sectionEmployeeAccount">
                         <CollapsibleTrigger asChild>
@@ -1103,6 +1110,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/Icon.vue';
 import EmployeeTeamAssignmentsFields from '@/components/employees/EmployeeTeamAssignmentsFields.vue';
+import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
+import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import type { Employee, Department, Company, BreadcrumbItem } from '@/types';
 
 const { t } = useI18n();
@@ -1122,6 +1131,7 @@ interface Nationality {
 
 interface Props {
     employee: Employee;
+    documents?: EmployeeDocumentItem[];
     companies: any[];
     defaultCompanyId?: number;
     countries: Country[];
@@ -1143,6 +1153,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const employeeDocuments = ref<EmployeeDocumentItem[]>([...(props.documents ?? [])]);
 
 /**
  * Laravel date casts serialize as ISO-8601 strings. HTML date inputs only accept yyyy-MM-dd.

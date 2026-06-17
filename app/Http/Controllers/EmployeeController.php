@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
 use App\Models\SystemSetting;
+use App\Services\EmployeeDocumentService;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\EmployeePortalUserService;
@@ -485,6 +486,7 @@ class EmployeeController extends Controller
             'residenceCountry',
             'user',
             'shift',
+            'documents',
             'assets.assetCategory',
             'assetAssignments.asset.assetCategory',
             'reportedTickets.ticketCategory',
@@ -496,6 +498,7 @@ class EmployeeController extends Controller
 
         return Inertia::render('Employees/Show', [
             'employee' => $employee,
+            'documents' => app(EmployeeDocumentService::class)->documentsForEmployee($employee),
             'portalAccount' => [
                 'exists' => (bool) $employee->user_id,
                 'email' => $employee->work_email ?: $employee->user?->email,
@@ -547,10 +550,11 @@ class EmployeeController extends Controller
         // Get Saudi Arabia as default residence country
         $saudiArabia = Country::where('code', 'SA')->first();
 
-        $employee->load(['debts', 'user']);
+        $employee->load(['debts', 'user', 'documents']);
 
         return Inertia::render('Employees/Edit', [
             'employee' => $employee,
+            'documents' => app(EmployeeDocumentService::class)->documentsForEmployee($employee),
             'companies' => $companies,
             'defaultCompanyId' => $employee->company_id,
             'countries' => Country::active()->orderByName()->get(),

@@ -14,6 +14,7 @@ use App\Http\Controllers\CustodyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeductionsController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\EmployeePortalLeaveController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\PrintJobController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SalaryRunController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\StorageTestController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\ZkTecoController;
 use App\Http\Controllers\ZKTekoDebugController;
@@ -79,6 +81,12 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+});
+
+Route::middleware(['auth', 'verified', 'role_or_permission:super-admin|settings.access'])->group(function () {
+    Route::get('storage-test', [StorageTestController::class, 'index'])->name('storage-test.index');
+    Route::post('storage-test', [StorageTestController::class, 'store'])->name('storage-test.store');
+    Route::delete('storage-test', [StorageTestController::class, 'destroy'])->name('storage-test.destroy');
 });
 
 // Super Admin routes
@@ -197,6 +205,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Employees management
     Route::put('employees/{employee}/fingerprint-link', [EmployeeController::class, 'updateFingerprintLink'])->name('employees.fingerprint-link');
     Route::post('employees/{employee}/sync-fingerprint-month', [EmployeeController::class, 'syncFingerprintMonth'])->name('employees.sync-fingerprint-month');
+    Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
+    Route::delete('employees/{employee}/documents/{type}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])
         ->name('employees.expiring-documents.index');
     Route::resource('employees', EmployeeController::class);
