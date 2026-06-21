@@ -125,6 +125,7 @@
                     <option value="">{{ $t('attendance.filter_status_all') }}</option>
                     <option value="on_time">{{ $t('attendance.status_on_time') }}</option>
                     <option value="late">{{ $t('attendance.status_late') }}</option>
+                    <option value="absent">{{ $t('attendance.status_absent') }}</option>
                   </select>
                 </div>
                 <!-- Custom Date Range (shown only when filter is custom) -->

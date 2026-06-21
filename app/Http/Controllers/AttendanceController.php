@@ -62,7 +62,7 @@ class AttendanceController extends Controller
         $fromDate = $request->query('from');
         $toDate = $request->query('to');
         $search = $request->query('search', '');
-        $statusFilter = $request->query('status'); // 'late' or 'on_time'
+        $statusFilter = $request->query('status'); // 'late', 'on_time', or 'absent'
 
         // Calculate date range based on filter type
         $now = Carbon::now('Asia/Riyadh');
@@ -123,6 +123,8 @@ class AttendanceController extends Controller
             $presentationQuery->where('status_ar', 'متأخر');
         } elseif ($statusFilter === 'on_time') {
             $presentationQuery->where('status_ar', 'في الموعد');
+        } elseif ($statusFilter === 'absent') {
+            $presentationQuery->where('status_ar', 'غائب');
         }
 
         $presentationQuery
