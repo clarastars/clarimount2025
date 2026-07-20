@@ -95,6 +95,7 @@ const props = defineProps<{
   monthPeriodStart: string
   monthPeriodEnd: string
   employeeId: number | null
+  penaltyStatus: 'approved' | 'rejected' | null
   approvedPenalties: ApprovedPenalty[]
   manualDeductions: ManualDeduction[]
   canManageAttendanceAdjustments?: boolean
@@ -380,10 +381,9 @@ function confirmDelete(row: ManualDeduction) {
 }
 
 const mergedList = computed((): DeductionRow[] => {
-  const list: DeductionRow[] = [
-    ...props.approvedPenalties,
-    ...props.manualDeductions,
-  ]
+  const penalties = props.approvedPenalties
+  const manuals = props.penaltyStatus ? [] : props.manualDeductions
+  const list: DeductionRow[] = [...penalties, ...manuals]
   list.sort((a, b) => (b.date < a.date ? -1 : b.date > a.date ? 1 : 0))
   return list
 })
@@ -402,11 +402,14 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
   },
 ])
 
-function applyFilters(params: { month?: string; employee_id?: number | '' }) {
+function applyFilters(params: { month?: string; employee_id?: number | ''; penalty_status?: 'approved' | 'rejected' | '' }) {
   const q: Record<string, string | number | undefined> = {}
   if (params.month) q.month = params.month
   if (params.employee_id !== undefined && params.employee_id !== '') {
     q.employee_id = params.employee_id
+  }
+  if (params.penalty_status) {
+    q.penalty_status = params.penalty_status
   }
   router.get(route('attendance.deductions', props.company.id), q, {
     preserveState: true,
@@ -418,10 +421,12 @@ function goToCompany(companyId: number) {
   router.get(route('attendance.deductions', companyId), {
     month: props.month,
     employee_id: employeeFilter.value || undefined,
+    penalty_status: penaltyStatusFilter.value || undefined,
   })
 }
 
 const employeeFilter = ref<number | ''>(props.employeeId ?? '')
+const penaltyStatusFilter = ref<'approved' | 'rejected' | ''>(props.penaltyStatus ?? '')
 
 watch(
   () => props.employeeId,
@@ -430,11 +435,36 @@ watch(
   }
 )
 
+watch(
+  () => props.penaltyStatus,
+  (status) => {
+    penaltyStatusFilter.value = status ?? ''
+  }
+)
+
 function onPayrollMonthChange(ym: string) {
-  applyFilters({ month: ym, employee_id: employeeFilter.value })
+  applyFilters({
+    month: ym,
+    employee_id: employeeFilter.value,
+    penalty_status: penaltyStatusFilter.value,
+  })
 }
 
-watch(employeeFilter, (v) => applyFilters({ month: props.month, employee_id: v }))
+watch(employeeFilter, (v) =>
+  applyFilters({
+    month: props.month,
+    employee_id: v,
+    penalty_status: penaltyStatusFilter.value,
+  })
+)
+
+watch(penaltyStatusFilter, (v) =>
+  applyFilters({
+    month: props.month,
+    employee_id: employeeFilter.value,
+    penalty_status: v,
+  })
+)
 
 function formatDate(dateStr: string) {
   if (!dateStr) return '-'
@@ -560,7 +590,7 @@ function deductionTypeLabel(type: string) {
           </CardHeader>
           <CardContent>
             <div class="flex flex-col gap-6">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label for="filter-company">{{ t('attendance.filter_company') }}</Label>
                   <select
@@ -585,6 +615,18 @@ function deductionTypeLabel(type: string) {
                     <option v-for="emp in employees" :key="emp.id" :value="emp.id">
                       {{ formatEmployeeSelectLabel(emp) }}
                     </option>
+                  </select>
+                </div>
+                <div>
+                  <Label for="filter-penalty-status">{{ t('attendance.filter_penalty_status') }}</Label>
+                  <select
+                    id="filter-penalty-status"
+                    v-model="penaltyStatusFilter"
+                    class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">{{ t('attendance.all_penalty_statuses') }}</option>
+                    <option value="approved">{{ t('attendance.approved') }}</option>
+                    <option value="rejected">{{ t('attendance.rejected') }}</option>
                   </select>
                 </div>
               </div>

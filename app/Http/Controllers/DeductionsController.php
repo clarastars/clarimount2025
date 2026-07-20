@@ -49,6 +49,10 @@ class DeductionsController extends Controller
         }
         $month = $canonical['ym'];
         $employeeId = $request->query('employee_id');
+        $penaltyStatus = $request->query('penalty_status');
+        if (! in_array($penaltyStatus, ['approved', 'rejected'], true)) {
+            $penaltyStatus = null;
+        }
         $range = $this->operationalMonthService->resolveRangeForPayrollMonth($canonical['year'], $canonical['month']);
         $start = $range['start'];
         $end = $range['end'];
@@ -72,7 +76,7 @@ class DeductionsController extends Controller
             ]);
 
         $approvedPenaltiesQuery = AttendancePenalty::query()
-            ->whereIn('approval_status', ['approved', 'rejected'])
+            ->whereIn('approval_status', $penaltyStatus !== null ? [$penaltyStatus] : ['approved', 'rejected'])
             ->with(['employee:id,first_name,last_name,employee_id,company_id', 'approver:id,name'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
             ->whereBetween('attendance_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
@@ -113,6 +117,7 @@ class DeductionsController extends Controller
             'monthPeriodStart' => $start->format('Y-m-d'),
             'monthPeriodEnd' => $end->format('Y-m-d'),
             'employeeId' => $employeeId,
+            'penaltyStatus' => $penaltyStatus,
             'approvedPenalties' => $approvedPenalties->map(fn (AttendancePenalty $p) => [
                 'id' => $p->id,
                 'type' => 'penalty',

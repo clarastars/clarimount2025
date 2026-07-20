@@ -1626,6 +1626,8 @@ return [
         'no_deductions_description' => 'No approved or manual deductions for the selected period.',
         'filter_company' => 'Company',
         'filter_employee' => 'Employee',
+        'filter_penalty_status' => 'Penalty status',
+        'all_penalty_statuses' => 'All statuses',
         'filter_month' => 'Month',
         'prev_payroll_month' => 'Previous month',
         'next_payroll_month' => 'Next month',

@@ -1638,6 +1638,8 @@ return [
         'no_deductions_description' => 'لا توجد خصومات معتمدة أو يدوية للفترة المحددة.',
         'filter_company' => 'الشركة',
         'filter_employee' => 'الموظف',
+        'filter_penalty_status' => 'حالة الجزاء',
+        'all_penalty_statuses' => 'جميع الحالات',
         'filter_month' => 'الشهر',
         'prev_payroll_month' => 'الشهر السابق',
         'next_payroll_month' => 'الشهر التالي',
