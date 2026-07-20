@@ -285,6 +285,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Attendance Penalty Approval routes
     Route::post('attendance-penalties/{penalty}/approve', [AttendancePenaltyApprovalController::class, 'approve'])->name('attendance-penalties.approve');
     Route::post('attendance-penalties/{penalty}/reject', [AttendancePenaltyApprovalController::class, 'reject'])->name('attendance-penalties.reject');
+    Route::post('attendance-penalties/{penalty}/recalculate', [AttendancePenaltyApprovalController::class, 'recalculate'])->name('attendance-penalties.recalculate');
 
     // Salary run approval steps (per company)
     Route::get('companies/{company}/salary-run-approvals', [CompanySalaryRunApprovalStepsController::class, 'index'])->name('companies.salary-run-approvals.index');

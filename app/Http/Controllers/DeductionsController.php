@@ -72,7 +72,7 @@ class DeductionsController extends Controller
             ]);
 
         $approvedPenaltiesQuery = AttendancePenalty::query()
-            ->approved()
+            ->whereIn('approval_status', ['approved', 'rejected'])
             ->with(['employee:id,first_name,last_name,employee_id,company_id', 'approver:id,name'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
             ->whereBetween('attendance_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
@@ -123,8 +123,11 @@ class DeductionsController extends Controller
                 'action_text' => $p->action_text,
                 'reason_text' => $p->reason_text,
                 'late_minutes_deduction_amount' => $p->late_minutes_deduction_amount !== null ? (float) $p->late_minutes_deduction_amount : null,
+                'approval_status' => $p->approval_status,
                 'approved_at' => $p->approved_at?->toIso8601String(),
                 'approver_name' => $p->approver?->name,
+                'rejection_reason' => $p->rejection_reason,
+                'rejection_attachment_path' => $p->rejection_attachment_path,
             ]),
             'manualDeductions' => $manualDeductions->map(fn (EmployeeDeduction $d) => [
                 'id' => $d->id,

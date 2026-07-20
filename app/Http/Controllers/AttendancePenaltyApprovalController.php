@@ -13,6 +13,7 @@ use App\Services\AttendancePenaltyService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AttendancePenaltyApprovalController extends Controller
@@ -88,5 +89,39 @@ class AttendancePenaltyApprovalController extends Controller
         );
 
         return back()->with('success', __('Penalty rejected successfully.'));
+    }
+
+    /**
+     * Recalculate a previously rejected penalty and restore it to the active sequence.
+     */
+    public function recalculate(AttendancePenalty $penalty): RedirectResponse
+    {
+        $penalty->loadMissing(['employee.company']);
+
+        $user = Auth::user();
+        $company = Company::findOrFail($penalty->employee->company_id);
+        $this->abortUnlessCanManageAttendanceAdjustments($user, $company);
+
+        if ($penalty->approval_status !== 'rejected') {
+            return back()->with('error', __('messages.attendance.penalty_not_rejected'));
+        }
+
+        $attachmentPath = $penalty->rejection_attachment_path;
+
+        $penalty = $this->attendancePenaltyService->recalculateRejectedPenalty($penalty);
+
+        $penalty->update([
+            'approval_status' => 'approved',
+            'approved_by' => $user->id,
+            'approved_at' => now(),
+        ]);
+
+        $this->approvalNotifier->notifyEmployeeOfApproval($penalty->fresh());
+
+        if ($attachmentPath !== null && $attachmentPath !== '') {
+            Storage::disk('public')->delete($attachmentPath);
+        }
+
+        return back()->with('success', __('messages.attendance.penalty_recalculated_success'));
     }
 }

@@ -194,6 +194,46 @@ class AttendancePenaltyService
     }
 
     /**
+     * Restore a rejected penalty: clear rejection, re-sequence the payroll period, and re-apply auto-approval if applicable.
+     */
+    public function recalculateRejectedPenalty(AttendancePenalty $penalty): AttendancePenalty
+    {
+        if (! $penalty->isRejected()) {
+            throw new \InvalidArgumentException('Penalty is not rejected.');
+        }
+
+        $attDateYmd = Carbon::parse($penalty->attendance_date)->format('Y-m-d');
+        $employeeId = (int) $penalty->employee_id;
+        $violationType = (string) $penalty->violation_type;
+
+        $penalty->update([
+            'approval_status' => 'pending',
+            'approved_by' => null,
+            'approved_at' => null,
+            'rejection_reason' => null,
+            'rejection_attachment_path' => null,
+        ]);
+
+        $this->resequenceMonthlyPenaltiesAfterRejection($employeeId, $violationType, $attDateYmd);
+
+        $penalty = $penalty->fresh();
+        if ($penalty === null) {
+            throw new \RuntimeException('Penalty not found after recalculation.');
+        }
+
+        if ($penalty->isLateViolation() && (int) $penalty->late_minutes > 0) {
+            $lateMinutesDeductionAmount = $this->calculateLateMinutesDeductionAmount(
+                $employeeId,
+                (int) $penalty->late_minutes
+            );
+            $penalty->update(['late_minutes_deduction_amount' => $lateMinutesDeductionAmount]);
+            $penalty = $penalty->fresh();
+        }
+
+        return $penalty;
+    }
+
+    /**
      * Re-sequence repeat_number for one employee/violation_type/payroll period after state changes
      * (e.g. when one penalty is rejected) so later rows shift correctly.
      * Rejected rows are excluded from the counting sequence.

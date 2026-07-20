@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import PayrollMonthFilter from '@/components/attendance/PayrollMonthFilter.vue'
-import { Banknote, Plus, Pencil, Trash2, X } from 'lucide-vue-next'
+import { Banknote, Plus, Pencil, Trash2, X, RotateCcw } from 'lucide-vue-next'
 import axios from 'axios'
 import { formatEmployeeSelectLabel } from '@/lib/utils'
 
@@ -52,8 +52,11 @@ interface ApprovedPenalty {
   action_text: string
   reason_text: string
   late_minutes_deduction_amount: number | null
+  approval_status: 'approved' | 'rejected'
   approved_at: string | null
   approver_name: string | null
+  rejection_reason: string | null
+  rejection_attachment_path: string | null
 }
 
 type AmountInputMode =
@@ -508,6 +511,15 @@ function submitPenaltyReject() {
   })
 }
 
+function confirmRecalculate(row: ApprovedPenalty) {
+  if (!confirm(t('attendance.recalculate_penalty_confirm'))) return
+  router.post(route('attendance-penalties.recalculate', row.id), {}, { preserveScroll: true })
+}
+
+function getAttachmentUrl(path: string) {
+  return `/storage/${path}`
+}
+
 function deductionTypeLabel(type: string) {
   const map: Record<string, string> = {
     penalties: t('attendance.deduction_type_penalties'),
@@ -621,6 +633,9 @@ function deductionTypeLabel(type: string) {
                     <th class="px-4 py-3 text-start text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       {{ t('attendance.approved_by_label') }} / {{ t('attendance.created_by_label') }}
                     </th>
+                    <th class="px-4 py-3 text-start text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      {{ t('common.status') }}
+                    </th>
                     <th class="px-4 py-3 text-start text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-28">
                       {{ t('common.actions') }}
                     </th>
@@ -669,6 +684,28 @@ function deductionTypeLabel(type: string) {
                       </template>
                     </td>
                     <td class="px-4 py-3 text-sm">
+                      <template v-if="isPenalty(row)">
+                        <template v-if="row.approval_status === 'rejected'">
+                          <Badge variant="destructive" class="mb-1">{{ t('attendance.rejected') }}</Badge>
+                          <div v-if="row.rejection_reason" class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-[160px] truncate" :title="row.rejection_reason">
+                            {{ row.rejection_reason }}
+                          </div>
+                          <a
+                            v-if="row.rejection_attachment_path"
+                            :href="getAttachmentUrl(row.rejection_attachment_path)"
+                            target="_blank"
+                            class="text-xs text-blue-600 hover:underline mt-1 block"
+                          >
+                            {{ t('attendance.view_attachment') }}
+                          </a>
+                        </template>
+                        <template v-else>
+                          <Badge variant="default" class="bg-green-600 text-white">{{ t('attendance.approved') }}</Badge>
+                        </template>
+                      </template>
+                      <span v-else class="text-muted-foreground">-</span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
                       <template v-if="canManageAttendanceAdjustments && isManual(row)">
                         <div class="flex gap-1">
                           <Button variant="ghost" size="sm" class="h-8 w-8 p-0" @click="openEditModal(row)" :title="t('attendance.edit_deduction')">
@@ -680,16 +717,30 @@ function deductionTypeLabel(type: string) {
                         </div>
                       </template>
                       <template v-else-if="canManageAttendanceAdjustments && isPenalty(row)">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          class="h-8 gap-1 px-2 text-red-600 hover:text-red-700"
-                          :title="t('attendance.reject')"
-                          @click="openPenaltyRejectModal(row)"
-                        >
-                          <X class="h-4 w-4" />
-                          <span class="text-xs">{{ t('attendance.reject') }}</span>
-                        </Button>
+                        <div class="flex gap-1 flex-wrap">
+                          <Button
+                            v-if="row.approval_status !== 'rejected'"
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 gap-1 px-2 text-red-600 hover:text-red-700"
+                            :title="t('attendance.reject')"
+                            @click="openPenaltyRejectModal(row)"
+                          >
+                            <X class="h-4 w-4" />
+                            <span class="text-xs">{{ t('attendance.reject') }}</span>
+                          </Button>
+                          <Button
+                            v-if="row.approval_status === 'rejected'"
+                            variant="ghost"
+                            size="sm"
+                            class="h-8 gap-1 px-2 text-blue-600 hover:text-blue-700"
+                            :title="t('attendance.recalculate_penalty')"
+                            @click="confirmRecalculate(row)"
+                          >
+                            <RotateCcw class="h-4 w-4" />
+                            <span class="text-xs">{{ t('attendance.recalculate_penalty') }}</span>
+                          </Button>
+                        </div>
                       </template>
                       <span v-else class="text-muted-foreground">-</span>
                     </td>

@@ -208,6 +208,7 @@ class RedirectIfEmployeePortalUser
                 'attendance.additions.destroy',
                 'attendance-penalties.approve',
                 'attendance-penalties.reject',
+                'attendance-penalties.recalculate',
                 'attendance.penalty-auto-approval.update',
             ]);
         }
