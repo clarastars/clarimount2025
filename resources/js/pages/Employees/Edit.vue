@@ -302,31 +302,9 @@
                                 <EmployeeTeamAssignmentsFields
                                     v-model:team-role-assignments="form.team_role_assignments"
                                     :available-teams="props.availableTeams || []"
+                                    :role-companies="props.roleCompanies || []"
                                     :errors="form.errors"
                                 />
-
-                                <div class="space-y-2">
-                                    <Label>{{ t('companies.title') }}</Label>
-                                    <p class="text-xs text-muted-foreground">
-                                        {{ t('settings.role_companies_hint') }}
-                                    </p>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
-                                        <label
-                                            v-for="company in (props.roleCompanies || [])"
-                                            :key="company.id"
-                                            class="flex items-center gap-2 text-sm"
-                                        >
-                                            <input
-                                                v-model="form.role_company_ids"
-                                                :value="company.id"
-                                                type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-300"
-                                            >
-                                            <span>{{ company.name }}</span>
-                                        </label>
-                                    </div>
-                                    <div v-if="form.errors.role_company_ids" class="text-red-500 text-sm mt-1">{{ form.errors.role_company_ids }}</div>
-                                </div>
                             </CardContent>
                         </CollapsibleContent>
                     </Collapsible>
@@ -1146,10 +1124,9 @@ interface Props {
     };
     availableTeams?: Array<{ id: number; name: string }>;
     assignableTeamRoles?: Array<{ name: string; label: string }>;
-    teamRoleAssignments?: Array<{ team_id: number; role_name: string }>;
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[] }>;
     primaryTeamId?: number | null;
     roleCompanies?: Array<{ id: number; name: string }>;
-    assignedRoleCompanyIds?: number[];
 }
 
 const props = defineProps<Props>();
@@ -1256,8 +1233,11 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
-    team_role_assignments: props.teamRoleAssignments ?? [] as Array<{ team_id: number; role_name: string }>,
-    role_company_ids: props.assignedRoleCompanyIds ?? [] as number[],
+    team_role_assignments: (props.teamRoleAssignments ?? []).map((row) => ({
+        team_id: row.team_id,
+        role_name: row.role_name || 'team-member',
+        company_ids: Array.isArray(row.company_ids) ? [...row.company_ids] : [],
+    })),
 })
 
 // Auto-calculate total allowances from allowance details

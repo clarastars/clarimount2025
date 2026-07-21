@@ -41,12 +41,90 @@ class CompanyController extends Controller
 
     private function canViewCompanyReadOnly(): bool
     {
-        return Auth::user()?->can('company.readonly') ?? false;
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return app(\App\Services\EmployeeUserRoleService::class)
+            ->canInAnyAssignedTeam($user, 'company.readonly');
     }
 
     private function canViewCompanyByTeamScope(Company $company): bool
     {
-        return in_array((int) $company->id, $this->userAccessibleCompanyIds(), true);
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return app(\App\Services\EmployeeUserRoleService::class)
+            ->canForCompany($user, 'company.readonly', (int) $company->id);
+    }
+
+    /**
+     * @return array{
+     *     can_view_employees_readonly: bool,
+     *     can_manage_employees: bool,
+     *     can_view_company_leaves: bool,
+     *     can_view_attendance_readonly: bool,
+     *     can_manage_attendance_adjustments: bool,
+     *     can_view_salary_runs_readonly: bool,
+     *     can_approve_salary_runs: bool
+     * }
+     */
+    private function companyCapabilityFlags(Company $company): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return [
+                'can_view_employees_readonly' => false,
+                'can_manage_employees' => false,
+                'can_view_company_leaves' => false,
+                'can_view_attendance_readonly' => false,
+                'can_manage_attendance_adjustments' => false,
+                'can_view_salary_runs_readonly' => false,
+                'can_approve_salary_runs' => false,
+            ];
+        }
+
+        if ($user->hasRole('super-admin') || $this->canManageCompany($company)) {
+            return [
+                'can_view_employees_readonly' => true,
+                'can_manage_employees' => true,
+                'can_view_company_leaves' => true,
+                'can_view_attendance_readonly' => true,
+                'can_manage_attendance_adjustments' => true,
+                'can_view_salary_runs_readonly' => true,
+                'can_approve_salary_runs' => true,
+            ];
+        }
+
+        $roleService = app(\App\Services\EmployeeUserRoleService::class);
+        $companyId = (int) $company->id;
+
+        return [
+            'can_view_employees_readonly' => $roleService->canAnyForCompany(
+                $user,
+                ['employees.readonly', 'employees.manage'],
+                $companyId
+            ),
+            'can_manage_employees' => $roleService->canForCompany($user, 'employees.manage', $companyId),
+            'can_view_company_leaves' => $roleService->canForCompany($user, 'leaves.company.view', $companyId),
+            'can_view_attendance_readonly' => $roleService->canForCompany($user, 'attendance.readonly', $companyId),
+            'can_manage_attendance_adjustments' => $roleService->canForCompany($user, 'attendance.adjustments.manage', $companyId),
+            'can_view_salary_runs_readonly' => $roleService->canAnyForCompany(
+                $user,
+                [
+                    'salary-runs.readonly',
+                    'salary-runs.approve',
+                    'salary-runs.create',
+                    'salary-runs.delete',
+                    'salary-runs.debt-deductions.manage',
+                ],
+                $companyId
+            ),
+            'can_approve_salary_runs' => $roleService->canForCompany($user, 'salary-runs.approve', $companyId),
+        ];
     }
 
     private function canManageCompany(Company $company): bool
@@ -91,7 +169,8 @@ class CompanyController extends Controller
             if ($ownedCompanies->exists()) {
                 $companies = $this->companiesIndexPayload($ownedCompanies);
             } elseif ($this->canViewCompanyReadOnly()) {
-                $allowedCompanyIds = $this->userAccessibleCompanyIds();
+                $roleService = app(\App\Services\EmployeeUserRoleService::class);
+                $allowedCompanyIds = $roleService->companyIdsWhereCan($user, ['company.readonly']);
                 $companies = $this->companiesIndexPayload(
                     Company::query()
                         ->when(
@@ -190,6 +269,7 @@ class CompanyController extends Controller
             'company' => $company,
             'totalAssetsCount' => $totalAssetsCount,
             'isReadOnly' => ! $canManage,
+            'capabilities' => $this->companyCapabilityFlags($company),
         ]);
     }
 
@@ -290,7 +370,8 @@ class CompanyController extends Controller
         } elseif (Company::where('owner_id', $user->id)->exists()) {
             $companyQuery->where('owner_id', $user->id);
         } elseif ($this->canViewCompanyReadOnly()) {
-            $allowedCompanyIds = $this->userAccessibleCompanyIds();
+            $allowedCompanyIds = app(\App\Services\EmployeeUserRoleService::class)
+                ->companyIdsWhereCan($user, ['company.readonly']);
             $companyQuery->when(
                 ! empty($allowedCompanyIds),
                 fn ($q) => $q->whereIn('id', $allowedCompanyIds),

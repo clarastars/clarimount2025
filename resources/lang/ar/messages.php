@@ -212,7 +212,7 @@ return [
         'create_team' => 'إنشاء فريق',
         'assign_employee_team' => 'تعيين الموظف على فريق',
         'assign_employee_teams' => 'تعيين الموظف على فرق',
-        'assign_employee_teams_hint' => 'اختر فريقًا واحدًا أو أكثر لهذا الموظف.',
+        'assign_employee_teams_hint' => 'اختر فريقًا واحدًا أو أكثر، وحدد الشركات المسموح بها لكل فريق على حدة.',
         'no_teams_available' => 'لا توجد فرق متاحة للتعيين.',
         'primary_team' => 'أساسي',
         'team_role_member' => 'عضو',
@@ -220,6 +220,8 @@ return [
         'team_role_viewer' => 'مشاهد',
         'no_team' => 'بدون فريق',
         'role_companies_hint' => 'حدد الشركات المسموح للموظف الوصول لها عبر دوره.',
+        'role_companies_per_team_hint' => 'حدد الشركات المسموح بها لهذا الدور فقط.',
+        'no_companies_available' => 'لا توجد شركات متاحة.',
     ],
     'profile' => [
         'title' => 'إعدادات الملف الشخصي',

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\EmployeeUserRoleService;
 use Illuminate\Support\Collection;
 
 trait AuthorizesEmployeeAccess
@@ -27,6 +28,24 @@ trait AuthorizesEmployeeAccess
             ->all();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    protected function employeeViewPermissions(): array
+    {
+        return [
+            'employees.readonly',
+            'employees.manage',
+            'employees.custody.update',
+            'attendance.fingerprint-month.sync',
+        ];
+    }
+
+    protected function roleService(): EmployeeUserRoleService
+    {
+        return app(EmployeeUserRoleService::class);
+    }
+
     protected function employeeQueryableCompanyIds(User $user): Collection
     {
         if ($user->hasRole('super-admin')) {
@@ -38,14 +57,21 @@ trait AuthorizesEmployeeAccess
             return $ownedIds;
         }
 
-        if ($user->can('employees.readonly')
-            || $user->can('employees.manage')
-            || $user->can('employees.custody.update')
-            || $user->can('attendance.fingerprint-month.sync')) {
-            return collect($this->userAccessibleCompanyIds($user));
+        return collect($this->roleService()->companyIdsWhereCan($user, $this->employeeViewPermissions()));
+    }
+
+    protected function employeeManageableCompanyIds(User $user): Collection
+    {
+        if ($user->hasRole('super-admin')) {
+            return Company::query()->pluck('id');
         }
 
-        return collect();
+        $ownedIds = $user->ownedCompanies()->pluck('id');
+        if ($ownedIds->isNotEmpty()) {
+            return $ownedIds;
+        }
+
+        return collect($this->roleService()->companyIdsWhereCan($user, ['employees.manage']));
     }
 
     protected function canViewEmployees(User $user): bool
@@ -58,10 +84,13 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('employees.readonly')
-            || $user->can('employees.manage')
-            || $user->can('employees.custody.update')
-            || $user->can('attendance.fingerprint-month.sync');
+        foreach ($this->employeeViewPermissions() as $permission) {
+            if ($this->roleService()->canInAnyAssignedTeam($user, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function canSyncEmployeeFingerprintMonth(User $user, Employee $employee): bool
@@ -70,7 +99,7 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        if (! $user->can('attendance.fingerprint-month.sync')) {
+        if (! $this->roleService()->canForCompany($user, 'attendance.fingerprint-month.sync', (int) $employee->company_id)) {
             return false;
         }
 
@@ -87,7 +116,20 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('employees.custody.update');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.custody.update');
+    }
+
+    protected function canUpdateEmployeeCustodyForEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canForCompany($user, 'employees.custody.update', (int) $employee->company_id);
     }
 
     protected function canManageEmployees(User $user): bool
@@ -100,7 +142,20 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('employees.manage');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.manage');
+    }
+
+    protected function canManageEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canForCompany($user, 'employees.manage', (int) $employee->company_id);
     }
 
     protected function canViewCompanyLeaves(User $user): bool
@@ -113,7 +168,7 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('leaves.company.view');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'leaves.company.view');
     }
 
     protected function canCreateLeaves(User $user): bool
@@ -126,15 +181,11 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('leaves.create');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'leaves.create');
     }
 
     protected function canCreateLeaveForEmployee(User $user, Employee $employee): bool
     {
-        if (! $this->canCreateLeaves($user)) {
-            return false;
-        }
-
         if ($user->hasRole('super-admin')) {
             return true;
         }
@@ -143,7 +194,7 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return in_array((int) $employee->company_id, $this->userAccessibleCompanyIds($user), true);
+        return $this->roleService()->canForCompany($user, 'leaves.create', (int) $employee->company_id);
     }
 
     protected function canAccessCompanyLeaves(User $user, Company $company): bool
@@ -156,11 +207,11 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        if ($user->can('leaves.company.view') || $user->can('leaves.create')) {
-            return in_array((int) $company->id, $this->userAccessibleCompanyIds($user), true);
-        }
-
-        return false;
+        return $this->roleService()->canAnyForCompany(
+            $user,
+            ['leaves.company.view', 'leaves.create'],
+            (int) $company->id
+        );
     }
 
     protected function abortUnlessCanViewCompanyLeaves(User $user): void
@@ -198,6 +249,11 @@ trait AuthorizesEmployeeAccess
         abort_unless($this->canManageEmployees($user), 403);
     }
 
+    protected function abortUnlessCanManageEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canManageEmployee($user, $employee), 403);
+    }
+
     protected function abortUnlessCanAccessEmployee(User $user, Employee $employee): void
     {
         abort_unless($this->canAccessEmployee($user, $employee), 403);
@@ -205,7 +261,7 @@ trait AuthorizesEmployeeAccess
 
     protected function abortUnlessCanUpdateEmployeeCustody(User $user, Employee $employee): void
     {
-        abort_unless($this->canUpdateEmployeeCustody($user), 403);
+        abort_unless($this->canUpdateEmployeeCustodyForEmployee($user, $employee), 403);
         abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
@@ -238,7 +294,7 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $user->can('employees.global-search');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.global-search');
     }
 
     /**
@@ -254,8 +310,8 @@ trait AuthorizesEmployeeAccess
             return $this->userAccessibleCompanyIds($user);
         }
 
-        if ($user->can('employees.global-search')) {
-            return $this->roleAssignedCompanyIds($user);
+        if ($this->roleService()->canInAnyAssignedTeam($user, 'employees.global-search')) {
+            return $this->roleService()->companyIdsWhereCan($user, ['employees.global-search']);
         }
 
         return [];
@@ -263,7 +319,7 @@ trait AuthorizesEmployeeAccess
 
     protected function canViewEmployeeViaGlobalSearch(User $user, Employee $employee): bool
     {
-        if (! $user->can('employees.global-search')) {
+        if (! $this->roleService()->canForCompany($user, 'employees.global-search', (int) $employee->company_id)) {
             return false;
         }
 

@@ -40,7 +40,7 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @return array<int, array{team_id: int, role_name: string}>
+     * @return array<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>
      */
     public function assignedTeamRoleAssignments(User $portalUser): array
     {
@@ -48,7 +48,7 @@ class EmployeeUserRoleService
         $pivotTable = config('permission.table_names.model_has_roles');
         $rolesTable = config('permission.table_names.roles');
 
-        return DB::table($pivotTable)
+        $assignments = DB::table($pivotTable)
             ->join($rolesTable, "{$rolesTable}.id", '=', "{$pivotTable}.role_id")
             ->where("{$pivotTable}.model_type", $portalUser->getMorphClass())
             ->where("{$pivotTable}.model_id", $portalUser->id)
@@ -64,6 +64,36 @@ class EmployeeUserRoleService
                 'role_name' => (string) $row->role_name,
             ])
             ->unique('team_id')
+            ->values();
+
+        $companyIdsByTeam = DB::table('company_user_access')
+            ->where('user_id', $portalUser->id)
+            ->whereNotNull('team_id')
+            ->get(['team_id', 'company_id'])
+            ->groupBy(fn ($row) => (int) $row->team_id)
+            ->map(fn ($rows) => $rows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values()->all());
+
+        // Legacy unscoped companies (team_id NULL) apply to every current team so prior access is preserved in the UI.
+        $legacyCompanyIds = DB::table('company_user_access')
+            ->where('user_id', $portalUser->id)
+            ->whereNull('team_id')
+            ->pluck('company_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $assignments
+            ->map(function (array $row) use ($companyIdsByTeam, $legacyCompanyIds) {
+                $teamId = (int) $row['team_id'];
+                $scoped = $companyIdsByTeam->get($teamId, []);
+
+                return [
+                    'team_id' => $teamId,
+                    'role_name' => (string) $row['role_name'],
+                    'company_ids' => array_values(array_unique(array_merge($scoped, $legacyCompanyIds))),
+                ];
+            })
             ->values()
             ->all();
     }
@@ -90,9 +120,9 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @param  array<int, array{team_id?: int|string|null, role_name?: string|null}>  $teamRoleAssignments
+     * @param  array<int, array{team_id?: int|string|null, role_name?: string|null, company_ids?: array<int, int|string>}>  $teamRoleAssignments
      * @param  array<int, string>  $globalRoleNames
-     * @param  array<int, int|string>  $roleCompanyIds
+     * @param  array<int, int|string>|null  $legacyRoleCompanyIds  Kept for backward compatibility; applied to every assigned team when company_ids are omitted.
      */
     public function sync(
         User $portalUser,
@@ -100,12 +130,12 @@ class EmployeeUserRoleService
         array $teamRoleAssignments,
         ?int $primaryTeamId,
         array $globalRoleNames,
-        array $roleCompanyIds
+        ?array $legacyRoleCompanyIds = null
     ): void {
         $manageableTeamIds = $this->manageableTeamsFor($actingUser)->pluck('id')->map(fn ($id) => (int) $id);
 
         $normalizedAssignments = collect($teamRoleAssignments)
-            ->map(function (array $row) use ($manageableTeamIds) {
+            ->map(function (array $row) use ($manageableTeamIds, $legacyRoleCompanyIds) {
                 $teamId = isset($row['team_id']) ? (int) $row['team_id'] : 0;
                 $roleName = isset($row['role_name']) ? (string) $row['role_name'] : '';
 
@@ -117,7 +147,18 @@ class EmployeeUserRoleService
                     $roleName = 'team-member';
                 }
 
-                return ['team_id' => $teamId, 'role_name' => $roleName];
+                $companyIds = collect($row['company_ids'] ?? $legacyRoleCompanyIds ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn (int $id) => $id > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'team_id' => $teamId,
+                    'role_name' => $roleName,
+                    'company_ids' => $companyIds,
+                ];
             })
             ->filter()
             ->unique(fn (array $row) => (string) $row['team_id'])
@@ -155,11 +196,60 @@ class EmployeeUserRoleService
         }
 
         $this->syncGlobalRoles($portalUser, $globalRoleNames);
-        $portalUser->accessibleCompanies()->sync($roleCompanyIds);
+        $this->syncTeamCompanyAccess($portalUser, $manageableTeamIds, $normalizedAssignments);
 
         app(PermissionRegistrar::class)->setPermissionsTeamId($portalUser->team_id);
         $portalUser->unsetRelation('roles');
         $portalUser->unsetRelation('permissions');
+        $portalUser->unsetRelation('accessibleCompanies');
+    }
+
+    /**
+     * Sync company access scoped to each team assignment.
+     * Only replaces rows for teams the acting user can manage; other teams' access is left intact.
+     *
+     * @param  Collection<int, int>  $manageableTeamIds
+     * @param  Collection<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>  $normalizedAssignments
+     */
+    private function syncTeamCompanyAccess(
+        User $portalUser,
+        Collection $manageableTeamIds,
+        Collection $normalizedAssignments
+    ): void {
+        if ($manageableTeamIds->isEmpty()) {
+            return;
+        }
+
+        DB::table('company_user_access')
+            ->where('user_id', $portalUser->id)
+            ->where(function ($query) use ($manageableTeamIds): void {
+                $query->whereIn('team_id', $manageableTeamIds->all())
+                    ->orWhereNull('team_id');
+            })
+            ->delete();
+
+        $now = now();
+        $rows = [];
+
+        foreach ($normalizedAssignments as $assignment) {
+            foreach ($assignment['company_ids'] as $companyId) {
+                $rows[] = [
+                    'company_id' => (int) $companyId,
+                    'user_id' => $portalUser->id,
+                    'team_id' => (int) $assignment['team_id'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        if ($rows === []) {
+            return;
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('company_user_access')->insertOrIgnore($chunk);
+        }
     }
 
     /**
@@ -390,5 +480,226 @@ class EmployeeUserRoleService
         $roleName = (string) ($assignment['role_name'] ?? 'team-member');
 
         return __(self::TEAM_ROLES[$roleName] ?? $roleName);
+    }
+
+    /**
+     * Team IDs that grant this user access to the given company.
+     *
+     * @return array<int, int>
+     */
+    public function teamIdsForCompany(User $user, int $companyId): array
+    {
+        $scopedTeamIds = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->where('company_id', $companyId)
+            ->whereNotNull('team_id')
+            ->pluck('team_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($scopedTeamIds->isNotEmpty()) {
+            return $scopedTeamIds->all();
+        }
+
+        // Legacy unscoped rows: company access applies under every assigned team.
+        $hasLegacyAccess = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->where('company_id', $companyId)
+            ->whereNull('team_id')
+            ->exists();
+
+        if (! $hasLegacyAccess) {
+            return [];
+        }
+
+        return $this->assignedTeamIdsFor($user);
+    }
+
+    /**
+     * Whether the user has the permission via any team linked to this company.
+     */
+    public function canForCompany(User $user, string $permission, int $companyId): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($companyId)->exists()) {
+            return true;
+        }
+
+        $teamIds = $this->teamIdsForCompany($user, $companyId);
+        if ($teamIds === []) {
+            return false;
+        }
+
+        return $this->withTeamContexts($user, $teamIds, function () use ($user, $permission): bool {
+            return $user->can($permission);
+        });
+    }
+
+    /**
+     * Whether the user has any of the permissions via any team linked to this company.
+     *
+     * @param  array<int, string>  $permissions
+     */
+    public function canAnyForCompany(User $user, array $permissions, int $companyId): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->canForCompany($user, $permission, $companyId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Company IDs where at least one linked team grants any of the given permissions.
+     *
+     * @param  array<int, string>  $permissions
+     * @return array<int, int>
+     */
+    public function companyIdsWhereCan(User $user, array $permissions): array
+    {
+        if ($user->hasRole('super-admin')) {
+            return \App\Models\Company::query()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        $ownedIds = $user->ownedCompanies()->pluck('id')->map(fn ($id) => (int) $id);
+        if ($ownedIds->isNotEmpty()) {
+            return $ownedIds->all();
+        }
+
+        $accessRows = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->get(['company_id', 'team_id']);
+
+        if ($accessRows->isEmpty()) {
+            return [];
+        }
+
+        $companyIds = $accessRows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values();
+        $matched = [];
+
+        foreach ($companyIds as $companyId) {
+            if ($this->canAnyForCompany($user, $permissions, $companyId)) {
+                $matched[] = $companyId;
+            }
+        }
+
+        return $matched;
+    }
+
+    /**
+     * Whether the user has the permission in any of their assigned teams.
+     */
+    public function canInAnyAssignedTeam(User $user, string $permission): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        $teamIds = $this->assignedTeamIdsFor($user);
+        if ($teamIds === []) {
+            $previousTeamId = app(PermissionRegistrar::class)->getPermissionsTeamId();
+            try {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                return $user->can($permission);
+            } finally {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($previousTeamId);
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+            }
+        }
+
+        return $this->withTeamContexts($user, $teamIds, function () use ($user, $permission): bool {
+            return $user->can($permission);
+        });
+    }
+
+    /**
+     * Union of permission names across all assigned teams (for menus / route allowlists).
+     *
+     * @return array<int, string>
+     */
+    public function permissionNamesAcrossAssignedTeams(User $user): array
+    {
+        $teamIds = $this->assignedTeamIdsFor($user);
+        if ($teamIds === [] && $user->team_id) {
+            $teamIds = [(int) $user->team_id];
+        }
+
+        if ($teamIds === []) {
+            return $user->getAllPermissions()->pluck('name')->map(fn ($name) => (string) $name)->unique()->values()->all();
+        }
+
+        $names = [];
+        $previousTeamId = app(PermissionRegistrar::class)->getPermissionsTeamId();
+
+        try {
+            foreach ($teamIds as $teamId) {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($teamId);
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                foreach ($user->getAllPermissions() as $permission) {
+                    $names[] = (string) $permission->name;
+                }
+            }
+        } finally {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($previousTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    /**
+     * Dashboard subtitle listing all assigned teams when the user has more than one.
+     */
+    public function dashboardTeamSubtitleFor(User $portalUser): ?string
+    {
+        $teams = $this->assignedTeamsForUi($portalUser);
+
+        if ($teams === []) {
+            return null;
+        }
+
+        return collect($teams)->pluck('name')->filter()->implode('، ');
+    }
+
+    /**
+     * Run a callback while temporarily switching Spatie team context for each team until one succeeds.
+     *
+     * @param  array<int, int>  $teamIds
+     * @param  callable(): bool  $callback
+     */
+    private function withTeamContexts(User $user, array $teamIds, callable $callback): bool
+    {
+        $previousTeamId = app(PermissionRegistrar::class)->getPermissionsTeamId();
+
+        try {
+            foreach ($teamIds as $teamId) {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($teamId);
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                if ($callback()) {
+                    return true;
+                }
+            }
+        } finally {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($previousTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+        }
+
+        return false;
     }
 }

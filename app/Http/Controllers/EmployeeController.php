@@ -276,7 +276,7 @@ class EmployeeController extends Controller
         $user = Auth::user();
         $this->abortUnlessCanManageEmployees($user);
 
-        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
         $currentCompany = $user->currentCompany();
 
@@ -310,15 +310,7 @@ class EmployeeController extends Controller
         $this->abortUnlessCanManageEmployees($user);
 
         $isSuperAdmin = $user->hasRole('super-admin');
-        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
-
-        // Debug logging
-        \Log::info('Employee creation debug', [
-            'user_id' => $user->id,
-            'owned_company_ids' => $ownedCompanyIds->toArray(),
-            'request_company_id' => $request->input('company_id'),
-            'request_data' => $request->all(),
-        ]);
+        $ownedCompanyIds = $this->employeeManageableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             return redirect()->route('employees.index')
@@ -541,10 +533,9 @@ class EmployeeController extends Controller
     public function edit(Employee $employee): Response|RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
-        $companyIds = $this->employeeQueryableCompanyIds($user);
+        $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
 
         // Get Saudi Arabia as default residence country
@@ -578,8 +569,7 @@ class EmployeeController extends Controller
     public function updateFingerprintLink(Request $request, Employee $employee): JsonResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         $validated = $request->validate([
             'fingerprint_device_id' => 'nullable|string|max:100',
@@ -599,11 +589,10 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee): Response|RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         $isSuperAdmin = $user->hasRole('super-admin');
-        $ownedCompanyIds = $this->employeeQueryableCompanyIds($user);
+        $ownedCompanyIds = $this->employeeManageableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             abort(403);
@@ -737,8 +726,7 @@ class EmployeeController extends Controller
     public function destroy(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         $queryParams = $request->only(['search', 'status', 'department', 'company_id']);
 
@@ -916,17 +904,25 @@ class EmployeeController extends Controller
     }
 
     /**
-     * @return array<int, array{team_id: int, role_name: string}>
+     * @return array<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>
      */
     private function resolveTeamRoleAssignments(EmployeeUserRoleService $roleService, \App\Models\User $portalUser): array
     {
         $assignments = $roleService->assignedTeamRoleAssignments($portalUser);
 
         if ($assignments === [] && $portalUser->team_id) {
+            $legacyCompanyIds = $portalUser->accessibleCompanies()
+                ->pluck('companies.id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
             return [
                 [
                     'team_id' => (int) $portalUser->team_id,
                     'role_name' => 'team-member',
+                    'company_ids' => $legacyCompanyIds,
                 ],
             ];
         }
@@ -956,9 +952,6 @@ class EmployeeController extends Controller
                 ])
                 ->values()
                 ->all(),
-            'assignedRoleCompanyIds' => $portalUser
-                ? $portalUser->accessibleCompanies()->pluck('companies.id')->values()->all()
-                : [],
         ];
     }
 
@@ -971,8 +964,8 @@ class EmployeeController extends Controller
             'team_role_assignments' => ['array'],
             'team_role_assignments.*.team_id' => ['required', 'integer', Rule::exists('teams', 'id')],
             'team_role_assignments.*.role_name' => ['nullable', 'string', Rule::in(array_keys(EmployeeUserRoleService::TEAM_ROLES))],
-            'role_company_ids' => ['array'],
-            'role_company_ids.*' => ['integer', Rule::exists('companies', 'id')],
+            'team_role_assignments.*.company_ids' => ['array'],
+            'team_role_assignments.*.company_ids.*' => ['integer', Rule::exists('companies', 'id')],
         ];
     }
 
@@ -989,7 +982,6 @@ class EmployeeController extends Controller
             $validated['team_role_assignments'] ?? [],
             null,
             $roleService->assignedGlobalRoleNames($portalUser),
-            $validated['role_company_ids'] ?? [],
         );
     }
 }

@@ -30,6 +30,9 @@ class RedirectIfEmployeePortalUser
             app(PermissionRegistrar::class)->setPermissionsTeamId($user->team_id);
         }
 
+        $roleService = app(\App\Services\EmployeeUserRoleService::class);
+        $can = fn (string $permission): bool => $roleService->canInAnyAssignedTeam($user, $permission);
+
         $allowed = [
             'dashboard',
             'logout',
@@ -50,7 +53,7 @@ class RedirectIfEmployeePortalUser
         ];
 
         // Allow employees to access only the sections explicitly granted by team permissions.
-        if ($user->can('asset-inventory.access')) {
+        if ($can('asset-inventory.access')) {
             $allowed = array_merge($allowed, [
                 'locations.*',
                 'assets.*',
@@ -63,7 +66,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('settings.access')) {
+        if ($can('settings.access')) {
             $allowed = array_merge($allowed, [
                 'settings.*',
                 'appearance',
@@ -74,7 +77,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('company.readonly')) {
+        if ($can('company.readonly')) {
             $allowed = array_merge($allowed, [
                 'companies.index',
                 'companies.show',
@@ -82,7 +85,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('employees.readonly')) {
+        if ($can('employees.readonly')) {
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
@@ -91,14 +94,14 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('employees.global-search')) {
+        if ($can('employees.global-search')) {
             $allowed = array_merge($allowed, [
                 'employees.show',
                 'api.employees.global-search',
             ]);
         }
 
-        if ($user->can('employees.manage')) {
+        if ($can('employees.manage')) {
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
@@ -126,13 +129,13 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('leaves.company.view')) {
+        if ($can('leaves.company.view')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
             ]);
         }
 
-        if ($user->can('leaves.requests.receive-email')) {
+        if ($can('leaves.requests.receive-email')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
                 'api.notifications.index',
@@ -141,7 +144,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('leaves.create') || $user->can('leaves.approve')) {
+        if ($can('leaves.create') || $can('leaves.approve')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
                 'companies.leave-requests.approve-step',
@@ -149,7 +152,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('leaves.approve')) {
+        if ($can('leaves.approve')) {
             $allowed = array_merge($allowed, [
                 'api.notifications.index',
                 'api.notifications.read',
@@ -157,7 +160,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('leaves.create')) {
+        if ($can('leaves.create')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.store',
                 'companies.leave-requests.approve',
@@ -168,7 +171,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('employees.custody.update')) {
+        if ($can('employees.custody.update')) {
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
@@ -186,7 +189,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('attendance.readonly')) {
+        if ($can('attendance.readonly')) {
             $allowed = array_merge($allowed, [
                 'attendance.index',
                 'attendance.late',
@@ -194,7 +197,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('attendance.adjustments.manage')) {
+        if ($can('attendance.adjustments.manage')) {
             $allowed = array_merge($allowed, [
                 'attendance.index',
                 'attendance.late',
@@ -213,7 +216,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('attendance.fingerprint-month.sync')) {
+        if ($can('attendance.fingerprint-month.sync')) {
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
@@ -222,7 +225,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('salary-runs.readonly')) {
+        if ($can('salary-runs.readonly')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',
@@ -233,7 +236,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('salary-runs.create')) {
+        if ($can('salary-runs.create')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',
@@ -245,7 +248,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('salary-runs.delete')) {
+        if ($can('salary-runs.delete')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',
@@ -257,7 +260,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('salary-runs.approve')) {
+        if ($can('salary-runs.approve')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',
@@ -270,7 +273,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($user->can('salary-runs.debt-deductions.manage')) {
+        if ($can('salary-runs.debt-deductions.manage')) {
             $allowed = array_merge($allowed, [
                 'salary-runs.index',
                 'salary-runs.show',

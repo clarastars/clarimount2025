@@ -47,7 +47,12 @@ class HandleInertiaRequests extends Middleware
         }
 
         $isSuperAdmin = $user?->hasRole('super-admin') ?? false;
-        $permissionNames = $user?->getAllPermissions()->pluck('name')->values()->all() ?? [];
+        $roleService = app(\App\Services\EmployeeUserRoleService::class);
+        $permissionNames = $user
+            ? ($isSuperAdmin
+                ? $user->getAllPermissions()->pluck('name')->values()->all()
+                : $roleService->permissionNamesAcrossAssignedTeams($user))
+            : [];
         $globalEmployeeSearchEnabled = $this->isEmployeeGlobalSearchEnabled();
         
         return [
@@ -90,7 +95,7 @@ class HandleInertiaRequests extends Middleware
                 'can_use_employee_global_search' => $user !== null && (
                     $isSuperAdmin
                     || $user->ownedCompanies()->exists()
-                    || $user->can('employees.global-search')
+                    || in_array('employees.global-search', $permissionNames, true)
                 ),
                 'can_view_salary_run_notifications' => $user !== null && (
                     $isSuperAdmin

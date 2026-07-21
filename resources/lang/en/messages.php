@@ -212,7 +212,7 @@ return [
         'create_team' => 'Create Team',
         'assign_employee_team' => 'Assign employee to team',
         'assign_employee_teams' => 'Assign employee to teams',
-        'assign_employee_teams_hint' => 'Select one or more teams for this employee.',
+        'assign_employee_teams_hint' => 'Select one or more teams, and choose the allowed companies for each team separately.',
         'no_teams_available' => 'No teams available to assign.',
         'primary_team' => 'Primary',
         'team_role_member' => 'Member',
@@ -220,6 +220,8 @@ return [
         'team_role_viewer' => 'Viewer',
         'no_team' => 'No team',
         'role_companies_hint' => 'Select companies this employee can access through their role.',
+        'role_companies_per_team_hint' => 'Select companies allowed for this role only.',
+        'no_companies_available' => 'No companies available.',
     ],
     'profile' => [
         'title' => 'Profile settings',

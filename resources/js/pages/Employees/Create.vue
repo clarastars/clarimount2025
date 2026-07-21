@@ -47,10 +47,9 @@ interface Props {
     canManagePortalAccount?: boolean
     availableTeams?: Array<{ id: number; name: string }>
     assignableTeamRoles?: Array<{ name: string; label: string }>
-    teamRoleAssignments?: Array<{ team_id: number; role_name: string }>
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[] }>
     primaryTeamId?: number | null
     roleCompanies?: Array<{ id: number; name: string }>
-    assignedRoleCompanyIds?: number[]
 }
 
 const props = defineProps<Props>()
@@ -125,8 +124,7 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
-    team_role_assignments: [] as Array<{ team_id: number; role_name: string }>,
-    role_company_ids: [] as number[],
+    team_role_assignments: [] as Array<{ team_id: number; role_name: string; company_ids: number[] }>,
 })
 
 // Auto-calculate total allowances from allowance details
@@ -1038,27 +1036,9 @@ const formatCurrency = (amount: number) => {
                                 <EmployeeTeamAssignmentsFields
                                     v-model:team-role-assignments="form.team_role_assignments"
                                     :available-teams="props.availableTeams || []"
+                                    :role-companies="props.roleCompanies || []"
                                     :errors="form.errors"
                                 />
-                                <div class="space-y-2">
-                                    <Label>{{ t('companies.title') }}</Label>
-                                    <p class="text-xs text-muted-foreground">{{ t('settings.role_companies_hint') }}</p>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border p-3 max-h-56 overflow-auto">
-                                        <label
-                                            v-for="company in (props.roleCompanies || [])"
-                                            :key="company.id"
-                                            class="flex items-center gap-2 text-sm"
-                                        >
-                                            <input
-                                                v-model="form.role_company_ids"
-                                                :value="company.id"
-                                                type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-300"
-                                            >
-                                            <span>{{ company.name }}</span>
-                                        </label>
-                                    </div>
-                                </div>
                             </CardContent>
                         </CollapsibleContent>
                     </Collapsible>

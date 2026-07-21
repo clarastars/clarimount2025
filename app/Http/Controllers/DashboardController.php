@@ -24,10 +24,10 @@ class DashboardController extends Controller
                 return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
             }
             $roleService = app(EmployeeUserRoleService::class);
-            $primaryTeamName = $roleService->primaryTeamNameFor($user);
+            $teamNames = $roleService->dashboardTeamSubtitleFor($user);
 
-            $dashboardSubtitle = $primaryTeamName
-                ? __('messages.dashboard.employee_subtitle_with_team', ['team' => $primaryTeamName])
+            $dashboardSubtitle = $teamNames
+                ? __('messages.dashboard.employee_subtitle_with_team', ['team' => $teamNames])
                 : __('messages.dashboard.employee_subtitle');
 
             return Inertia::render('DashboardEmployee', [

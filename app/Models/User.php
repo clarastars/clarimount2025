@@ -83,11 +83,13 @@ class User extends Authenticatable
     }
 
     /**
-     * Companies this user can access through assigned role scope.
+     * Companies this user can access through assigned team/role scope.
+     * Pivot may include team_id so access can differ per team assignment.
      */
     public function accessibleCompanies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class, 'company_user_access')
+            ->withPivot('team_id')
             ->withTimestamps();
     }
 

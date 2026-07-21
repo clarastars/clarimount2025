@@ -25,8 +25,7 @@ class EmployeeDocumentController extends Controller
     public function store(Request $request, Employee $employee): JsonResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         $validated = $request->validate([
             'type' => ['required', 'string', Rule::in(EmployeeDocument::types())],
@@ -48,8 +47,7 @@ class EmployeeDocumentController extends Controller
     public function destroy(Employee $employee, string $type): JsonResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         if (! in_array($type, EmployeeDocument::types(), true)) {
             abort(404);

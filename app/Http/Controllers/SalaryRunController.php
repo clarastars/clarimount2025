@@ -57,7 +57,7 @@ class SalaryRunController extends Controller
             return true;
         }
 
-        $teamCompanyIds = $this->userAccessibleCompanyIds($user);
+        $roleService = app(\App\Services\EmployeeUserRoleService::class);
 
         $salaryRunPermissions = [
             'salary-runs.readonly',
@@ -67,13 +67,7 @@ class SalaryRunController extends Controller
             'salary-runs.debt-deductions.manage',
         ];
 
-        foreach ($salaryRunPermissions as $salaryRunPermission) {
-            if ($user->can($salaryRunPermission) && in_array((int) $company->id, $teamCompanyIds, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $roleService->canAnyForCompany($user, $salaryRunPermissions, (int) $company->id);
     }
 
     private function canAccessCompanyWithPermission($user, Company $company, string $permission): bool
@@ -86,9 +80,8 @@ class SalaryRunController extends Controller
             return true;
         }
 
-        $teamCompanyIds = $this->userAccessibleCompanyIds($user);
-
-        return $user->can($permission) && in_array((int) $company->id, $teamCompanyIds, true);
+        return app(\App\Services\EmployeeUserRoleService::class)
+            ->canForCompany($user, $permission, (int) $company->id);
     }
 
     private function canCreateSalaryRun($user, Company $company): bool

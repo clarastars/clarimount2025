@@ -21,8 +21,7 @@ class EmployeeDebtController extends Controller
     public function store(Request $request, Employee $employee): RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
@@ -40,8 +39,7 @@ class EmployeeDebtController extends Controller
     public function update(Request $request, Employee $employee, EmployeeDebt $debt): RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         if ($debt->employee_id !== $employee->id) {
             abort(404, 'Debt not found for this employee.');
@@ -63,8 +61,7 @@ class EmployeeDebtController extends Controller
     public function destroy(Employee $employee, EmployeeDebt $debt): RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanManageEmployees($user);
-        $this->abortUnlessCanAccessEmployee($user, $employee);
+        $this->abortUnlessCanManageEmployee($user, $employee);
 
         if ($debt->employee_id !== $employee->id) {
             abort(404, 'Debt not found for this employee.');

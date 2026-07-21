@@ -6,9 +6,15 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\EmployeeUserRoleService;
 
 trait AuthorizesAttendanceAccess
 {
+    protected function attendanceRoleService(): EmployeeUserRoleService
+    {
+        return app(EmployeeUserRoleService::class);
+    }
+
     /**
      * @return array<int>
      */
@@ -35,10 +41,11 @@ trait AuthorizesAttendanceAccess
             return true;
         }
 
-        $allowedCompanyIds = $this->userAccessibleCompanyIds($user);
-
-        return $user->can('attendance.readonly')
-            && in_array((int) $company->id, $allowedCompanyIds, true);
+        return $this->attendanceRoleService()->canForCompany(
+            $user,
+            'attendance.readonly',
+            (int) $company->id
+        );
     }
 
     protected function canManageAttendanceAdjustments(User $user): bool
@@ -51,15 +58,11 @@ trait AuthorizesAttendanceAccess
             return true;
         }
 
-        return $user->can('attendance.adjustments.manage');
+        return $this->attendanceRoleService()->canInAnyAssignedTeam($user, 'attendance.adjustments.manage');
     }
 
     protected function canManageAttendanceAdjustmentsForCompany(User $user, Company $company): bool
     {
-        if (! $this->canManageAttendanceAdjustments($user)) {
-            return false;
-        }
-
         if ($user->hasRole('super-admin')) {
             return true;
         }
@@ -68,7 +71,11 @@ trait AuthorizesAttendanceAccess
             return true;
         }
 
-        return in_array((int) $company->id, $this->userAccessibleCompanyIds($user), true);
+        return $this->attendanceRoleService()->canForCompany(
+            $user,
+            'attendance.adjustments.manage',
+            (int) $company->id
+        );
     }
 
     protected function canViewAttendanceAdjustmentsForCompany(User $user, Company $company): bool
@@ -90,11 +97,7 @@ trait AuthorizesAttendanceAccess
             return $user->ownedCompanies()->pluck('id')->map(fn ($id): int => (int) $id)->all();
         }
 
-        if ($user->can('attendance.adjustments.manage')) {
-            return $this->userAccessibleCompanyIds($user);
-        }
-
-        return [];
+        return $this->attendanceRoleService()->companyIdsWhereCan($user, ['attendance.adjustments.manage']);
     }
 
     protected function abortUnlessCanViewAttendanceAdjustments(User $user, Company $company): void
