@@ -95,7 +95,7 @@ const props = defineProps<{
   monthPeriodStart: string
   monthPeriodEnd: string
   employeeId: number | null
-  penaltyStatus: 'approved' | 'rejected' | null
+  penaltyStatus: 'approved' | 'rejected' | 'manual' | null
   approvedPenalties: ApprovedPenalty[]
   manualDeductions: ManualDeduction[]
   canManageAttendanceAdjustments?: boolean
@@ -381,9 +381,10 @@ function confirmDelete(row: ManualDeduction) {
 }
 
 const mergedList = computed((): DeductionRow[] => {
-  const penalties = props.approvedPenalties
-  const manuals = props.penaltyStatus ? [] : props.manualDeductions
-  const list: DeductionRow[] = [...penalties, ...manuals]
+  const list: DeductionRow[] = [
+    ...props.approvedPenalties,
+    ...props.manualDeductions,
+  ]
   list.sort((a, b) => (b.date < a.date ? -1 : b.date > a.date ? 1 : 0))
   return list
 })
@@ -402,7 +403,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
   },
 ])
 
-function applyFilters(params: { month?: string; employee_id?: number | ''; penalty_status?: 'approved' | 'rejected' | '' }) {
+function applyFilters(params: { month?: string; employee_id?: number | ''; penalty_status?: 'approved' | 'rejected' | 'manual' | '' }) {
   const q: Record<string, string | number | undefined> = {}
   if (params.month) q.month = params.month
   if (params.employee_id !== undefined && params.employee_id !== '') {
@@ -426,7 +427,7 @@ function goToCompany(companyId: number) {
 }
 
 const employeeFilter = ref<number | ''>(props.employeeId ?? '')
-const penaltyStatusFilter = ref<'approved' | 'rejected' | ''>(props.penaltyStatus ?? '')
+const penaltyStatusFilter = ref<'approved' | 'rejected' | 'manual' | ''>(props.penaltyStatus ?? '')
 
 watch(
   () => props.employeeId,
@@ -618,15 +619,16 @@ function deductionTypeLabel(type: string) {
                   </select>
                 </div>
                 <div>
-                  <Label for="filter-penalty-status">{{ t('attendance.filter_penalty_status') }}</Label>
+                  <Label for="filter-penalty-status">{{ t('attendance.filter_deduction_type') }}</Label>
                   <select
                     id="filter-penalty-status"
                     v-model="penaltyStatusFilter"
                     class="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">{{ t('attendance.all_penalty_statuses') }}</option>
+                    <option value="">{{ t('attendance.all_deduction_types') }}</option>
                     <option value="approved">{{ t('attendance.approved') }}</option>
                     <option value="rejected">{{ t('attendance.rejected') }}</option>
+                    <option value="manual">{{ t('attendance.deduction_type_manual') }}</option>
                   </select>
                 </div>
               </div>

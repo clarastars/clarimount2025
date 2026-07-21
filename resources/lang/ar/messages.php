@@ -1640,6 +1640,8 @@ return [
         'filter_employee' => 'الموظف',
         'filter_penalty_status' => 'حالة الجزاء',
         'all_penalty_statuses' => 'جميع الحالات',
+        'filter_deduction_type' => 'النوع / الحالة',
+        'all_deduction_types' => 'جميع الأنواع',
         'filter_month' => 'الشهر',
         'prev_payroll_month' => 'الشهر السابق',
         'next_payroll_month' => 'الشهر التالي',

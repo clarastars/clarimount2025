@@ -50,7 +50,7 @@ class DeductionsController extends Controller
         $month = $canonical['ym'];
         $employeeId = $request->query('employee_id');
         $penaltyStatus = $request->query('penalty_status');
-        if (! in_array($penaltyStatus, ['approved', 'rejected'], true)) {
+        if (! in_array($penaltyStatus, ['approved', 'rejected', 'manual'], true)) {
             $penaltyStatus = null;
         }
         $range = $this->operationalMonthService->resolveRangeForPayrollMonth($canonical['year'], $canonical['month']);
@@ -75,28 +75,42 @@ class DeductionsController extends Controller
                 'basic_hourly_wage' => $this->manualDeductionAmountService->basicHourlyWage($employee),
             ]);
 
-        $approvedPenaltiesQuery = AttendancePenalty::query()
-            ->whereIn('approval_status', $penaltyStatus !== null ? [$penaltyStatus] : ['approved', 'rejected'])
-            ->with(['employee:id,first_name,last_name,employee_id,company_id', 'approver:id,name'])
-            ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
-            ->whereBetween('attendance_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
+        $includePenalties = $penaltyStatus === null || in_array($penaltyStatus, ['approved', 'rejected'], true);
+        $includeManuals = $penaltyStatus === null || $penaltyStatus === 'manual';
 
-        if ($employeeId) {
-            $approvedPenaltiesQuery->where('employee_id', $employeeId);
+        $approvedPenalties = collect();
+        if ($includePenalties) {
+            $approvedPenaltiesQuery = AttendancePenalty::query()
+                ->whereIn(
+                    'approval_status',
+                    $penaltyStatus === 'approved' || $penaltyStatus === 'rejected'
+                        ? [$penaltyStatus]
+                        : ['approved', 'rejected']
+                )
+                ->with(['employee:id,first_name,last_name,employee_id,company_id', 'approver:id,name'])
+                ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
+                ->whereBetween('attendance_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
+
+            if ($employeeId) {
+                $approvedPenaltiesQuery->where('employee_id', $employeeId);
+            }
+
+            $approvedPenalties = $approvedPenaltiesQuery->orderBy('attendance_date', 'desc')->get();
         }
 
-        $approvedPenalties = $approvedPenaltiesQuery->orderBy('attendance_date', 'desc')->get();
+        $manualDeductions = collect();
+        if ($includeManuals) {
+            $manualDeductionsQuery = EmployeeDeduction::query()
+                ->with(['employee:id,first_name,last_name,employee_id,company_id', 'creator:id,name'])
+                ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
+                ->whereBetween('deduction_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
 
-        $manualDeductionsQuery = EmployeeDeduction::query()
-            ->with(['employee:id,first_name,last_name,employee_id,company_id', 'creator:id,name'])
-            ->whereHas('employee', fn ($q) => $q->where('company_id', $company->id))
-            ->whereBetween('deduction_date', [$start->format('Y-m-d'), $end->format('Y-m-d')]);
+            if ($employeeId) {
+                $manualDeductionsQuery->where('employee_id', $employeeId);
+            }
 
-        if ($employeeId) {
-            $manualDeductionsQuery->where('employee_id', $employeeId);
+            $manualDeductions = $manualDeductionsQuery->orderBy('deduction_date', 'desc')->get();
         }
-
-        $manualDeductions = $manualDeductionsQuery->orderBy('deduction_date', 'desc')->get();
 
         $viewableCompanyIds = array_unique(array_merge(
             $user->ownedCompanies()->pluck('id')->map(fn ($id): int => (int) $id)->all(),
