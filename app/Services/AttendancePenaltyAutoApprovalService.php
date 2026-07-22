@@ -120,11 +120,13 @@ class AttendancePenaltyAutoApprovalService
     }
 
     /**
+     * Resolve the active operational period that contains "today" in Riyadh time.
+     *
      * @return array{0: string, 1: string} [startYmd, endYmd]
      */
     private function currentOperationalMonthDateBounds(): array
     {
-        $range = $this->operationalMonthService->resolveCurrentOperationalMonthRange(
+        $range = $this->operationalMonthService->resolveOperationalMonthRangeContainingDate(
             Carbon::now(self::TZ)
         );
 
