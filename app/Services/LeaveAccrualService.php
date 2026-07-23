@@ -51,6 +51,54 @@ class LeaveAccrualService
         ];
     }
 
+    /**
+     * Accrue one month for active employees who have annual entitlement but no hire_date.
+     * Skips hire_date eligibility only; duplicate periods are never applied twice.
+     *
+     * @return array{processed: int, skipped: int, accrued: int}
+     */
+    public function accrueForPeriodMissingHireDate(string $period): array
+    {
+        if (! preg_match('/^\d{4}-\d{2}$/', $period)) {
+            throw new \InvalidArgumentException('Accrual period must be in YYYY-MM format.');
+        }
+
+        $processed = 0;
+        $skipped = 0;
+        $accrued = 0;
+
+        Employee::query()
+            ->where('employment_status', 'active')
+            ->whereNull('hire_date')
+            ->where('annual_leave_balance', '>', 0)
+            ->orderBy('id')
+            ->chunkById(100, function ($employees) use ($period, &$processed, &$skipped, &$accrued): void {
+                foreach ($employees as $employee) {
+                    $result = $this->accrueEmployeeForPeriod(
+                        $employee,
+                        $period,
+                        force: false,
+                        requireHireDate: false,
+                    );
+
+                    if ($result === null) {
+                        $skipped++;
+
+                        continue;
+                    }
+
+                    $processed++;
+                    $accrued++;
+                }
+            });
+
+        return [
+            'processed' => $processed,
+            'skipped' => $skipped,
+            'accrued' => $accrued,
+        ];
+    }
+
     public function monthlyAccrualDays(Employee $employee): float
     {
         $entitlement = (int) ($employee->annual_leave_balance ?? 0);
@@ -101,8 +149,11 @@ class LeaveAccrualService
         return $this->persistAccruedBalance($employee, $runningBalance, $logRows, $replaceExistingLogs);
     }
 
-    public function isEmployeeEligibleForAccrualPeriod(Employee $employee, string $period): bool
-    {
+    public function isEmployeeEligibleForAccrualPeriod(
+        Employee $employee,
+        string $period,
+        bool $requireHireDate = true
+    ): bool {
         if (! preg_match('/^\d{4}-\d{2}$/', $period)) {
             return false;
         }
@@ -113,7 +164,7 @@ class LeaveAccrualService
 
         $hireDate = $this->resolveHireDate($employee);
         if ($hireDate === null) {
-            return false;
+            return ! $requireHireDate;
         }
 
         $periodStart = Carbon::createFromFormat('Y-m-d', $period.'-01', self::TZ)->startOfDay();
@@ -148,9 +199,13 @@ class LeaveAccrualService
         return $periods;
     }
 
-    private function accrueEmployeeForPeriod(Employee $employee, string $period, bool $force): ?LeaveAccrualLog
-    {
-        if (! $this->isEmployeeEligibleForAccrualPeriod($employee, $period)) {
+    private function accrueEmployeeForPeriod(
+        Employee $employee,
+        string $period,
+        bool $force = false,
+        bool $requireHireDate = true
+    ): ?LeaveAccrualLog {
+        if (! $this->isEmployeeEligibleForAccrualPeriod($employee, $period, $requireHireDate)) {
             return null;
         }
 
