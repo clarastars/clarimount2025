@@ -12,10 +12,12 @@ const page = usePage();
 const authProps = computed(() => (page.props.auth as {
     can_access_settings?: boolean;
     is_employee?: boolean;
+    is_super_admin?: boolean;
 }) ?? {});
 
 const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
 const isEmployeePortal = computed(() => authProps.value.is_employee ?? false);
+const isSuperAdmin = computed(() => authProps.value.is_super_admin ?? false);
 
 const sidebarNavItems = computed((): NavItem[] => {
     const personal: NavItem[] = [
@@ -76,6 +78,13 @@ const sidebarNavItems = computed((): NavItem[] => {
                 href: '/settings/user-login',
             },
         );
+    }
+
+    if (isSuperAdmin.value) {
+        items.push({
+            title: t('settings.missing_hire_date_export'),
+            href: '/settings/missing-hire-date-export',
+        });
     }
 
     return items;

@@ -5,6 +5,7 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
+use App\Http\Controllers\Settings\MissingHireDateExportController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SalaryRunApprovalStepsController;
@@ -67,6 +68,12 @@ Route::middleware('auth')->group(function () {
 
         Route::get('settings/user-login', [UserLoginSettingsController::class, 'index'])->name('settings.user-login.index');
         Route::put('settings/user-login/{user}', [UserLoginSettingsController::class, 'update'])->name('settings.user-login.update');
+    });
 
+    Route::middleware('super-admin')->group(function () {
+        Route::get('settings/missing-hire-date-export', [MissingHireDateExportController::class, 'index'])
+            ->name('settings.missing-hire-date-export.index');
+        Route::get('settings/missing-hire-date-export/download', [MissingHireDateExportController::class, 'export'])
+            ->name('settings.missing-hire-date-export.download');
     });
 });

@@ -62,6 +62,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
                 'is_employee' => ($user?->roles()->where('name', 'employee')->exists() ?? false) || ($user?->employee()->exists() ?? false),
+                'is_super_admin' => $isSuperAdmin,
                 'permissions' => $permissionNames,
                 'can_access_settings' => $isSuperAdmin || in_array('settings.access', $permissionNames, true),
                 'can_access_asset_inventory' => $isSuperAdmin || in_array('asset-inventory.access', $permissionNames, true),
