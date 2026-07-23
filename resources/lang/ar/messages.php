@@ -926,6 +926,7 @@ return [
         'leave_days_used_placeholder' => '0',
         'monthly_leave_accrual' => 'الاستحقاق الشهري',
         'remaining_balance' => 'الرصيد المتبقي',
+        'current_entitled_leave_days' => 'الرصيد المستحق حالياً',
         'leave_history' => 'سجل الإجازات',
         'no_leaves_yet' => 'لا توجد إجازات مسجلة بعد',
         'days' => 'يوم',

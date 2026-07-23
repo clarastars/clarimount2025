@@ -316,7 +316,19 @@ class CompanyLeaveController extends Controller
             ->where('status', $status)
             ->whereHas('employee', fn ($query) => $query->where('company_id', $company->id))
             ->with([
-                'employee:id,first_name,father_name,last_name,company_id',
+                'employee' => function ($query): void {
+                    $query->select(
+                        'id',
+                        'first_name',
+                        'father_name',
+                        'last_name',
+                        'company_id',
+                        'leave_accrued_balance',
+                        'leave_days_used',
+                    )->withSum([
+                        'leaves as leave_days_deducted' => fn ($leaveQuery) => $leaveQuery->where('deduct_from_balance', true),
+                    ], 'days');
+                },
                 'reviewer:id,name',
             ]);
 
@@ -347,6 +359,12 @@ class CompanyLeaveController extends Controller
         User $user,
         bool $includeWorkflow = false,
     ): array {
+        $employee = $leaveRequest->employee;
+        $accruedBalance = (float) ($employee->leave_accrued_balance ?? 0);
+        $previouslyUsed = (float) ($employee->leave_days_used ?? 0);
+        $deductedDays = (float) ($employee->leave_days_deducted ?? 0);
+        $remainingBalance = max(0, round($accruedBalance - $previouslyUsed - $deductedDays, 2));
+
         $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
@@ -365,8 +383,10 @@ class CompanyLeaveController extends Controller
             'reviewed_at' => $leaveRequest->reviewed_at?->toIso8601String(),
             'reviewer_name' => $leaveRequest->reviewer?->name,
             'employee' => [
-                'id' => $leaveRequest->employee->id,
-                'full_name' => $leaveRequest->employee->full_name,
+                'id' => $employee->id,
+                'full_name' => $employee->full_name,
+                'leave_accrued_balance' => $accruedBalance,
+                'remaining_annual_leave_balance' => $remainingBalance,
             ],
         ];
 

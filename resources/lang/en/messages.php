@@ -929,6 +929,7 @@ return [
         'leave_days_used_placeholder' => '0',
         'monthly_leave_accrual' => 'Monthly accrual',
         'remaining_balance' => 'Remaining Balance',
+        'current_entitled_leave_days' => 'Current entitled leave days',
         'leave_history' => 'Leave History',
         'no_leaves_yet' => 'No leaves recorded yet',
         'days' => 'days',

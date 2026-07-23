@@ -73,6 +73,8 @@ interface LeaveRequestItem {
     employee: {
         id: number;
         full_name: string;
+        leave_accrued_balance?: number | null;
+        remaining_annual_leave_balance?: number | null;
     };
     approval_steps?: ApprovalStepState[];
     latest_rejection?: LatestRejectionState | null;
@@ -522,84 +524,93 @@ function submitRejectStep() {
             </Card>
 
             <Dialog :open="detailsDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeRequestDetails())">
-                <DialogContent class="max-w-lg">
-                    <DialogHeader>
+                <DialogContent class="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader class="space-y-1">
                         <DialogTitle>{{ t('leaves.request_details') }}</DialogTitle>
-                        <DialogDescription v-if="selectedRequest">
+                        <DialogDescription v-if="selectedRequest" class="text-base font-medium text-foreground">
                             {{ selectedRequest.employee.full_name }}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div v-if="selectedRequest" class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.leave_type') }}</p>
-                            <p class="font-medium">{{ leaveTypeLabel(selectedRequest.leave_type) }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.days') }}</p>
-                            <p class="font-medium">{{ selectedRequest.days }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.start_date') }}</p>
-                            <p class="font-medium">{{ selectedRequest.start_date }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.end_date') }}</p>
-                            <p class="font-medium">{{ selectedRequest.end_date }}</p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.deduct_from_balance_label') }}</p>
-                            <p class="font-medium">
-                                {{ selectedRequest.deduct_from_balance ? t('leaves.deduct_yes') : t('leaves.deduct_no') }}
-                            </p>
-                        </div>
-                        <div>
-                            <p class="text-muted-foreground">{{ t('leaves.paid_leave_label') }}</p>
-                            <p class="font-medium">
-                                {{ selectedRequest.is_paid ? t('leaves.paid_yes') : t('leaves.paid_no') }}
-                            </p>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.request_submitted_at') }}</p>
-                            <p class="font-medium">{{ formatDateTime(selectedRequest.created_at) }}</p>
-                        </div>
-                        <div v-if="selectedRequest.reviewed_at" class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.request_reviewed_at') }}</p>
-                            <p class="font-medium">
-                                {{ formatDateTime(selectedRequest.reviewed_at) }}
-                                <span v-if="selectedRequest.reviewer_name"> — {{ selectedRequest.reviewer_name }}</span>
-                            </p>
-                        </div>
-                        <div v-if="selectedRequest.status" class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.request_status') }}</p>
-                            <Badge :variant="statusVariant(selectedRequest.status)">
+                    <div v-if="selectedRequest" class="space-y-4">
+                        <div class="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-xs text-muted-foreground">{{ t('leaves.current_entitled_leave_days') }}</p>
+                                <p class="text-lg font-semibold tabular-nums">
+                                    {{ selectedRequest.employee.remaining_annual_leave_balance ?? '—' }}
+                                    <span class="text-sm font-normal text-muted-foreground">{{ t('leaves.days') }}</span>
+                                </p>
+                            </div>
+                            <Badge v-if="selectedRequest.status" :variant="statusVariant(selectedRequest.status)">
                                 {{ statusLabel(selectedRequest.status) }}
                             </Badge>
                         </div>
-                        <div class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.notes') }}</p>
-                            <p class="font-medium">{{ selectedRequest.notes || '—' }}</p>
-                        </div>
-                        <div v-if="selectedRequest.review_notes" class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.review_notes') }}</p>
-                            <p class="font-medium">{{ selectedRequest.review_notes }}</p>
-                        </div>
-                        <div v-if="selectedRequest.attachment_url" class="sm:col-span-2">
-                            <p class="text-muted-foreground">{{ t('leaves.attachment') }}</p>
-                            <a
-                                :href="selectedRequest.attachment_url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="text-primary hover:underline font-medium"
-                            >
-                                {{ t('leaves.view_attachment') }}
-                            </a>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.leave_type') }}</p>
+                                <p class="font-medium">{{ leaveTypeLabel(selectedRequest.leave_type) }}</p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.days') }}</p>
+                                <p class="font-medium tabular-nums">{{ selectedRequest.days }}</p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.start_date') }}</p>
+                                <p class="font-medium tabular-nums">{{ selectedRequest.start_date }}</p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.end_date') }}</p>
+                                <p class="font-medium tabular-nums">{{ selectedRequest.end_date }}</p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.deduct_from_balance_label') }}</p>
+                                <p class="font-medium leading-snug">
+                                    {{ selectedRequest.deduct_from_balance ? t('leaves.deduct_yes') : t('leaves.deduct_no') }}
+                                </p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.paid_leave_label') }}</p>
+                                <p class="font-medium">
+                                    {{ selectedRequest.is_paid ? t('leaves.paid_yes') : t('leaves.paid_no') }}
+                                </p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.request_submitted_at') }}</p>
+                                <p class="font-medium">{{ formatDateTime(selectedRequest.created_at) }}</p>
+                            </div>
+                            <div v-if="selectedRequest.reviewed_at" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.request_reviewed_at') }}</p>
+                                <p class="font-medium">
+                                    {{ formatDateTime(selectedRequest.reviewed_at) }}
+                                    <span v-if="selectedRequest.reviewer_name"> — {{ selectedRequest.reviewer_name }}</span>
+                                </p>
+                            </div>
+                            <div class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.notes') }}</p>
+                                <p class="font-medium whitespace-pre-wrap">{{ selectedRequest.notes || '—' }}</p>
+                            </div>
+                            <div v-if="selectedRequest.review_notes" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.review_notes') }}</p>
+                                <p class="font-medium whitespace-pre-wrap">{{ selectedRequest.review_notes }}</p>
+                            </div>
+                            <div v-if="selectedRequest.attachment_url" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.attachment') }}</p>
+                                <a
+                                    :href="selectedRequest.attachment_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-primary hover:underline font-medium"
+                                >
+                                    {{ t('leaves.view_attachment') }}
+                                </a>
+                            </div>
                         </div>
                     </div>
 
                     <div
                         v-if="hasLeaveApprovalWorkflow && selectedRequest?.approval_steps?.length"
-                        class="sm:col-span-2 space-y-4 border-t pt-4"
+                        class="space-y-4 border-t pt-4"
                     >
                         <p class="font-medium">{{ t('leaves.approvals_section') }}</p>
 
