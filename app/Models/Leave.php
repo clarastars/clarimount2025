@@ -17,6 +17,7 @@ class Leave extends Model
     public const TYPE_MARRIAGE = 'marriage';
     public const TYPE_EMERGENCY = 'emergency';
     public const TYPE_MATERNITY = 'maternity';
+    public const TYPE_BEREAVEMENT = 'bereavement';
 
     public const TYPES = [
         self::TYPE_ANNUAL,
@@ -24,6 +25,7 @@ class Leave extends Model
         self::TYPE_MARRIAGE,
         self::TYPE_EMERGENCY,
         self::TYPE_MATERNITY,
+        self::TYPE_BEREAVEMENT,
     ];
 
     protected $fillable = [

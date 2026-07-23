@@ -903,6 +903,7 @@ return [
         'type_marriage' => 'إجازة زواج',
         'type_emergency' => 'إجازة طارئة',
         'type_maternity' => 'إجازة أمومة',
+        'type_bereavement' => 'إجازة وفاة',
         'start_date' => 'تاريخ البداية',
         'end_date' => 'تاريخ النهاية',
         'attachment' => 'ملف الإثبات',

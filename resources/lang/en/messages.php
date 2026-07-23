@@ -906,6 +906,7 @@ return [
         'type_marriage' => 'Marriage Leave',
         'type_emergency' => 'Emergency Leave',
         'type_maternity' => 'Maternity Leave',
+        'type_bereavement' => 'Bereavement Leave',
         'start_date' => 'Start Date',
         'end_date' => 'End Date',
         'attachment' => 'Proof Document',

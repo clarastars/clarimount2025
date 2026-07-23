@@ -30,6 +30,7 @@
                 <option value="marriage">{{ t('leaves.type_marriage') }}</option>
                 <option value="emergency">{{ t('leaves.type_emergency') }}</option>
                 <option value="maternity">{{ t('leaves.type_maternity') }}</option>
+                <option value="bereavement">{{ t('leaves.type_bereavement') }}</option>
             </select>
             <p v-if="form.errors.leave_type" class="text-red-500 text-sm mt-1">{{ form.errors.leave_type }}</p>
         </div>
