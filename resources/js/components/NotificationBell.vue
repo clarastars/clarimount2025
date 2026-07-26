@@ -14,8 +14,10 @@ interface NotificationData {
     event_type: string;
     salary_run_id?: number;
     leave_request_id?: number;
+    salary_certificate_request_id?: number;
     employee_name?: string;
     leave_type?: string;
+    purpose?: string;
     start_date?: string;
     end_date?: string;
     days?: number;
@@ -170,6 +172,75 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         };
 
         const messageKey = keyMap[data.event_type] ?? 'notifications.leave_request_workflow_your_turn';
+
+        return t(messageKey, params);
+    }
+
+    if (data.event_type === 'salary_certificate_request_submitted') {
+        return t('notifications.salary_certificate_request_submitted', {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            purpose: data.purpose ?? '',
+        });
+    }
+
+    if (
+        data.event_type === 'salary_certificate_request_completed'
+        || (data.event_type === 'salary_certificate_request_rejected' && !data.step_title)
+    ) {
+        const messageKey = data.event_type === 'salary_certificate_request_completed'
+            ? 'notifications.salary_certificate_request_completed'
+            : 'notifications.salary_certificate_request_rejected';
+
+        let message = t(messageKey, {
+            company: data.company_name ?? '',
+            purpose: data.purpose ?? '',
+        });
+
+        if (data.review_notes) {
+            message += ` ${t('notifications.salary_certificate_request_decision_notes', { notes: data.review_notes })}`;
+        }
+
+        return message;
+    }
+
+    const salaryCertificateWorkflowTypes = [
+        'salary_certificate_request_your_turn',
+        'salary_certificate_request_step_approved',
+        'salary_certificate_request_step_progress',
+        'salary_certificate_request_workflow_rejected',
+        'salary_certificate_request_finalized',
+    ];
+
+    if (
+        salaryCertificateWorkflowTypes.includes(data.event_type)
+        || (data.event_type === 'salary_certificate_request_rejected' && data.step_title)
+    ) {
+        const params = {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            purpose: data.purpose ?? '',
+            step: data.step_title ?? '',
+            name: data.actor_name ?? '',
+            reason: data.reason ?? '',
+            remaining: data.remaining_steps ?? '',
+        };
+
+        if (data.event_type === 'salary_certificate_request_your_turn' && data.after_rejection) {
+            return t('notifications.salary_certificate_request_workflow_your_turn_after_rejection', params);
+        }
+
+        const keyMap: Record<string, string> = {
+            salary_certificate_request_your_turn: 'notifications.salary_certificate_request_workflow_your_turn',
+            salary_certificate_request_step_approved: 'notifications.salary_certificate_request_workflow_step_approved',
+            salary_certificate_request_step_progress: 'notifications.salary_certificate_request_workflow_step_progress',
+            salary_certificate_request_workflow_rejected: 'notifications.salary_certificate_request_workflow_employee_rejected',
+            salary_certificate_request_finalized: 'notifications.salary_certificate_request_workflow_finalized',
+            salary_certificate_request_rejected: 'notifications.salary_certificate_request_workflow_rejected',
+            salary_certificate_request_completed: 'notifications.salary_certificate_request_workflow_finalized',
+        };
+
+        const messageKey = keyMap[data.event_type] ?? 'notifications.salary_certificate_request_workflow_your_turn';
 
         return t(messageKey, params);
     }

@@ -2,7 +2,7 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText, CalendarDays } from 'lucide-vue-next';
+import { Edit, Globe, Mail, Calendar, User, Users, Package, Settings, CheckCircle, XCircle, Clock, FileText, CalendarDays, FileBadge } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -125,6 +125,12 @@ const formatLastSync = (lastSync: string | null) => {
                         <Link :href="route('companies.leaves.index', company.id)">
                             <CalendarDays class="mr-2 h-4 w-4" />
                             {{ t('leaves.company_leaves_title') }}
+                        </Link>
+                    </Button>
+                    <Button v-if="caps.can_view_company_leaves" variant="outline" as-child>
+                        <Link :href="route('companies.salary-certificates.index', company.id)">
+                            <FileBadge class="mr-2 h-4 w-4" />
+                            {{ t('salary_certificates.company_title') }}
                         </Link>
                     </Button>
                     <Button v-if="caps.can_view_attendance_readonly || caps.can_manage_attendance_adjustments" variant="outline" as-child>

@@ -151,11 +151,18 @@ const moveStep = (index: number, direction: -1 | 1) => {
                     :title="t('settings.leave_approvals_for_company', { company: companyName })"
                     :description="t('settings.leave_approvals_description')"
                 />
-                <Button variant="outline" as-child>
-                    <Link :href="route('companies.leaves.index', company.id)">
-                        {{ t('leaves.company_leaves_title') }}
-                    </Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <Link :href="route('companies.leaves.index', company.id)">
+                            {{ t('leaves.company_leaves_title') }}
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="route('companies.salary-certificates.index', company.id)">
+                            {{ t('salary_certificates.company_title') }}
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="status" class="text-sm text-green-600 dark:text-green-400">{{ status }}</p>

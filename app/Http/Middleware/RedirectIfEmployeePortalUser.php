@@ -47,6 +47,10 @@ class RedirectIfEmployeePortalUser
             'employee.leaves.index',
             'employee.leaves.store',
             'employee.leaves.destroy',
+            'employee.salary-certificates.index',
+            'employee.salary-certificates.store',
+            'employee.salary-certificates.destroy',
+            'employee.salary-certificates.download',
             'api.notifications.index',
             'api.notifications.read',
             'api.notifications.read-all',
@@ -132,12 +136,16 @@ class RedirectIfEmployeePortalUser
         if ($can('leaves.company.view')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
+                'companies.salary-certificates.index',
+                'companies.salary-certificate-requests.download',
             ]);
         }
 
         if ($can('leaves.requests.receive-email')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
+                'companies.salary-certificates.index',
+                'companies.salary-certificate-requests.download',
                 'api.notifications.index',
                 'api.notifications.read',
                 'api.notifications.read-all',
@@ -149,6 +157,10 @@ class RedirectIfEmployeePortalUser
                 'companies.leaves.index',
                 'companies.leave-requests.approve-step',
                 'companies.leave-requests.reject-step',
+                'companies.salary-certificates.index',
+                'companies.salary-certificate-requests.approve-step',
+                'companies.salary-certificate-requests.reject-step',
+                'companies.salary-certificate-requests.download',
             ]);
         }
 
@@ -165,6 +177,8 @@ class RedirectIfEmployeePortalUser
                 'companies.leaves.store',
                 'companies.leave-requests.approve',
                 'companies.leave-requests.reject',
+                'companies.salary-certificate-requests.complete',
+                'companies.salary-certificate-requests.reject',
                 'employees.leaves.create',
                 'employees.leaves.store',
                 'employees.show',

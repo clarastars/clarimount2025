@@ -117,6 +117,11 @@ class Employee extends Model
         return $this->hasMany(LeaveRequest::class);
     }
 
+    public function salaryCertificateRequests(): HasMany
+    {
+        return $this->hasMany(SalaryCertificateRequest::class);
+    }
+
     /**
      * Get the company this employee belongs to.
      */

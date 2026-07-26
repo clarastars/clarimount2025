@@ -1,0 +1,161 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\Employee;
+use App\Models\SalaryCertificateRequest;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class SalaryCertificateRequestService
+{
+    public function __construct(
+        private SalaryCertificateRequestNotificationService $notificationService,
+        private SalaryCertificateApprovalService $approvalService,
+        private SalaryCertificateApprovalNotificationService $approvalNotificationService,
+    ) {}
+
+    public function submitForEmployee(Employee $employee, Request $request): SalaryCertificateRequest
+    {
+        $validated = $request->validate([
+            'purpose' => ['required', 'string', 'max:500'],
+            'addressed_to' => ['nullable', 'string', 'max:255'],
+            'language' => ['required', 'string', Rule::in(SalaryCertificateRequest::LANGUAGES)],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $certificateRequest = SalaryCertificateRequest::query()->create([
+            'employee_id' => $employee->id,
+            'purpose' => $validated['purpose'],
+            'addressed_to' => $validated['addressed_to'] ?? null,
+            'language' => $validated['language'],
+            'notes' => $validated['notes'] ?? null,
+            'status' => SalaryCertificateRequest::STATUS_PENDING,
+        ]);
+
+        $certificateRequest->load(['employee.company']);
+        $company = $certificateRequest->employee->company;
+        $actor = $certificateRequest->employee->user ?? User::make(['name' => $certificateRequest->employee->full_name]);
+
+        if ($company !== null && $this->approvalService->hasActiveStepsForCompany($company)) {
+            $this->approvalNotificationService->notifyWorkflowStarted($certificateRequest, $company, $actor);
+        } else {
+            $this->notificationService->notifySubmitted($certificateRequest);
+        }
+
+        return $certificateRequest;
+    }
+
+    public function complete(
+        SalaryCertificateRequest $certificateRequest,
+        User $reviewer,
+        UploadedFile $certificate,
+        ?string $reviewNotes = null,
+        bool $skipEmployeeNotification = false,
+    ): SalaryCertificateRequest {
+        if (! $certificateRequest->isPending()) {
+            throw ValidationException::withMessages([
+                'status' => [__('messages.salary_certificates.request_already_processed')],
+            ]);
+        }
+
+        $previousDisk = $certificateRequest->certificateDisk();
+        $previousPath = $certificateRequest->certificate_path;
+
+        $diskName = $this->certificateDiskName();
+        $path = $certificate->storeAs(
+            'salary-certificates/'.$certificateRequest->employee_id,
+            $this->buildCertificateFilename($certificate),
+            ['disk' => $diskName, 'visibility' => 'private'],
+        );
+
+        if ($previousPath && Storage::disk($previousDisk)->exists($previousPath)) {
+            Storage::disk($previousDisk)->delete($previousPath);
+        }
+
+        $certificateRequest->update([
+            'status' => SalaryCertificateRequest::STATUS_COMPLETED,
+            'certificate_path' => $path,
+            'certificate_disk' => $diskName,
+            'certificate_name' => $certificate->getClientOriginalName(),
+            'reviewed_by' => $reviewer->id,
+            'reviewed_at' => now(),
+            'review_notes' => $reviewNotes,
+        ]);
+
+        $fresh = $certificateRequest->fresh();
+
+        if (! $skipEmployeeNotification) {
+            $this->notificationService->notifyEmployeeCompleted($fresh);
+        }
+
+        return $fresh;
+    }
+
+    public function reject(
+        SalaryCertificateRequest $certificateRequest,
+        User $reviewer,
+        ?string $reviewNotes = null,
+    ): SalaryCertificateRequest {
+        if (! $certificateRequest->isPending()) {
+            throw ValidationException::withMessages([
+                'status' => [__('messages.salary_certificates.request_already_processed')],
+            ]);
+        }
+
+        $certificateRequest->update([
+            'status' => SalaryCertificateRequest::STATUS_REJECTED,
+            'reviewed_by' => $reviewer->id,
+            'reviewed_at' => now(),
+            'review_notes' => $reviewNotes,
+        ]);
+
+        $fresh = $certificateRequest->fresh();
+        $this->notificationService->notifyEmployeeRejected($fresh);
+
+        return $fresh;
+    }
+
+    public function cancelByEmployee(
+        SalaryCertificateRequest $certificateRequest,
+        Employee $employee,
+    ): void {
+        abort_unless((int) $certificateRequest->employee_id === (int) $employee->id, 403);
+
+        if (! $certificateRequest->isPending()) {
+            throw ValidationException::withMessages([
+                'status' => [__('messages.salary_certificates.request_already_processed')],
+            ]);
+        }
+
+        $certificateRequest->update([
+            'status' => SalaryCertificateRequest::STATUS_CANCELLED,
+        ]);
+
+        $certificateRequest->stepApprovals()->delete();
+    }
+
+    public function certificateDiskName(): string
+    {
+        return (string) config('filesystems.cloud', 's3');
+    }
+
+    private function buildCertificateFilename(UploadedFile $certificate): string
+    {
+        $extension = $certificate->getClientOriginalExtension() ?: 'pdf';
+        $baseName = Str::slug(pathinfo($certificate->getClientOriginalName(), PATHINFO_FILENAME));
+
+        if ($baseName === '') {
+            $baseName = 'salary-certificate';
+        }
+
+        return $baseName.'-'.now()->format('YmdHis').'.'.$extension;
+    }
+}
