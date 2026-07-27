@@ -289,6 +289,12 @@ class SalaryRunService
     }
 
     /**
+     * Prorate base salary for the payroll calendar month.
+     *
+     * - Hired on/before the 1st of this month: full month (factor 1.0), using the standard 30-day system elsewhere.
+     * - First employment month with hire day != 1: factor = workedDays / actual days-in-month.
+     * - Later months: factor 1.0 (no proration).
+     *
      * @return array{factor: float, effective_start: Carbon}
      */
     private function resolveEmploymentProration(Employee $employee, Carbon $periodStart, Carbon $periodEnd): array
@@ -319,7 +325,14 @@ class SalaryRunService
 
         // Inclusive calendar days from hire through last day of period (both at start-of-day in TZ).
         $workedDays = $hireDate->diffInDays($periodEndDay) + 1;
-        $factor = min(1.0, max(0.0, $workedDays / 30));
+
+        // First employment month with mid-month start (hire day != 1): prorate against the
+        // actual number of calendar days in this month. All other payroll logic stays on /30.
+        $denominator = $hireDate->day > 1
+            ? max(1, (int) $periodEndDay->daysInMonth)
+            : 30;
+
+        $factor = min(1.0, max(0.0, $workedDays / $denominator));
 
         return ['factor' => $factor, 'effective_start' => $hireDate];
     }
