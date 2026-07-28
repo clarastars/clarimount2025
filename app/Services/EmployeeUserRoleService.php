@@ -426,6 +426,69 @@ class EmployeeUserRoleService
     }
 
     /**
+     * @return array<int, int>
+     */
+    public function userIdsForTeamInCompany(int $teamId, int $companyId): array
+    {
+        return DB::table('company_user_access')
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function userBelongsToTeamInCompany(User $portalUser, int $teamId, int $companyId): bool
+    {
+        if (! $this->userBelongsToTeam($portalUser, $teamId)) {
+            return false;
+        }
+
+        return DB::table('company_user_access')
+            ->where('user_id', $portalUser->id)
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->exists();
+    }
+
+    /**
+     * @param  string|array<int, string>  $permissions
+     */
+    public function userCanAcrossTeams(User $user, string|array $permissions): bool
+    {
+        $permissions = is_array($permissions) ? $permissions : [$permissions];
+        $teamIds = $this->assignedTeamIdsFor($user);
+
+        if ($teamIds === []) {
+            return false;
+        }
+
+        $previousTeamId = app(PermissionRegistrar::class)->getPermissionsTeamId();
+
+        try {
+            foreach ($teamIds as $teamId) {
+                app(PermissionRegistrar::class)->setPermissionsTeamId($teamId);
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                foreach ($permissions as $permission) {
+                    if ($user->can($permission)) {
+                        return true;
+                    }
+                }
+            }
+        } finally {
+            app(PermissionRegistrar::class)->setPermissionsTeamId($previousTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+        }
+
+        return false;
+    }
+
+    /**
      * @return array<int, string>
      */
     public function describeAssignments(User $portalUser): array
