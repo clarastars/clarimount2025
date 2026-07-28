@@ -277,7 +277,7 @@ class CompanyLeaveController extends Controller
             $validated['reason'],
         );
 
-        return back()->with('success', __('messages.leaves.approval_rejection_saved'));
+        return back()->with('success', __('messages.leaves.request_rejected_success'));
     }
 
     private function canApproveLeaveWorkflow(?User $user): bool

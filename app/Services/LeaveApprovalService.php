@@ -419,6 +419,13 @@ class LeaveApprovalService
             $clearedCount = $leaveRequest->stepApprovals()->count();
             $leaveRequest->stepApprovals()->delete();
 
+            $leaveRequest->update([
+                'status' => LeaveRequest::STATUS_REJECTED,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now(),
+                'review_notes' => $reason,
+            ]);
+
             return LeaveRequestApprovalRejection::query()->create([
                 'leave_request_id' => $leaveRequest->id,
                 'approval_step_id' => $step->id,
