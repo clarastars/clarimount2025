@@ -333,7 +333,7 @@ class LeaveApprovalService
 
         $stepTeamId = (int) $step->team_id;
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeam($user, $stepTeamId)) {
+        if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
             return false;
         }
 

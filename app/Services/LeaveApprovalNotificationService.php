@@ -216,24 +216,12 @@ class LeaveApprovalNotificationService
         $roleService = app(EmployeeUserRoleService::class);
 
         foreach ($teamIds as $teamId) {
-            $teamMemberIds = $roleService->userIdsForTeam((int) $teamId);
+            $teamMemberIds = $roleService->userIdsForTeamInCompany((int) $teamId, (int) $company->id);
 
             if ($teamMemberIds === []) {
                 continue;
             }
-
-            $teamUserIds = User::query()
-                ->whereIn('id', $teamMemberIds)
-                ->where(function ($query) use ($company) {
-                    $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('companies.id', $company->id);
-                    })->orWhereHas('ownedCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('id', $company->id);
-                    });
-                })
-                ->pluck('id');
-
-            $userIds = $userIds->merge($teamUserIds);
+            $userIds = $userIds->merge($teamMemberIds);
         }
 
         return User::query()
@@ -249,7 +237,11 @@ class LeaveApprovalNotificationService
             return false;
         }
 
-        return app(EmployeeUserRoleService::class)->userBelongsToTeam($user, (int) $step->team_id);
+        return app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany(
+            $user,
+            (int) $step->team_id,
+            (int) $step->company_id
+        );
     }
 
     private function userCanReceiveLeaveWorkflowNotifications(User $user, Company $company): bool
@@ -270,6 +262,10 @@ class LeaveApprovalNotificationService
 
         foreach ($teamIds as $teamId) {
             $this->refreshUserPermissionContext($user, $teamId);
+
+            if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, (int) $teamId, (int) $company->id)) {
+                continue;
+            }
 
             if (
                 $user->can('leaves.approve')

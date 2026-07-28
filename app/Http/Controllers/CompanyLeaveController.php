@@ -290,7 +290,10 @@ class CompanyLeaveController extends Controller
             return true;
         }
 
-        return $user->can('leaves.approve') || $user->can('leaves.create');
+        return app(\App\Services\EmployeeUserRoleService::class)->userCanAcrossTeams(
+            $user,
+            ['leaves.approve', 'leaves.create']
+        );
     }
 
     private function abortUnlessLeaveRequestBelongsToCompany(LeaveRequest $leaveRequest, Company $company): void

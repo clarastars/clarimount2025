@@ -619,10 +619,10 @@ function submitRejectStep() {
                             class="rounded-lg border border-red-200 bg-red-50/50 p-4 space-y-2 dark:border-red-800 dark:bg-red-950/20"
                         >
                             <p class="font-medium text-red-800 dark:text-red-300">
-                                {{ t('salary_runs.approval_rejection_notice_title') }}
+                                {{ t('leaves.approval_rejection_notice_title') }}
                             </p>
                             <p class="text-sm text-red-700 dark:text-red-300">
-                                {{ t('salary_runs.approval_rejection_notice_message', {
+                                {{ t('leaves.approval_rejection_notice_message', {
                                     name: latestRejection.rejector_name ?? '—',
                                     step: latestRejection.step_title ?? '—',
                                     date: formatApprovalDate(latestRejection.rejected_at),
@@ -630,14 +630,14 @@ function submitRejectStep() {
                                 }) }}
                             </p>
                             <p v-if="latestRejection.cleared_approvals_count > 0" class="text-sm text-red-700 dark:text-red-300">
-                                {{ t('salary_runs.approval_rejection_cleared_count', { count: latestRejection.cleared_approvals_count }) }}
+                                {{ t('leaves.approval_rejection_cleared_count', { count: latestRejection.cleared_approvals_count }) }}
                             </p>
                             <div class="text-sm">
-                                <span class="font-medium text-red-800 dark:text-red-300">{{ t('salary_runs.approval_rejection_reason_label') }}:</span>
+                                <span class="font-medium text-red-800 dark:text-red-300">{{ t('leaves.approval_rejection_reason_label') }}:</span>
                                 <span class="text-red-700 dark:text-red-300">{{ latestRejection.reason }}</span>
                             </div>
                             <p class="text-sm text-red-600 dark:text-red-400">
-                                {{ t('salary_runs.approval_rejection_restart_hint') }}
+                                {{ t('leaves.approval_rejection_restart_hint') }}
                             </p>
                         </div>
 
@@ -654,24 +654,24 @@ function submitRejectStep() {
                                 </div>
                                 <div v-if="approval.approved_at" class="text-sm space-y-1">
                                     <div class="text-muted-foreground">
-                                        <span>{{ t('salary_runs.approval_date_label') }}:</span>
+                                        <span>{{ t('leaves.approval_date_label') }}:</span>
                                         {{ formatApprovalDate(approval.approved_at) }}
                                     </div>
                                     <div class="text-muted-foreground">
-                                        <span>{{ t('salary_runs.approval_time_label') }}:</span>
+                                        <span>{{ t('leaves.approval_time_label') }}:</span>
                                         {{ formatApprovalTime(approval.approved_at) }}
                                     </div>
                                     <div class="font-medium pt-0.5">
-                                        <span class="text-muted-foreground">{{ t('salary_runs.approval_by_label') }}:</span>
+                                        <span class="text-muted-foreground">{{ t('leaves.approval_by_label') }}:</span>
                                         {{ approval.approver_name || '—' }}
                                     </div>
                                 </div>
                                 <div v-else class="space-y-2">
                                     <p v-if="approval.waiting_previous" class="text-sm text-amber-600 dark:text-amber-400">
-                                        {{ t('salary_runs.approval_waiting_previous') }}
+                                        {{ t('leaves.approval_waiting_previous') }}
                                     </p>
                                     <p v-else class="text-sm text-amber-600 dark:text-amber-400">
-                                        {{ t('salary_runs.approval_pending') }}
+                                        {{ t('leaves.approval_pending') }}
                                     </p>
                                     <div v-if="approval.can_approve || approval.can_reject" class="flex gap-2">
                                         <Button
@@ -681,7 +681,7 @@ function submitRejectStep() {
                                             :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
                                             @click="approveWorkflowStep(approval.id)"
                                         >
-                                            {{ approvingStepId === approval.id ? '...' : t('salary_runs.approval_approve') }}
+                                            {{ approvingStepId === approval.id ? '...' : t('leaves.approval_approve') }}
                                         </Button>
                                         <Button
                                             v-if="approval.can_reject"
@@ -691,7 +691,7 @@ function submitRejectStep() {
                                             :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
                                             @click="openRejectDialog(approval.id)"
                                         >
-                                            {{ rejectingStepId === approval.id ? '...' : t('salary_runs.approval_reject') }}
+                                            {{ rejectingStepId === approval.id ? '...' : t('leaves.approval_reject') }}
                                         </Button>
                                     </div>
                                 </div>
@@ -710,16 +710,16 @@ function submitRejectStep() {
             <Dialog :open="rejectDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeRejectDialog())">
                 <DialogContent class="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{{ t('salary_runs.approval_reject_confirm_title') }}</DialogTitle>
-                        <DialogDescription>{{ t('salary_runs.approval_reject_confirm_message') }}</DialogDescription>
+                        <DialogTitle>{{ t('leaves.approval_reject_confirm_title') }}</DialogTitle>
+                        <DialogDescription>{{ t('leaves.approval_reject_confirm_message') }}</DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitRejectStep">
                         <div class="space-y-2">
-                            <Label for="reject-reason">{{ t('salary_runs.approval_reject_reason_label') }}</Label>
+                            <Label for="reject-reason">{{ t('leaves.approval_reject_reason_label') }}</Label>
                             <Input
                                 id="reject-reason"
                                 v-model="rejectForm.reason"
-                                :placeholder="t('salary_runs.approval_reject_reason_placeholder')"
+                                :placeholder="t('leaves.approval_reject_reason_placeholder')"
                                 required
                             />
                             <p v-if="rejectForm.errors.reason" class="text-sm text-red-600">{{ rejectForm.errors.reason }}</p>
@@ -729,7 +729,7 @@ function submitRejectStep() {
                                 {{ t('common.cancel') }}
                             </Button>
                             <Button type="submit" variant="destructive" :disabled="rejectForm.processing">
-                                {{ rejectForm.processing ? '...' : t('salary_runs.approval_reject') }}
+                                {{ rejectForm.processing ? '...' : t('leaves.approval_reject') }}
                             </Button>
                         </DialogFooter>
                     </form>
