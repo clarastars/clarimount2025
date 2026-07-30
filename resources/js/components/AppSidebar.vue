@@ -19,6 +19,7 @@ const authProps = computed(() => (page.props.auth as {
     can_view_company_readonly?: boolean;
     can_view_employees_readonly?: boolean;
     can_manage_employees?: boolean;
+    can_manage_departments?: boolean;
 }) ?? {});
 const isEmployee = computed(() => authProps.value.is_employee ?? false);
 const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
@@ -26,6 +27,7 @@ const canAccessAssetInventory = computed(() => authProps.value.can_access_asset_
 const canViewCompanyReadOnly = computed(() => authProps.value.can_view_company_readonly ?? false);
 const canViewEmployees = computed(() => authProps.value.can_view_employees_readonly ?? false);
 const canManageEmployees = computed(() => authProps.value.can_manage_employees ?? false);
+const canManageDepartments = computed(() => authProps.value.can_manage_departments ?? false);
 
 const mainNavItems = computed((): NavItem[] => [
     {
@@ -162,8 +164,12 @@ const footerNavItems = computed((): NavItem[] => [
                         || item.href === '/my/leaves'
                         || item.href === '/my/salary-certificates'
                         || (item.href === '/companies' && canViewCompanyReadOnly)
-                        || (item.href === '/employees' && canViewEmployees))
-                    : mainNavItems.filter((item) => item.href !== '/my/leaves' && item.href !== '/my/salary-certificates')"
+                        || (item.href === '/employees' && canViewEmployees)
+                        || (item.href === '/departments' && canManageDepartments))
+                    : mainNavItems.filter((item) =>
+                        item.href !== '/my/leaves'
+                        && item.href !== '/my/salary-certificates'
+                        && (item.href !== '/departments' || canManageDepartments))"
             />
             <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
             <NavMain v-if="canAccessSettings" :items="settingsNavItems" :label="t('nav.settings')" />

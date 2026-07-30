@@ -133,6 +133,19 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($can('departments.manage')) {
+            $allowed = array_merge($allowed, [
+                'departments.index',
+                'departments.create',
+                'departments.store',
+                'departments.show',
+                'departments.edit',
+                'departments.update',
+                'departments.destroy',
+                'api.departments.search',
+            ]);
+        }
+
         if ($can('leaves.company.view')) {
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',

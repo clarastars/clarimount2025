@@ -26,6 +26,7 @@ class TeamPermissionController extends Controller
         ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
         ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
         ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
+        ['name' => 'departments.manage', 'label' => 'إدارة الأقسام (عرض وإضافة وتعديل وحذف)'],
         ['name' => 'leaves.company.view', 'label' => 'الاطلاع على إجازات الشركة وطلبات تعريف الراتب (قراءة فقط)'],
         ['name' => 'leaves.create', 'label' => 'إنشاء الإجازات وإكمال طلبات تعريف الراتب'],
         ['name' => 'leaves.approve', 'label' => 'اعتماد طلبات الإجازة وتعريف الراتب (سلسلة الاعتمادات)'],

@@ -1,52 +1,62 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\Department;
 use App\Models\Company;
-use Illuminate\Http\Request;
+use App\Models\Department;
+use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\JsonResponse;
-use Inertia\Inertia;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class DepartmentController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request): Response
     {
-        $user = $request->user();
-        
-        // Get companies owned by the user
-        $companyIds = Company::where('owner_id', $user->id)->pluck('id');
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartments($user), 403);
+
+        $companyIds = $this->departmentManageableCompanyIds($user);
 
         $query = Department::with('company')
-            ->whereIn('company_id', $companyIds);
+            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds);
 
-        // Company filter
         if ($request->filled('company_id')) {
-            $query->where('company_id', $request->company_id);
+            $companyId = (int) $request->company_id;
+            if ($companyIds->contains($companyId)) {
+                $query->where('company_id', $companyId);
+            }
         }
 
-        // Search functionality
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = (string) $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('company', function ($companyQuery) use ($search) {
-                      $companyQuery->where('name_en', 'like', "%{$search}%")
-                                   ->orWhere('name_ar', 'like', "%{$search}%");
-                  });
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('company', function ($companyQuery) use ($search) {
+                        $companyQuery->where('name_en', 'like', "%{$search}%")
+                            ->orWhere('name_ar', 'like', "%{$search}%");
+                    });
             });
         }
 
         $departments = $query->orderBy('code')->paginate(15)->withQueryString();
-        
-        // Get companies for the filter/context
-        $companies = Company::where('owner_id', $user->id)->get();
+
+        $companies = Company::query()
+            ->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name_en')
+            ->get();
 
         return Inertia::render('Departments/Index', [
             'departments' => $departments,
@@ -58,10 +68,16 @@ class DepartmentController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Request $request)
+    public function create(Request $request): Response
     {
-        $user = $request->user();
-        $companies = Company::where('owner_id', $user->id)->get();
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartments($user), 403);
+
+        $companyIds = $this->departmentManageableCompanyIds($user);
+        $companies = Company::query()
+            ->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name_en')
+            ->get();
 
         return Inertia::render('Departments/Create', [
             'companies' => $companies,
@@ -71,18 +87,21 @@ class DepartmentController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartments($user), 403);
+
+        $companyIds = $this->departmentManageableCompanyIds($user);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'company_id' => [
                 'required',
                 'exists:companies,id',
-                function ($attribute, $value, $fail) use ($user) {
-                    if (!Company::where('id', $value)->where('owner_id', $user->id)->exists()) {
-                        $fail('You can only create departments for companies you own.');
+                function ($attribute, $value, $fail) use ($companyIds) {
+                    if (! $companyIds->contains((int) $value)) {
+                        $fail('You can only create departments for companies you can manage.');
                     }
                 },
             ],
@@ -105,12 +124,10 @@ class DepartmentController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Department $department)
+    public function show(Department $department): Response
     {
-        // Check if user owns the company this department belongs to
-        if ($department->company->owner_id !== auth()->id()) {
-            abort(403);
-        }
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
         $department->load(['company', 'employees']);
 
@@ -122,12 +139,10 @@ class DepartmentController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Department $department)
+    public function edit(Department $department): Response
     {
-        // Check if user owns the company this department belongs to
-        if ($department->company->owner_id !== auth()->id()) {
-            abort(403);
-        }
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
         return Inertia::render('Departments/Edit', [
             'department' => $department,
@@ -137,12 +152,10 @@ class DepartmentController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Department $department)
+    public function update(Request $request, Department $department): RedirectResponse
     {
-        // Check if user owns the company this department belongs to
-        if ($department->company->owner_id !== auth()->id()) {
-            abort(403);
-        }
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -165,14 +178,11 @@ class DepartmentController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Department $department)
+    public function destroy(Department $department): RedirectResponse
     {
-        // Check if user owns the company this department belongs to
-        if ($department->company->owner_id !== auth()->id()) {
-            abort(403);
-        }
+        $user = Auth::user();
+        abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
-        // Check if department has employees
         if ($department->employees()->count() > 0) {
             return back()->with('error', 'Cannot delete department that has employees assigned.');
         }
@@ -187,12 +197,27 @@ class DepartmentController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
+        $user = Auth::user();
+        if ($user === null) {
+            return response()->json([]);
+        }
+
         $query = $request->get('q', '');
         $companyId = $request->get('company_id');
-        
+        $companyIds = $this->departmentManageableCompanyIds($user);
+
+        if ($companyIds->isEmpty()) {
+            return response()->json([]);
+        }
+
         $departments = Department::query()
-            ->when($companyId, function ($q) use ($companyId) {
-                return $q->where('company_id', $companyId);
+            ->whereIn('company_id', $companyIds)
+            ->when($companyId, function ($q) use ($companyId, $companyIds) {
+                if ($companyIds->contains((int) $companyId)) {
+                    return $q->where('company_id', $companyId);
+                }
+
+                return $q->whereIn('company_id', $companyIds);
             })
             ->when($query, function ($q) use ($query) {
                 return $q->where(function ($subQuery) use ($query) {
@@ -210,11 +235,47 @@ class DepartmentController extends Controller
                     'name' => $department->name,
                     'code' => $department->code,
                     'description' => $department->description,
+                    'company_id' => $department->company_id,
                     'company_name' => $department->company->name_en,
                     'display_name' => "{$department->code}: {$department->name}",
                 ];
             });
 
         return response()->json($departments);
+    }
+
+    private function canManageDepartments($user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return app(EmployeeUserRoleService::class)->canInAnyAssignedTeam($user, 'departments.manage');
+    }
+
+    private function canManageDepartment($user, Department $department): bool
+    {
+        return $this->departmentManageableCompanyIds($user)->contains((int) $department->company_id);
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function departmentManageableCompanyIds($user): Collection
+    {
+        if ($user->hasRole('super-admin')) {
+            return Company::query()->pluck('id');
+        }
+
+        $ownedIds = $user->ownedCompanies()->pluck('id');
+        if ($ownedIds->isNotEmpty()) {
+            return $ownedIds;
+        }
+
+        return collect(app(EmployeeUserRoleService::class)->companyIdsWhereCan($user, ['departments.manage']));
     }
 }

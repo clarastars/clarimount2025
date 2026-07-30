@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Policies;
 
 use App\Models\Department;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
+use App\Services\EmployeeUserRoleService;
 
 class DepartmentPolicy
 {
@@ -13,7 +15,7 @@ class DepartmentPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true; // Users can view departments for companies they own
+        return $this->canManageDepartments($user);
     }
 
     /**
@@ -21,7 +23,7 @@ class DepartmentPolicy
      */
     public function view(User $user, Department $department): bool
     {
-        return $department->company->owner_id === $user->id;
+        return $this->canManageDepartment($user, $department);
     }
 
     /**
@@ -29,7 +31,7 @@ class DepartmentPolicy
      */
     public function create(User $user): bool
     {
-        return true; // Users can create departments for companies they own
+        return $this->canManageDepartments($user);
     }
 
     /**
@@ -37,7 +39,7 @@ class DepartmentPolicy
      */
     public function update(User $user, Department $department): bool
     {
-        return $department->company->owner_id === $user->id;
+        return $this->canManageDepartment($user, $department);
     }
 
     /**
@@ -45,7 +47,7 @@ class DepartmentPolicy
      */
     public function delete(User $user, Department $department): bool
     {
-        return $department->company->owner_id === $user->id;
+        return $this->canManageDepartment($user, $department);
     }
 
     /**
@@ -53,7 +55,7 @@ class DepartmentPolicy
      */
     public function restore(User $user, Department $department): bool
     {
-        return $department->company->owner_id === $user->id;
+        return $this->canManageDepartment($user, $department);
     }
 
     /**
@@ -61,6 +63,36 @@ class DepartmentPolicy
      */
     public function forceDelete(User $user, Department $department): bool
     {
-        return $department->company->owner_id === $user->id;
+        return $this->canManageDepartment($user, $department);
+    }
+
+    private function canManageDepartments(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return app(EmployeeUserRoleService::class)->canInAnyAssignedTeam($user, 'departments.manage');
+    }
+
+    private function canManageDepartment(User $user, Department $department): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($department->company_id)->exists()) {
+            return true;
+        }
+
+        return app(EmployeeUserRoleService::class)->canForCompany(
+            $user,
+            'departments.manage',
+            (int) $department->company_id
+        );
     }
 }

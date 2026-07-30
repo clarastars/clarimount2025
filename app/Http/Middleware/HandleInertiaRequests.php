@@ -71,6 +71,9 @@ class HandleInertiaRequests extends Middleware
                 'can_manage_employees' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.manage', $permissionNames, true),
+                'can_manage_departments' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('departments.manage', $permissionNames, true),
                 'can_view_company_leaves' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('leaves.company.view', $permissionNames, true),
