@@ -14,7 +14,6 @@ use App\Notifications\LeaveApprovalWorkflowNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Spatie\Permission\PermissionRegistrar;
 
 class LeaveApprovalNotificationService
 {
@@ -206,6 +205,8 @@ class LeaveApprovalNotificationService
      */
     public function getWorkflowStakeholders(LeaveRequest $leaveRequest, Company $company): Collection
     {
+        $leaveRequest->loadMissing('employee');
+
         $teamIds = $this->approvalService->activeStepsForCompany($company)
             ->pluck('team_id')
             ->filter()
@@ -227,7 +228,14 @@ class LeaveApprovalNotificationService
         return User::query()
             ->whereIn('id', $userIds->unique()->values())
             ->get()
-            ->filter(fn (User $user) => $this->userCanReceiveLeaveWorkflowNotifications($user, $company))
+            ->filter(function (User $user) use ($company, $leaveRequest) {
+                $employee = $leaveRequest->employee;
+                if ($employee === null) {
+                    return false;
+                }
+
+                return $this->userCanReceiveLeaveWorkflowNotifications($user, $company, $employee);
+            })
             ->values();
     }
 
@@ -244,46 +252,16 @@ class LeaveApprovalNotificationService
         );
     }
 
-    private function userCanReceiveLeaveWorkflowNotifications(User $user, Company $company): bool
+    private function userCanReceiveLeaveWorkflowNotifications(User $user, Company $company, Employee $employee): bool
     {
-        if ($user->hasRole('super-admin')) {
-            return true;
-        }
+        $roleService = app(EmployeeUserRoleService::class);
 
-        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
-            return true;
-        }
-
-        $teamIds = app(EmployeeUserRoleService::class)->assignedTeamIdsFor($user);
-
-        if ($teamIds === []) {
-            return false;
-        }
-
-        foreach ($teamIds as $teamId) {
-            $this->refreshUserPermissionContext($user, $teamId);
-
-            if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, (int) $teamId, (int) $company->id)) {
-                continue;
-            }
-
-            if (
-                $user->can('leaves.approve')
-                || $user->can('leaves.company.view')
-                || $user->can('leaves.create')
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function refreshUserPermissionContext(User $user, ?int $teamId = null): void
-    {
-        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId ?? $user->team_id);
-        $user->unsetRelation('roles');
-        $user->unsetRelation('permissions');
+        return $roleService->canAnyAccessEmployeeInCompanyDepartment(
+            $user,
+            ['leaves.approve', 'leaves.company.view', 'leaves.create'],
+            (int) $company->id,
+            $roleService->departmentIdForEmployeeScope($employee)
+        );
     }
 
     /**

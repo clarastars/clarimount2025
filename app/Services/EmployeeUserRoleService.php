@@ -862,6 +862,33 @@ class EmployeeUserRoleService
 
     /**
      * @param  array<int, string>  $permissions
+     */
+    public function canAnyAccessEmployeeInCompanyDepartment(
+        User $user,
+        array $permissions,
+        int $companyId,
+        ?string $departmentId
+    ): bool {
+        foreach ($permissions as $permission) {
+            if ($this->canAccessEmployeeInCompanyDepartment($user, $permission, $companyId, $departmentId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function departmentIdForEmployeeScope(?\App\Models\Employee $employee): ?string
+    {
+        if ($employee === null || $employee->department_id === null || $employee->department_id === '') {
+            return null;
+        }
+
+        return (string) $employee->department_id;
+    }
+
+    /**
+     * @param  array<int, string>  $permissions
      * @return array<int, array{company_id: int, department_ids: array<int, string>|null}>
      */
     public function employeeScopeWhereCan(User $user, array $permissions): array

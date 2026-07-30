@@ -14,7 +14,6 @@ use App\Notifications\SalaryCertificateApprovalWorkflowNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Spatie\Permission\PermissionRegistrar;
 
 class SalaryCertificateApprovalNotificationService
 {
@@ -40,7 +39,7 @@ class SalaryCertificateApprovalNotificationService
             'step_title' => $firstStep->title,
         ];
 
-        foreach ($this->getWorkflowStakeholders($company) as $user) {
+        foreach ($this->getWorkflowStakeholders($company, $certificateRequest->employee) as $user) {
             if ($user->id === $actor->id) {
                 continue;
             }
@@ -64,7 +63,7 @@ class SalaryCertificateApprovalNotificationService
         $basePayload['remaining_steps'] = $this->approvalService->remainingStepsCount($certificateRequest);
 
         $nextStep = $this->approvalService->getNextPendingStep($certificateRequest);
-        $stakeholders = $this->getWorkflowStakeholders($company);
+        $stakeholders = $this->getWorkflowStakeholders($company, $certificateRequest->employee);
 
         foreach ($stakeholders as $user) {
             if ($user->id === $actor->id) {
@@ -94,7 +93,7 @@ class SalaryCertificateApprovalNotificationService
     ): void {
         $payload = $this->buildBasePayload($certificateRequest, $company, $actor);
 
-        foreach ($this->getWorkflowStakeholders($company) as $user) {
+        foreach ($this->getWorkflowStakeholders($company, $certificateRequest->employee) as $user) {
             if ($user->id === $actor->id) {
                 continue;
             }
@@ -122,7 +121,7 @@ class SalaryCertificateApprovalNotificationService
 
         $firstStep = $this->approvalService->getNextPendingStep($certificateRequest);
 
-        foreach ($this->getWorkflowStakeholders($company) as $user) {
+        foreach ($this->getWorkflowStakeholders($company, $certificateRequest->employee) as $user) {
             if ($user->id === $actor->id) {
                 continue;
             }
@@ -213,7 +212,7 @@ class SalaryCertificateApprovalNotificationService
     /**
      * @return Collection<int, User>
      */
-    public function getWorkflowStakeholders(Company $company): Collection
+    public function getWorkflowStakeholders(Company $company, ?Employee $employee = null): Collection
     {
         $teamIds = $this->leaveApprovalService->activeStepsForCompany($company)
             ->pluck('team_id')
@@ -248,7 +247,7 @@ class SalaryCertificateApprovalNotificationService
         return User::query()
             ->whereIn('id', $userIds->unique()->values())
             ->get()
-            ->filter(fn (User $user) => $this->userCanReceiveWorkflowNotifications($user, $company))
+            ->filter(fn (User $user) => $this->userCanReceiveWorkflowNotifications($user, $company, $employee))
             ->values();
     }
 
@@ -261,42 +260,16 @@ class SalaryCertificateApprovalNotificationService
         return app(EmployeeUserRoleService::class)->userBelongsToTeam($user, (int) $step->team_id);
     }
 
-    private function userCanReceiveWorkflowNotifications(User $user, Company $company): bool
+    private function userCanReceiveWorkflowNotifications(User $user, Company $company, ?Employee $employee = null): bool
     {
-        if ($user->hasRole('super-admin')) {
-            return true;
-        }
+        $roleService = app(EmployeeUserRoleService::class);
 
-        if ($user->ownedCompanies()->where('id', $company->id)->exists()) {
-            return true;
-        }
-
-        $teamIds = app(EmployeeUserRoleService::class)->assignedTeamIdsFor($user);
-
-        if ($teamIds === []) {
-            return false;
-        }
-
-        foreach ($teamIds as $teamId) {
-            $this->refreshUserPermissionContext($user, $teamId);
-
-            if (
-                $user->can('leaves.approve')
-                || $user->can('leaves.company.view')
-                || $user->can('leaves.create')
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function refreshUserPermissionContext(User $user, ?int $teamId = null): void
-    {
-        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId ?? $user->team_id);
-        $user->unsetRelation('roles');
-        $user->unsetRelation('permissions');
+        return $roleService->canAnyAccessEmployeeInCompanyDepartment(
+            $user,
+            ['leaves.approve', 'leaves.company.view', 'leaves.create'],
+            (int) $company->id,
+            $roleService->departmentIdForEmployeeScope($employee)
+        );
     }
 
     /**

@@ -14,12 +14,12 @@ use App\Notifications\LeaveRequestNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Spatie\Permission\PermissionRegistrar;
 
 class LeaveRequestNotificationService
 {
     public function notifySubmitted(LeaveRequest $leaveRequest): void
     {
+        $leaveRequest->loadMissing(['employee.company']);
         $employee = $leaveRequest->employee;
         $company = $employee->company;
 
@@ -29,7 +29,7 @@ class LeaveRequestNotificationService
 
         $payload = $this->buildPayload($leaveRequest, $company);
 
-        foreach ($this->getRecipientsForCompany($company) as $user) {
+        foreach ($this->getRecipientsForCompany($company, $employee) as $user) {
             $this->send($user, 'submitted', $payload);
         }
     }
@@ -99,7 +99,7 @@ class LeaveRequestNotificationService
     /**
      * @return Collection<int, User>
      */
-    public function getRecipientsForCompany(Company $company): Collection
+    public function getRecipientsForCompany(Company $company, ?Employee $employee = null): Collection
     {
         $candidateIds = User::query()
             ->where(function ($query) use ($company) {
@@ -120,42 +120,20 @@ class LeaveRequestNotificationService
         return User::query()
             ->whereIn('id', $userIds)
             ->get()
-            ->filter(fn (User $user) => $this->userCanReceiveLeaveRequestNotifications($user, $company))
+            ->filter(fn (User $user) => $this->userCanReceiveLeaveRequestNotifications($user, $company, $employee))
             ->values();
     }
 
-    private function userCanReceiveLeaveRequestNotifications(User $user, Company $company): bool
+    private function userCanReceiveLeaveRequestNotifications(User $user, Company $company, ?Employee $employee = null): bool
     {
-        if ($user->hasRole('super-admin')) {
-            return true;
-        }
+        $roleService = app(EmployeeUserRoleService::class);
 
-        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
-            return true;
-        }
-
-        $teamIds = app(EmployeeUserRoleService::class)->assignedTeamIdsFor($user);
-
-        if ($teamIds === []) {
-            return false;
-        }
-
-        foreach ($teamIds as $teamId) {
-            $this->refreshUserPermissionContext($user, $teamId);
-
-            if ($user->can('leaves.requests.receive-email')) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function refreshUserPermissionContext(User $user, ?int $teamId = null): void
-    {
-        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId ?? $user->team_id);
-        $user->unsetRelation('roles');
-        $user->unsetRelation('permissions');
+        return $roleService->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'leaves.requests.receive-email',
+            (int) $company->id,
+            $roleService->departmentIdForEmployeeScope($employee)
+        );
     }
 
     /**
