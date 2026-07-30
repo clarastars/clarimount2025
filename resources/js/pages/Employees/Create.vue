@@ -21,7 +21,7 @@ const { t } = useI18n()
 interface Department {
     id: number
     name: string
-    company_name: string
+    company_id: number
 }
 
 interface Country {
@@ -42,6 +42,7 @@ interface Props {
     defaultCompanyId?: number
     countries: Country[]
     nationalities: Nationality[]
+    departments: Department[]
     defaultResidenceCountryId?: number
     shifts?: any[]
     canManagePortalAccount?: boolean
@@ -176,18 +177,27 @@ const removeDebt = (index: number) => {
     debts.value.splice(index, 1)
 }
 
-// Department search state
-const departmentSearchQuery = ref('')
-const departmentSearchResults = ref<Department[]>([])
-const departmentSearchLoading = ref(false)
-const showDepartmentDropdown = ref(false)
-const selectedDepartment = ref<Department | null>(null)
+const companyDepartments = computed(() => {
+    if (!form.company_id) {
+        return [] as Department[]
+    }
+
+    return props.departments.filter((department: Department) => department.company_id === Number(form.company_id))
+})
+
+const selectedDepartment = computed(() => {
+    if (!form.department_id) {
+        return null
+    }
+
+    return companyDepartments.value.find((department: Department) => department.id === Number(form.department_id)) ?? null
+})
 
 // Form completion tracking
 const completedSections = computed(() => {
     const sections = {
         general: form.first_name && form.last_name,
-        work: form.job_title || form.department || form.company_id,
+        work: form.job_title || form.department_id || form.company_id,
         legal: form.id_number || form.passport_number,
         insurance: form.insurance_policy,
         employment: form.hire_date || form.employment_status,
@@ -198,78 +208,12 @@ const completedSections = computed(() => {
     return sections
 })
 
-// Debounced department search
-let departmentSearchTimeout: ReturnType<typeof setTimeout> | null = null
-const searchDepartments = (query: string) => {
-    if (departmentSearchTimeout) {
-        clearTimeout(departmentSearchTimeout)
-    }
-    
-    departmentSearchTimeout = setTimeout(async () => {
-        if (query.length < 2) {
-            departmentSearchResults.value = []
-            return
-        }
-        
-        departmentSearchLoading.value = true
-        
-        try {
-            const companyParam = form.company_id ? `&company_id=${form.company_id}` : ''
-            const response = await fetch(`/api/departments/search?q=${encodeURIComponent(query)}${companyParam}`)
-            if (response.ok) {
-                departmentSearchResults.value = await response.json()
-            }
-        } catch (error) {
-            console.error('Error searching departments:', error)
-        } finally {
-            departmentSearchLoading.value = false
-        }
-    }, 300)
-}
-
-// Watch for department search changes
-watch(departmentSearchQuery, (newQuery) => {
-    if (newQuery.length >= 2) {
-        showDepartmentDropdown.value = true
-        searchDepartments(newQuery)
-    } else {
-        showDepartmentDropdown.value = false
-        departmentSearchResults.value = []
-    }
-})
-
 // Watch for company changes to clear department selection
-watch(() => form.company_id, (newCompanyId, oldCompanyId) => {
-    // Clear department when company changes (but not on initial load)
+watch(() => form.company_id, (newCompanyId: number | null | string, oldCompanyId: number | null | string) => {
     if (oldCompanyId !== undefined && newCompanyId !== oldCompanyId) {
-        clearDepartment()
-    }
-    // Clear department results when no company is selected
-    if (!newCompanyId) {
-        departmentSearchResults.value = []
+        form.department_id = null
     }
 })
-
-const selectDepartment = (department: Department) => {
-    selectedDepartment.value = department
-    form.department_id = department.id
-    departmentSearchQuery.value = department.name
-    showDepartmentDropdown.value = false
-}
-
-const clearDepartment = () => {
-    selectedDepartment.value = null
-    form.department_id = null
-    departmentSearchQuery.value = ''
-    departmentSearchResults.value = []
-    showDepartmentDropdown.value = false
-}
-
-const handleDepartmentBlur = () => {
-    setTimeout(() => {
-        showDepartmentDropdown.value = false
-    }, 200)
-}
 
 const pendingEmployeeDocuments = ref<Partial<Record<EmployeeDocumentType, File | null>>>({})
 
@@ -1262,62 +1206,30 @@ const formatCurrency = (amount: number) => {
                                     <div class="md:col-span-3">
                                         <Label for="department" class="mb-2">
                                             {{ t('employees.department') }}
-                                            <span v-if="form.errors.department_id" class="text-red-500 ml-1">*</span>
                                         </Label>
-                                        <div class="relative">
-                                            <div class="flex">
-                                                <Input 
-                                                    id="department"
-                                                    v-model="departmentSearchQuery"
-                                                    type="text" 
-                                                    :placeholder="form.company_id ? t('employees.department_placeholder') : 'Select a company first'"
-                                                    :disabled="!form.company_id"
-                                                    class="rounded-r-none"
-                                                    @focus="form.company_id && (showDepartmentDropdown = departmentSearchQuery.length >= 2)"
-                                                    @blur="handleDepartmentBlur"
-                                                />
-                                                <Button
-                                                    v-if="selectedDepartment"
-                                                    type="button"
-                                                    variant="outline"
-                                                    class="rounded-l-none border-l-0"
-                                                    @click="clearDepartment"
-                                                >
-                                                    <Icon name="X" class="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                            
-                                            <div v-if="!form.company_id" class="mt-2 text-sm text-gray-500">
-                                                Please select a company first to search for departments.
-                                            </div>
-                                            
-                                            <!-- Department Dropdown -->
-                                            <div v-if="showDepartmentDropdown && form.company_id" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                                                <div v-if="departmentSearchLoading" class="px-3 py-2 text-gray-500">
-                                                    {{ t('common.searching') }}...
-                                                </div>
-                                                <div v-else-if="departmentSearchResults.length === 0 && departmentSearchQuery.length >= 2" class="px-3 py-2 text-gray-500">
-                                                    {{ t('employees.no_departments_found') }}
-                                                </div>
-                                                <div v-else>
-                                                    <button
-                                                        v-for="department in departmentSearchResults"
-                                                        :key="department.id"
-                                                        type="button"
-                                                        @click="selectDepartment(department)"
-                                                        class="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
-                                                    >
-                                                        <div class="font-medium">{{ department.name }}</div>
-                                                        <div class="text-sm text-gray-500">{{ department.company_name }}</div>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            
-                                            <div v-if="selectedDepartment" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                                <div class="text-sm font-medium text-blue-800">{{ t('common.selected') }}: {{ selectedDepartment.name }}</div>
-                                                <div class="text-xs text-blue-600">{{ selectedDepartment.company_name }}</div>
-                                            </div>
-                                        </div>
+                                        <select
+                                            id="department"
+                                            v-model="form.department_id"
+                                            :disabled="!form.company_id"
+                                            :class="[
+                                                'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                                                form.errors.department_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                            ]"
+                                        >
+                                            <option :value="null">
+                                                {{ form.company_id ? t('employees.department_placeholder') : t('employees.select_company') }}
+                                            </option>
+                                            <option
+                                                v-for="department in companyDepartments"
+                                                :key="department.id"
+                                                :value="department.id"
+                                            >
+                                                {{ department.name }}
+                                            </option>
+                                        </select>
+                                        <p v-if="form.company_id && companyDepartments.length === 0" class="mt-2 text-sm text-muted-foreground">
+                                            {{ t('employees.no_departments_found') }}
+                                        </p>
                                         <div v-if="form.errors.department_id" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />
                                             {{ translateValidationError(form.errors.department_id || "") }}

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Company;
 use App\Models\Country;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
@@ -278,6 +279,10 @@ class EmployeeController extends Controller
 
         $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
+        $departments = Department::query()
+            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_id']);
         $currentCompany = $user->currentCompany();
 
         if ($companies->isEmpty()) {
@@ -290,6 +295,7 @@ class EmployeeController extends Controller
 
         return Inertia::render('Employees/Create', [
             'companies' => $companies,
+            'departments' => $departments,
             'currentCompany' => $currentCompany,
             'defaultCompanyId' => $currentCompany?->id,
             'countries' => Country::active()->orderByName()->get(),
@@ -399,6 +405,8 @@ class EmployeeController extends Controller
 
         \Log::info('Validation passed, checking department...');
 
+        $validated['department'] = null;
+
         // Validate department belongs to selected company if specified
         if (! empty($validated['department_id'])) {
             $department = \App\Models\Department::where('id', $validated['department_id'])
@@ -408,6 +416,8 @@ class EmployeeController extends Controller
             if (! $department) {
                 return back()->withErrors(['department_id' => 'Invalid department selection for the chosen company.']);
             }
+
+            $validated['department'] = $department->name;
         }
 
         \Log::info('Department check passed, setting defaults...');
@@ -537,6 +547,10 @@ class EmployeeController extends Controller
 
         $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
+        $departments = Department::query()
+            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_id']);
 
         // Get Saudi Arabia as default residence country
         $saudiArabia = Country::where('code', 'SA')->first();
@@ -551,7 +565,7 @@ class EmployeeController extends Controller
             'countries' => Country::active()->orderByName()->get(),
             'nationalities' => Nationality::active()->orderByName()->get(),
             'defaultResidenceCountryId' => $saudiArabia?->id,
-            'departments' => \App\Models\Department::all(),
+            'departments' => $departments,
             'locations' => \App\Models\Location::all(),
             'shifts' => Shift::orderBy('name')->get(),
             'canManagePortalAccount' => $user->hasRole('super-admin'),
@@ -676,6 +690,8 @@ class EmployeeController extends Controller
             abort(403, 'Access denied. Super admin role required.');
         }
 
+        $validated['department'] = null;
+
         // Validate department belongs to selected company if specified
         if (! empty($validated['department_id'])) {
             $department = \App\Models\Department::where('id', $validated['department_id'])
@@ -685,6 +701,8 @@ class EmployeeController extends Controller
             if (! $department) {
                 return back()->withErrors(['department_id' => 'Invalid department selection for the chosen company.']);
             }
+
+            $validated['department'] = $department->name;
         }
 
         if (isset($validated['employee_id']) && trim((string) $validated['employee_id']) === '') {
