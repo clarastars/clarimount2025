@@ -197,10 +197,31 @@
                             <p class="mb-2 min-h-[2.75rem] text-xs font-medium leading-snug text-muted-foreground text-start">
                                 {{ t('settings.assign_employee_teams') }}
                             </p>
-                            <div v-if="(assignedTeams || []).length" class="flex flex-wrap gap-2">
-                                <Badge v-for="team in assignedTeams" :key="team.id" variant="secondary">
-                                    {{ team.name }}
-                                </Badge>
+                            <div v-if="(assignedTeams || []).length" class="space-y-3">
+                                <div
+                                    v-for="team in assignedTeams"
+                                    :key="team.id"
+                                    class="rounded-md border p-3"
+                                >
+                                    <div class="flex flex-wrap gap-2 mb-2">
+                                        <Badge variant="secondary">
+                                            {{ team.name }}
+                                        </Badge>
+                                    </div>
+                                    <div v-if="(team.company_names || []).length" class="flex flex-wrap gap-1.5">
+                                        <Badge
+                                            v-for="(companyName, idx) in team.company_names"
+                                            :key="`${team.id}-${idx}`"
+                                            variant="outline"
+                                            class="text-xs font-normal"
+                                        >
+                                            {{ companyName }}
+                                        </Badge>
+                                    </div>
+                                    <p v-else class="text-xs text-muted-foreground">
+                                        {{ t('settings.no_companies_for_team') }}
+                                    </p>
+                                </div>
                             </div>
                             <p v-else class="text-sm text-muted-foreground">{{ t('settings.no_team') }}</p>
                         </div>
@@ -347,6 +368,8 @@ interface Props {
     assignedTeams?: Array<{
         id: number;
         name: string;
+        company_ids?: number[];
+        company_names?: string[];
     }>;
     canManageEmployees?: boolean;
     canCreateLeaves?: boolean;

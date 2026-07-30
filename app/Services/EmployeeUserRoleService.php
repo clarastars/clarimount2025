@@ -341,7 +341,7 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @return array<int, array{id: int, name: string}>
+     * @return array<int, array{id: int, name: string, company_ids: array<int, int>, company_names: array<int, string>}>
      */
     public function assignedTeamsForUi(User $portalUser): array
     {
@@ -360,13 +360,39 @@ class EmployeeUserRoleService
             ->whereIn('id', collect($assignments)->pluck('team_id'))
             ->pluck('name', 'id');
 
+        $allCompanyIds = collect($assignments)
+            ->pluck('company_ids')
+            ->flatten()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $companyNames = DB::table('companies')
+            ->whereIn('id', $allCompanyIds)
+            ->get(['id', 'name_en', 'name_ar'])
+            ->mapWithKeys(function ($company) {
+                $name = trim(($company->name_ar ?? '').' '.($company->name_en ?? ''));
+
+                return [(int) $company->id => $name !== '' ? $name : (string) $company->id];
+            });
+
         return collect($assignments)
-            ->map(function (array $row) use ($teamNames) {
+            ->map(function (array $row) use ($teamNames, $companyNames) {
                 $teamId = (int) $row['team_id'];
+                $companyIds = collect($row['company_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
 
                 return [
                     'id' => $teamId,
                     'name' => (string) ($teamNames[$teamId] ?? $teamId),
+                    'company_ids' => $companyIds,
+                    'company_names' => collect($companyIds)
+                        ->map(fn (int $id) => (string) ($companyNames[$id] ?? $id))
+                        ->values()
+                        ->all(),
                 ];
             })
             ->values()
