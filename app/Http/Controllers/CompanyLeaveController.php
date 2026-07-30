@@ -45,7 +45,10 @@ class CompanyLeaveController extends Controller
         $today = now()->toDateString();
 
         $currentLeaves = Leave::query()
-            ->whereHas('employee', fn ($query) => $query->where('company_id', $company->id))
+            ->whereHas('employee', function ($query) use ($company, $user): void {
+                $query->where('company_id', $company->id);
+                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create']);
+            })
             ->whereDate('start_date', '<=', $today)
             ->whereDate('end_date', '>=', $today)
             ->with(['employee:id,first_name,father_name,last_name,company_id'])
@@ -81,10 +84,15 @@ class CompanyLeaveController extends Controller
 
         $employees = [];
         if ($canCreateLeaves) {
-            $employees = Employee::query()
+            $employeeQuery = Employee::query()
                 ->where('company_id', $company->id)
                 ->orderBy('first_name')
                 ->orderBy('last_name')
+                ;
+
+            $this->applyEmployeePermissionScope($employeeQuery, $user, ['leaves.create']);
+
+            $employees = $employeeQuery
                 ->get(['id', 'first_name', 'father_name', 'last_name'])
                 ->map(fn (Employee $employee): array => [
                     'id' => $employee->id,
@@ -125,6 +133,7 @@ class CompanyLeaveController extends Controller
 
         $employee = Employee::query()->findOrFail($validated['employee_id']);
         abort_unless((int) $employee->company_id === (int) $company->id, 403);
+        $this->abortUnlessCanCreateLeaveForEmployee($user, $employee);
 
         $this->leaveStoreService->validateAndCreate($request, $employee);
 
@@ -144,7 +153,7 @@ class CompanyLeaveController extends Controller
 
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company, $user);
 
         $validated = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
@@ -168,7 +177,7 @@ class CompanyLeaveController extends Controller
 
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company, $user);
 
         $validated = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
@@ -190,7 +199,7 @@ class CompanyLeaveController extends Controller
         abort_unless($user !== null, 403);
 
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company, $user);
 
         if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
             abort(403);
@@ -239,7 +248,7 @@ class CompanyLeaveController extends Controller
         abort_unless($user !== null, 403);
 
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company);
+        $this->abortUnlessLeaveRequestBelongsToCompany($leaveRequest, $company, $user);
 
         if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
             abort(403);
@@ -296,10 +305,14 @@ class CompanyLeaveController extends Controller
         );
     }
 
-    private function abortUnlessLeaveRequestBelongsToCompany(LeaveRequest $leaveRequest, Company $company): void
+    private function abortUnlessLeaveRequestBelongsToCompany(LeaveRequest $leaveRequest, Company $company, User $user): void
     {
+        $employee = $leaveRequest->employee()->first(['id', 'company_id', 'department_id']);
+
         abort_unless(
-            (int) $leaveRequest->employee()->value('company_id') === (int) $company->id,
+            $employee !== null
+            && (int) $employee->company_id === (int) $company->id
+            && $this->canAccessEmployee($user, $employee),
             404
         );
     }
@@ -317,7 +330,10 @@ class CompanyLeaveController extends Controller
     ): array {
         $query = LeaveRequest::query()
             ->where('status', $status)
-            ->whereHas('employee', fn ($query) => $query->where('company_id', $company->id))
+            ->whereHas('employee', function ($query) use ($company, $user): void {
+                $query->where('company_id', $company->id);
+                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create']);
+            })
             ->with([
                 'employee' => function ($query): void {
                     $query->select(

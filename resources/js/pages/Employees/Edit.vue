@@ -303,6 +303,7 @@
                                     v-model:team-role-assignments="form.team_role_assignments"
                                     :available-teams="props.availableTeams || []"
                                     :role-companies="props.roleCompanies || []"
+                                    :role-departments="props.roleDepartments || []"
                                     :errors="form.errors"
                                 />
                             </CardContent>
@@ -1096,9 +1097,10 @@ interface Props {
     };
     availableTeams?: Array<{ id: number; name: string }>;
     assignableTeamRoles?: Array<{ name: string; label: string }>;
-    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[] }>;
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[]; company_departments?: Record<number, string[]> }>;
     primaryTeamId?: number | null;
     roleCompanies?: Array<{ id: number; name: string }>;
+    roleDepartments?: Array<{ id: string; name: string; company_id: number }>;
 }
 
 const props = defineProps<Props>();
@@ -1217,6 +1219,7 @@ const form = useForm({
         team_id: row.team_id,
         role_name: row.role_name || 'team-member',
         company_ids: Array.isArray(row.company_ids) ? [...row.company_ids] : [],
+        company_departments: row.company_departments ? { ...row.company_departments } : {},
     })),
 })
 

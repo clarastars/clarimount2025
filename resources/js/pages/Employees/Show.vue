@@ -208,15 +208,29 @@
                                             {{ team.name }}
                                         </Badge>
                                     </div>
-                                    <div v-if="(team.company_names || []).length" class="flex flex-wrap gap-1.5">
-                                        <Badge
-                                            v-for="(companyName, idx) in team.company_names"
-                                            :key="`${team.id}-${idx}`"
-                                            variant="outline"
-                                            class="text-xs font-normal"
+                                    <div v-if="(team.company_scopes || []).length" class="space-y-2">
+                                        <div
+                                            v-for="companyScope in team.company_scopes"
+                                            :key="`${team.id}-${companyScope.company_id}`"
+                                            class="rounded-md border p-2"
                                         >
-                                            {{ companyName }}
-                                        </Badge>
+                                            <Badge variant="outline" class="text-xs font-normal">
+                                                {{ companyScope.company_name }}
+                                            </Badge>
+                                            <div v-if="(companyScope.department_names || []).length" class="mt-2 flex flex-wrap gap-1.5">
+                                                <Badge
+                                                    v-for="(departmentName, idx) in companyScope.department_names"
+                                                    :key="`${team.id}-${companyScope.company_id}-${idx}`"
+                                                    variant="secondary"
+                                                    class="text-[11px] font-normal"
+                                                >
+                                                    {{ departmentName }}
+                                                </Badge>
+                                            </div>
+                                            <p v-else class="mt-2 text-xs text-muted-foreground">
+                                                {{ t('settings.role_scope_full_company') }}
+                                            </p>
+                                        </div>
                                     </div>
                                     <p v-else class="text-xs text-muted-foreground">
                                         {{ t('settings.no_companies_for_team') }}
@@ -370,6 +384,11 @@ interface Props {
         name: string;
         company_ids?: number[];
         company_names?: string[];
+        company_scopes?: Array<{
+            company_id: number;
+            company_name: string;
+            department_names?: string[];
+        }>;
     }>;
     canManageEmployees?: boolean;
     canCreateLeaves?: boolean;

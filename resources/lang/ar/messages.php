@@ -229,6 +229,10 @@ return [
         'no_team' => 'بدون فريق',
         'role_companies_hint' => 'حدد الشركات المسموح للموظف الوصول لها عبر دوره.',
         'role_companies_per_team_hint' => 'حدد الشركات المسموح بها لهذا الدور فقط.',
+        'select_departments' => 'تحديد قسم',
+        'hide_departments' => 'إخفاء الأقسام',
+        'role_departments_per_company_hint' => 'اترك الأقسام بدون تحديد ليكون الدور على الشركة بالكامل.',
+        'role_scope_full_company' => 'الدور على الشركة بالكامل',
         'no_companies_available' => 'لا توجد شركات متاحة.',
     ],
     'profile' => [

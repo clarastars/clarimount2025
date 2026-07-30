@@ -1,29 +1,37 @@
 <script setup lang="ts">
 import { Label } from '@/components/ui/label'
+import { reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 export interface TeamRoleAssignment {
     team_id: number
     role_name: string
     company_ids: number[]
+    company_departments: Record<number, string[]>
 }
 
 const props = defineProps<{
     availableTeams: Array<{ id: number; name: string }>
     roleCompanies?: Array<{ id: number; name: string }>
+    roleDepartments?: Array<{ id: string; name: string; company_id: number }>
     errors?: Record<string, string>
 }>()
 
 const teamRoleAssignments = defineModel<TeamRoleAssignment[]>('teamRoleAssignments', { required: true })
 
 const { t } = useI18n()
+const expandedCompanies = reactive<Record<string, boolean>>({})
+
+function isChecked(event: Event): boolean {
+    return (event.target as HTMLInputElement | null)?.checked === true
+}
 
 function isTeamSelected(teamId: number): boolean {
-    return teamRoleAssignments.value.some((row) => row.team_id === teamId)
+    return teamRoleAssignments.value.some((row: TeamRoleAssignment) => row.team_id === teamId)
 }
 
 function assignmentFor(teamId: number): TeamRoleAssignment | undefined {
-    return teamRoleAssignments.value.find((row) => row.team_id === teamId)
+    return teamRoleAssignments.value.find((row: TeamRoleAssignment) => row.team_id === teamId)
 }
 
 function toggleTeam(teamId: number, checked: boolean): void {
@@ -31,13 +39,13 @@ function toggleTeam(teamId: number, checked: boolean): void {
         if (!isTeamSelected(teamId)) {
             teamRoleAssignments.value = [
                 ...teamRoleAssignments.value,
-                { team_id: teamId, role_name: 'team-member', company_ids: [] },
+                { team_id: teamId, role_name: 'team-member', company_ids: [], company_departments: {} },
             ]
         }
         return
     }
 
-    teamRoleAssignments.value = teamRoleAssignments.value.filter((row) => row.team_id !== teamId)
+    teamRoleAssignments.value = teamRoleAssignments.value.filter((row: TeamRoleAssignment) => row.team_id !== teamId)
 }
 
 function isCompanySelected(teamId: number, companyId: number): boolean {
@@ -46,22 +54,75 @@ function isCompanySelected(teamId: number, companyId: number): boolean {
 }
 
 function toggleCompany(teamId: number, companyId: number, checked: boolean): void {
-    teamRoleAssignments.value = teamRoleAssignments.value.map((row) => {
+    teamRoleAssignments.value = teamRoleAssignments.value.map((row: TeamRoleAssignment) => {
         if (row.team_id !== teamId) {
             return row
         }
 
         const current = row.company_ids ?? []
+        const company_departments = { ...(row.company_departments ?? {}) }
         const company_ids = checked
             ? Array.from(new Set([...current, companyId]))
-            : current.filter((id) => id !== companyId)
+            : current.filter((id: number) => id !== companyId)
 
-        return { ...row, company_ids }
+        if (!checked) {
+            delete company_departments[companyId]
+        }
+
+        return { ...row, company_ids, company_departments }
     })
 }
 
+function departmentsForCompany(companyId: number): Array<{ id: string; name: string; company_id: number }> {
+    return (props.roleDepartments || []).filter((department: { id: string; name: string; company_id: number }) => department.company_id === companyId)
+}
+
+function selectedDepartmentIds(teamId: number, companyId: number): string[] {
+    const assignment = assignmentFor(teamId)
+    return assignment?.company_departments?.[companyId] ?? []
+}
+
+function isDepartmentSelected(teamId: number, companyId: number, departmentId: string): boolean {
+    return selectedDepartmentIds(teamId, companyId).includes(departmentId)
+}
+
+function toggleDepartment(teamId: number, companyId: number, departmentId: string, checked: boolean): void {
+    teamRoleAssignments.value = teamRoleAssignments.value.map((row: TeamRoleAssignment) => {
+        if (row.team_id !== teamId) {
+            return row
+        }
+
+        const company_departments = { ...(row.company_departments ?? {}) }
+        const current = company_departments[companyId] ?? []
+        const next = checked
+            ? Array.from(new Set([...current, departmentId]))
+            : current.filter((id: string) => id !== departmentId)
+
+        if (next.length === 0) {
+            delete company_departments[companyId]
+        } else {
+            company_departments[companyId] = next
+        }
+
+        return { ...row, company_departments }
+    })
+}
+
+function companyScopeKey(teamId: number, companyId: number): string {
+    return `${teamId}-${companyId}`
+}
+
+function isDepartmentPickerOpen(teamId: number, companyId: number): boolean {
+    return expandedCompanies[companyScopeKey(teamId, companyId)] === true
+}
+
+function toggleDepartmentPicker(teamId: number, companyId: number): void {
+    const key = companyScopeKey(teamId, companyId)
+    expandedCompanies[key] = !expandedCompanies[key]
+}
+
 function companyErrorFor(teamId: number): string | undefined {
-    const index = teamRoleAssignments.value.findIndex((row) => row.team_id === teamId)
+    const index = teamRoleAssignments.value.findIndex((row: TeamRoleAssignment) => row.team_id === teamId)
     if (index < 0 || !props.errors) {
         return undefined
     }
@@ -94,7 +155,7 @@ function companyErrorFor(teamId: number): string | undefined {
                             type="checkbox"
                             class="h-4 w-4 rounded border-gray-300"
                             :checked="isTeamSelected(team.id)"
-                            @change="toggleTeam(team.id, ($event.target as HTMLInputElement).checked)"
+                            @change="toggleTeam(team.id, isChecked($event))"
                         >
                         <span class="font-medium">{{ team.name }}</span>
                     </label>
@@ -122,19 +183,68 @@ function companyErrorFor(teamId: number): string | undefined {
                             v-else
                             class="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-40 overflow-auto"
                         >
-                            <label
+                            <div
                                 v-for="company in (roleCompanies || [])"
                                 :key="`${team.id}-${company.id}`"
-                                class="flex items-center gap-2 text-xs rounded px-1.5 py-1 hover:bg-muted/50"
+                                class="rounded border px-2 py-2 space-y-2"
                             >
-                                <input
-                                    type="checkbox"
-                                    class="h-3.5 w-3.5 rounded border-gray-300"
-                                    :checked="isCompanySelected(team.id, company.id)"
-                                    @change="toggleCompany(team.id, company.id, ($event.target as HTMLInputElement).checked)"
+                                <div class="flex items-center justify-between gap-2">
+                                    <label class="flex items-center gap-2 text-xs rounded hover:bg-muted/50 cursor-pointer min-w-0">
+                                        <input
+                                            type="checkbox"
+                                            class="h-3.5 w-3.5 rounded border-gray-300"
+                                            :checked="isCompanySelected(team.id, company.id)"
+                                            @change="toggleCompany(team.id, company.id, isChecked($event))"
+                                        >
+                                        <span class="truncate">{{ company.name }}</span>
+                                    </label>
+
+                                    <button
+                                        v-if="isCompanySelected(team.id, company.id)"
+                                        type="button"
+                                        class="text-[11px] text-primary hover:underline shrink-0"
+                                        @click="toggleDepartmentPicker(team.id, company.id)"
+                                    >
+                                        {{ isDepartmentPickerOpen(team.id, company.id) ? t('settings.hide_departments') : t('settings.select_departments') }}
+                                    </button>
+                                </div>
+
+                                <div
+                                    v-if="isCompanySelected(team.id, company.id) && isDepartmentPickerOpen(team.id, company.id)"
+                                    class="rounded-md bg-background border p-2 space-y-2"
                                 >
-                                <span>{{ company.name }}</span>
-                            </label>
+                                    <div>
+                                        <p class="text-[11px] font-medium text-foreground">
+                                            {{ t('employees.department') }}
+                                        </p>
+                                        <p class="text-[11px] text-muted-foreground">
+                                            {{ t('settings.role_departments_per_company_hint') }}
+                                        </p>
+                                    </div>
+
+                                    <div
+                                        v-if="departmentsForCompany(company.id).length"
+                                        class="grid grid-cols-1 gap-1 max-h-28 overflow-auto"
+                                    >
+                                        <label
+                                            v-for="department in departmentsForCompany(company.id)"
+                                            :key="`${team.id}-${company.id}-${department.id}`"
+                                            class="flex items-center gap-2 text-[11px] rounded px-1 py-1 hover:bg-muted/50 cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="h-3.5 w-3.5 rounded border-gray-300"
+                                                :checked="isDepartmentSelected(team.id, company.id, department.id)"
+                                                @change="toggleDepartment(team.id, company.id, department.id, isChecked($event))"
+                                            >
+                                            <span>{{ department.name }}</span>
+                                        </label>
+                                    </div>
+                                    <p v-else class="text-[11px] text-muted-foreground">
+                                        {{ t('employees.no_departments_found') }}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         <div v-if="companyErrorFor(team.id)" class="text-sm text-red-500">
                             {{ companyErrorFor(team.id) }}

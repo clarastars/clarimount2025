@@ -16,6 +16,7 @@ use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
 use App\Services\LeaveAccrualService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -133,6 +134,8 @@ class EmployeeController extends Controller
         $query = Employee::whereIn('company_id', $companies->isEmpty() ? [-1] : $companies)
             ->with(['assets', 'company'])
             ->withCount(['assets', 'reportedTickets']);
+
+        $this->applyEmployeePermissionScope($query, $user, $this->employeeViewPermissions());
 
         // Apply company filter
         if ($request->filled('company_id')) {
@@ -820,7 +823,7 @@ class EmployeeController extends Controller
                 return $q->whereIn('company_id', $accessibleCompanyIds);
             })
             ->when($departmentId, function ($q) use ($departmentId) {
-                return $q->where('department', $departmentId);
+                return $q->where('department_id', $departmentId);
             })
             ->when($query, function ($q) use ($query) {
                 $this->applyEmployeeSearch($q, (string) $query);
@@ -830,7 +833,11 @@ class EmployeeController extends Controller
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->limit(20)
-            ->get()
+            ;
+
+        $this->applyEmployeePermissionScope($employees, $user, $this->employeeViewPermissions());
+
+        $employees = $employees->get()
             ->map(function ($employee) {
                 return [
                     'id' => $employee->id,
@@ -877,6 +884,7 @@ class EmployeeController extends Controller
             return response()->json([]);
         }
 
+        /** @var Builder $employees */
         $employees = Employee::query()
             ->when(is_array($companyIds), fn ($q) => $q->whereIn('company_id', $companyIds))
             ->with('company')
@@ -886,8 +894,11 @@ class EmployeeController extends Controller
             ->orderBy('first_name')
             ->orderBy('father_name')
             ->orderBy('last_name')
-            ->limit(10)
-            ->get()
+            ->limit(10);
+
+        $this->applyEmployeePermissionScope($employees, $user, ['employees.global-search']);
+
+        $employees = $employees->get()
             ->map(function (Employee $employee): array {
                 $fullName = trim(implode(' ', array_filter([
                     $employee->first_name,
@@ -922,7 +933,12 @@ class EmployeeController extends Controller
     }
 
     /**
-     * @return array<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>
+     * @return array<int, array{
+     *     team_id: int,
+     *     role_name: string,
+     *     company_ids: array<int, int>,
+     *     company_departments: array<int|string, array<int, string>>
+     * }>
      */
     private function resolveTeamRoleAssignments(EmployeeUserRoleService $roleService, \App\Models\User $portalUser): array
     {
@@ -941,6 +957,7 @@ class EmployeeController extends Controller
                     'team_id' => (int) $portalUser->team_id,
                     'role_name' => 'team-member',
                     'company_ids' => $legacyCompanyIds,
+                    'company_departments' => [],
                 ],
             ];
         }
@@ -970,6 +987,16 @@ class EmployeeController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'roleDepartments' => Department::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'company_id'])
+                ->map(fn (Department $department) => [
+                    'id' => (string) $department->id,
+                    'name' => $department->name,
+                    'company_id' => (int) $department->company_id,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
@@ -984,6 +1011,9 @@ class EmployeeController extends Controller
             'team_role_assignments.*.role_name' => ['nullable', 'string', Rule::in(array_keys(EmployeeUserRoleService::TEAM_ROLES))],
             'team_role_assignments.*.company_ids' => ['array'],
             'team_role_assignments.*.company_ids.*' => ['integer', Rule::exists('companies', 'id')],
+            'team_role_assignments.*.company_departments' => ['array'],
+            'team_role_assignments.*.company_departments.*' => ['array'],
+            'team_role_assignments.*.company_departments.*.*' => ['string', Rule::exists('departments', 'id')],
         ];
     }
 

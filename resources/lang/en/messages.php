@@ -229,6 +229,10 @@ return [
         'no_team' => 'No team',
         'role_companies_hint' => 'Select companies this employee can access through their role.',
         'role_companies_per_team_hint' => 'Select companies allowed for this role only.',
+        'select_departments' => 'Select departments',
+        'hide_departments' => 'Hide departments',
+        'role_departments_per_company_hint' => 'Leave departments unselected to apply the role to the whole company.',
+        'role_scope_full_company' => 'Role applies to the whole company',
         'no_companies_available' => 'No companies available.',
     ],
     'profile' => [

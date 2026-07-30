@@ -40,7 +40,12 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @return array<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>
+     * @return array<int, array{
+     *     team_id: int,
+     *     role_name: string,
+     *     company_ids: array<int, int>,
+     *     company_departments: array<int|string, array<int, string>>
+     * }>
      */
     public function assignedTeamRoleAssignments(User $portalUser): array
     {
@@ -66,12 +71,40 @@ class EmployeeUserRoleService
             ->unique('team_id')
             ->values();
 
-        $companyIdsByTeam = DB::table('company_user_access')
+        $companyAccessByTeam = DB::table('company_user_access')
             ->where('user_id', $portalUser->id)
             ->whereNotNull('team_id')
-            ->get(['team_id', 'company_id'])
+            ->get(['team_id', 'company_id', 'department_id'])
             ->groupBy(fn ($row) => (int) $row->team_id)
-            ->map(fn ($rows) => $rows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values()->all());
+            ->map(function ($rows) {
+                $companyIds = $rows->pluck('company_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $companyDepartments = $rows
+                    ->groupBy(fn ($row) => (int) $row->company_id)
+                    ->map(function ($companyRows) {
+                        if ($companyRows->contains(fn ($row) => $row->department_id === null)) {
+                            return [];
+                        }
+
+                        return $companyRows->pluck('department_id')
+                            ->filter()
+                            ->map(fn ($id) => (string) $id)
+                            ->unique()
+                            ->values()
+                            ->all();
+                    })
+                    ->filter(fn (array $departmentIds) => $departmentIds !== [])
+                    ->all();
+
+                return [
+                    'company_ids' => $companyIds,
+                    'company_departments' => $companyDepartments,
+                ];
+            });
 
         // Legacy unscoped companies (team_id NULL) apply to every current team so prior access is preserved in the UI.
         $legacyCompanyIds = DB::table('company_user_access')
@@ -84,14 +117,19 @@ class EmployeeUserRoleService
             ->all();
 
         return $assignments
-            ->map(function (array $row) use ($companyIdsByTeam, $legacyCompanyIds) {
+            ->map(function (array $row) use ($companyAccessByTeam, $legacyCompanyIds) {
                 $teamId = (int) $row['team_id'];
-                $scoped = $companyIdsByTeam->get($teamId, []);
+                $scoped = $companyAccessByTeam->get($teamId, [
+                    'company_ids' => [],
+                    'company_departments' => [],
+                ]);
+                $companyIds = array_values(array_unique(array_merge($scoped['company_ids'], $legacyCompanyIds)));
 
                 return [
                     'team_id' => $teamId,
                     'role_name' => (string) $row['role_name'],
-                    'company_ids' => array_values(array_unique(array_merge($scoped, $legacyCompanyIds))),
+                    'company_ids' => $companyIds,
+                    'company_departments' => $scoped['company_departments'],
                 ];
             })
             ->values()
@@ -120,7 +158,12 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @param  array<int, array{team_id?: int|string|null, role_name?: string|null, company_ids?: array<int, int|string>}>  $teamRoleAssignments
+     * @param  array<int, array{
+     *     team_id?: int|string|null,
+     *     role_name?: string|null,
+     *     company_ids?: array<int, int|string>,
+     *     company_departments?: array<int|string, array<int, string>>
+     * }>  $teamRoleAssignments
      * @param  array<int, string>  $globalRoleNames
      * @param  array<int, int|string>|null  $legacyRoleCompanyIds  Kept for backward compatibility; applied to every assigned team when company_ids are omitted.
      */
@@ -154,10 +197,45 @@ class EmployeeUserRoleService
                     ->values()
                     ->all();
 
+                $companyDepartments = collect($row['company_departments'] ?? [])
+                    ->mapWithKeys(function ($departmentIds, $companyId) use ($companyIds) {
+                        $companyId = (int) $companyId;
+
+                        if (! in_array($companyId, $companyIds, true) || ! is_array($departmentIds)) {
+                            return [];
+                        }
+
+                        $normalizedDepartmentIds = collect($departmentIds)
+                            ->map(fn ($id) => (string) $id)
+                            ->filter(fn (string $id) => $id !== '')
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        return [$companyId => $normalizedDepartmentIds];
+                    })
+                    ->mapWithKeys(function (array $departmentIds, int $companyId) {
+                        if ($departmentIds === []) {
+                            return [$companyId => []];
+                        }
+
+                        $validDepartmentIds = DB::table('departments')
+                            ->where('company_id', $companyId)
+                            ->whereIn('id', $departmentIds)
+                            ->pluck('id')
+                            ->map(fn ($id) => (string) $id)
+                            ->values()
+                            ->all();
+
+                        return [$companyId => $validDepartmentIds];
+                    })
+                    ->all();
+
                 return [
                     'team_id' => $teamId,
                     'role_name' => $roleName,
                     'company_ids' => $companyIds,
+                    'company_departments' => $companyDepartments,
                 ];
             })
             ->filter()
@@ -209,7 +287,12 @@ class EmployeeUserRoleService
      * Only replaces rows for teams the acting user can manage; other teams' access is left intact.
      *
      * @param  Collection<int, int>  $manageableTeamIds
-     * @param  Collection<int, array{team_id: int, role_name: string, company_ids: array<int, int>}>  $normalizedAssignments
+     * @param  Collection<int, array{
+     *     team_id: int,
+     *     role_name: string,
+     *     company_ids: array<int, int>,
+     *     company_departments: array<int|string, array<int, string>>
+     * }>  $normalizedAssignments
      */
     private function syncTeamCompanyAccess(
         User $portalUser,
@@ -233,13 +316,36 @@ class EmployeeUserRoleService
 
         foreach ($normalizedAssignments as $assignment) {
             foreach ($assignment['company_ids'] as $companyId) {
-                $rows[] = [
-                    'company_id' => (int) $companyId,
-                    'user_id' => $portalUser->id,
-                    'team_id' => (int) $assignment['team_id'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+                $departmentIds = collect($assignment['company_departments'][$companyId] ?? [])
+                    ->map(fn ($id) => (string) $id)
+                    ->filter(fn (string $id) => $id !== '')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($departmentIds === []) {
+                    $rows[] = [
+                        'company_id' => (int) $companyId,
+                        'department_id' => null,
+                        'user_id' => $portalUser->id,
+                        'team_id' => (int) $assignment['team_id'],
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+
+                    continue;
+                }
+
+                foreach ($departmentIds as $departmentId) {
+                    $rows[] = [
+                        'company_id' => (int) $companyId,
+                        'department_id' => $departmentId,
+                        'user_id' => $portalUser->id,
+                        'team_id' => (int) $assignment['team_id'],
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
             }
         }
 
@@ -341,7 +447,17 @@ class EmployeeUserRoleService
     }
 
     /**
-     * @return array<int, array{id: int, name: string, company_ids: array<int, int>, company_names: array<int, string>}>
+     * @return array<int, array{
+     *     id: int,
+     *     name: string,
+     *     company_ids: array<int, int>,
+     *     company_names: array<int, string>,
+     *     company_scopes: array<int, array{
+     *         company_id: int,
+     *         company_name: string,
+     *         department_names: array<int, string>
+     *     }>
+     * }>
      */
     public function assignedTeamsForUi(User $portalUser): array
     {
@@ -376,14 +492,30 @@ class EmployeeUserRoleService
                 return [(int) $company->id => $name !== '' ? $name : (string) $company->id];
             });
 
+        $allDepartmentIds = collect($assignments)
+            ->pluck('company_departments')
+            ->filter()
+            ->flatMap(function ($companyDepartments) {
+                return collect($companyDepartments)->flatten();
+            })
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+
+        $departmentNames = DB::table('departments')
+            ->whereIn('id', $allDepartmentIds)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id) => [(string) $id => (string) $name]);
+
         return collect($assignments)
-            ->map(function (array $row) use ($teamNames, $companyNames) {
+            ->map(function (array $row) use ($teamNames, $companyNames, $departmentNames) {
                 $teamId = (int) $row['team_id'];
                 $companyIds = collect($row['company_ids'] ?? [])
                     ->map(fn ($id) => (int) $id)
                     ->unique()
                     ->values()
                     ->all();
+                $companyDepartments = collect($row['company_departments'] ?? []);
 
                 return [
                     'id' => $teamId,
@@ -391,6 +523,24 @@ class EmployeeUserRoleService
                     'company_ids' => $companyIds,
                     'company_names' => collect($companyIds)
                         ->map(fn (int $id) => (string) ($companyNames[$id] ?? $id))
+                        ->values()
+                        ->all(),
+                    'company_scopes' => collect($companyIds)
+                        ->map(function (int $companyId) use ($companyNames, $companyDepartments, $departmentNames) {
+                            $departmentIds = collect($companyDepartments->get($companyId, []))
+                                ->map(fn ($id) => (string) $id)
+                                ->values()
+                                ->all();
+
+                            return [
+                                'company_id' => $companyId,
+                                'company_name' => (string) ($companyNames[$companyId] ?? $companyId),
+                                'department_names' => collect($departmentIds)
+                                    ->map(fn (string $id) => (string) ($departmentNames[$id] ?? $id))
+                                    ->values()
+                                    ->all(),
+                            ];
+                        })
                         ->values()
                         ->all(),
                 ];
@@ -606,6 +756,48 @@ class EmployeeUserRoleService
     }
 
     /**
+     * Team IDs that grant this user access to the given company and department.
+     *
+     * A NULL department scope means whole-company access for that team.
+     *
+     * @return array<int, int>
+     */
+    public function teamIdsForScopedCompany(User $user, int $companyId, ?string $departmentId): array
+    {
+        $scopedTeamIds = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->where('company_id', $companyId)
+            ->whereNotNull('team_id')
+            ->where(function ($query) use ($departmentId): void {
+                $query->whereNull('department_id');
+
+                if ($departmentId !== null && $departmentId !== '') {
+                    $query->orWhere('department_id', $departmentId);
+                }
+            })
+            ->pluck('team_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($scopedTeamIds->isNotEmpty()) {
+            return $scopedTeamIds->all();
+        }
+
+        $hasLegacyAccess = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->where('company_id', $companyId)
+            ->whereNull('team_id')
+            ->exists();
+
+        if (! $hasLegacyAccess) {
+            return [];
+        }
+
+        return $this->assignedTeamIdsFor($user);
+    }
+
+    /**
      * Whether the user has the permission via any team linked to this company.
      */
     public function canForCompany(User $user, string $permission, int $companyId): bool
@@ -642,6 +834,137 @@ class EmployeeUserRoleService
         }
 
         return false;
+    }
+
+    public function canAccessEmployeeInCompanyDepartment(
+        User $user,
+        string $permission,
+        int $companyId,
+        ?string $departmentId
+    ): bool {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($companyId)->exists()) {
+            return true;
+        }
+
+        $teamIds = $this->teamIdsForScopedCompany($user, $companyId, $departmentId);
+        if ($teamIds === []) {
+            return false;
+        }
+
+        return $this->withTeamContexts($user, $teamIds, function () use ($user, $permission): bool {
+            return $user->can($permission);
+        });
+    }
+
+    /**
+     * @param  array<int, string>  $permissions
+     * @return array<int, array{company_id: int, department_ids: array<int, string>|null}>
+     */
+    public function employeeScopeWhereCan(User $user, array $permissions): array
+    {
+        if ($user->hasRole('super-admin')) {
+            return \App\Models\Company::query()
+                ->pluck('id')
+                ->map(fn ($id) => [
+                    'company_id' => (int) $id,
+                    'department_ids' => null,
+                ])
+                ->all();
+        }
+
+        $ownedIds = $user->ownedCompanies()->pluck('id')->map(fn ($id) => (int) $id);
+        if ($ownedIds->isNotEmpty()) {
+            return $ownedIds
+                ->map(fn (int $id) => [
+                    'company_id' => $id,
+                    'department_ids' => null,
+                ])
+                ->all();
+        }
+
+        $accessRows = DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->get(['company_id', 'team_id', 'department_id']);
+
+        if ($accessRows->isEmpty()) {
+            return [];
+        }
+
+        $scopes = [];
+        $legacyCompanyIds = $accessRows
+            ->whereNull('team_id')
+            ->pluck('company_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        foreach ($accessRows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values() as $companyId) {
+            $teamIds = $this->teamIdsForCompany($user, $companyId);
+            $permittedTeamIds = [];
+
+            foreach ($teamIds as $teamId) {
+                $hasPermission = $this->withTeamContexts($user, [$teamId], function () use ($user, $permissions): bool {
+                    foreach ($permissions as $permission) {
+                        if ($user->can($permission)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+                if ($hasPermission) {
+                    $permittedTeamIds[] = $teamId;
+                }
+            }
+
+            if ($permittedTeamIds === []) {
+                continue;
+            }
+
+            if (in_array($companyId, $legacyCompanyIds, true)) {
+                $scopes[] = [
+                    'company_id' => $companyId,
+                    'department_ids' => null,
+                ];
+                continue;
+            }
+
+            $companyRows = $accessRows
+                ->where('company_id', $companyId)
+                ->whereIn('team_id', $permittedTeamIds);
+
+            if ($companyRows->contains(fn ($row) => $row->department_id === null)) {
+                $scopes[] = [
+                    'company_id' => $companyId,
+                    'department_ids' => null,
+                ];
+                continue;
+            }
+
+            $departmentIds = $companyRows->pluck('department_id')
+                ->filter()
+                ->map(fn ($id) => (string) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($departmentIds === []) {
+                continue;
+            }
+
+            $scopes[] = [
+                'company_id' => $companyId,
+                'department_ids' => $departmentIds,
+            ];
+        }
+
+        return $scopes;
     }
 
     /**

@@ -48,9 +48,10 @@ interface Props {
     canManagePortalAccount?: boolean
     availableTeams?: Array<{ id: number; name: string }>
     assignableTeamRoles?: Array<{ name: string; label: string }>
-    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[] }>
+    teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[]; company_departments?: Record<number, string[]> }>
     primaryTeamId?: number | null
     roleCompanies?: Array<{ id: number; name: string }>
+    roleDepartments?: Array<{ id: string; name: string; company_id: number }>
 }
 
 const props = defineProps<Props>()
@@ -125,7 +126,7 @@ const form = useForm({
     portal_password: '',
     portal_password_confirmation: '',
     portal_password_reset: false,
-    team_role_assignments: [] as Array<{ team_id: number; role_name: string; company_ids: number[] }>,
+    team_role_assignments: [] as Array<{ team_id: number; role_name: string; company_ids: number[]; company_departments: Record<number, string[]> }>,
 })
 
 // Auto-calculate total allowances from allowance details
@@ -981,6 +982,7 @@ const formatCurrency = (amount: number) => {
                                     v-model:team-role-assignments="form.team_role_assignments"
                                     :available-teams="props.availableTeams || []"
                                     :role-companies="props.roleCompanies || []"
+                                    :role-departments="props.roleDepartments || []"
                                     :errors="form.errors"
                                 />
                             </CardContent>

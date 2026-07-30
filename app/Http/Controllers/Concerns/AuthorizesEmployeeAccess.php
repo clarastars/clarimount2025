@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Support\Collection;
 
@@ -129,7 +130,12 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $this->roleService()->canForCompany($user, 'employees.custody.update', (int) $employee->company_id);
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.custody.update',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
     }
 
     protected function canManageEmployees(User $user): bool
@@ -155,7 +161,12 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $this->roleService()->canForCompany($user, 'employees.manage', (int) $employee->company_id);
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.manage',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
     }
 
     protected function canViewCompanyLeaves(User $user): bool
@@ -194,7 +205,12 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $this->roleService()->canForCompany($user, 'leaves.create', (int) $employee->company_id);
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'leaves.create',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
     }
 
     protected function canAccessCompanyLeaves(User $user, Company $company): bool
@@ -236,7 +252,26 @@ trait AuthorizesEmployeeAccess
 
     protected function canAccessEmployee(User $user, Employee $employee): bool
     {
-        return $this->employeeQueryableCompanyIds($user)->contains($employee->company_id);
+        if (! $this->employeeQueryableCompanyIds($user)->contains($employee->company_id)) {
+            return false;
+        }
+
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        foreach ($this->employeeViewPermissions() as $permission) {
+            if ($this->roleService()->canAccessEmployeeInCompanyDepartment(
+                $user,
+                $permission,
+                (int) $employee->company_id,
+                $employee->department_id ? (string) $employee->department_id : null
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function abortUnlessCanViewEmployees(User $user): void
@@ -319,11 +354,53 @@ trait AuthorizesEmployeeAccess
 
     protected function canViewEmployeeViaGlobalSearch(User $user, Employee $employee): bool
     {
-        if (! $this->roleService()->canForCompany($user, 'employees.global-search', (int) $employee->company_id)) {
+        if (! $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.global-search',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        )) {
             return false;
         }
 
         return in_array((int) $employee->company_id, $this->roleAssignedCompanyIds($user), true);
+    }
+
+    /**
+     * Restrict an employee query to the departments allowed by the role scope.
+     *
+     * @param  array<int, string>  $permissions
+     */
+    protected function applyEmployeePermissionScope(Builder $query, User $user, array $permissions): void
+    {
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->exists()) {
+            return;
+        }
+
+        $scopes = $this->roleService()->employeeScopeWhereCan($user, $permissions);
+
+        if ($scopes === []) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where(function (Builder $scopeQuery) use ($scopes): void {
+            foreach ($scopes as $scope) {
+                $companyId = (int) $scope['company_id'];
+                $departmentIds = $scope['department_ids'];
+
+                if ($departmentIds === null) {
+                    $scopeQuery->orWhere('company_id', $companyId);
+                    continue;
+                }
+
+                $scopeQuery->orWhere(function (Builder $companyQuery) use ($companyId, $departmentIds): void {
+                    $companyQuery
+                        ->where('company_id', $companyId)
+                        ->whereIn('department_id', $departmentIds);
+                });
+            }
+        });
     }
 
     protected function abortUnlessCanViewEmployeeProfile(User $user, Employee $employee): void
