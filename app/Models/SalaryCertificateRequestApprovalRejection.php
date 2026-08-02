@@ -30,7 +30,7 @@ class SalaryCertificateRequestApprovalRejection extends Model
 
     public function approvalStep(): BelongsTo
     {
-        return $this->belongsTo(LeaveApprovalStep::class, 'approval_step_id');
+        return $this->belongsTo(SalaryCertificateApprovalStep::class, 'approval_step_id');
     }
 
     public function rejector(): BelongsTo

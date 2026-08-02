@@ -5,23 +5,73 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Company;
-use App\Models\LeaveApprovalStep;
+use App\Models\SalaryCertificateApprovalStep;
 use App\Models\SalaryCertificateRequest;
 use App\Models\SalaryCertificateRequestApprovalRejection;
 use App\Models\SalaryCertificateRequestStepApproval;
+use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 class SalaryCertificateApprovalService
 {
-    public function __construct(
-        private LeaveApprovalService $leaveApprovalService,
-    ) {}
+    /** @var list<string> Steps auto-created by seedDefaultStepsForCompany. */
+    public const DEFAULT_STEP_TITLES = [
+        'مراجعة الموارد البشرية',
+        'اعتماد المدير المباشر',
+        'اعتماد الإدارة',
+    ];
+
+    /**
+     * @return Collection<int, SalaryCertificateApprovalStep>
+     */
+    public function activeStepsForCompany(int|Company $company): Collection
+    {
+        $companyId = $company instanceof Company ? (int) $company->id : $company;
+
+        return SalaryCertificateApprovalStep::query()
+            ->with('team')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
 
     public function hasActiveStepsForCompany(int|Company $company): bool
     {
-        return $this->leaveApprovalService->hasActiveStepsForCompany($company);
+        return $this->activeStepsForCompany($company)->isNotEmpty();
+    }
+
+    public function seedDefaultStepsForCompany(Company $company): void
+    {
+        if (SalaryCertificateApprovalStep::query()->where('company_id', $company->id)->exists()) {
+            return;
+        }
+
+        $defaults = [
+            ['title' => 'مراجعة الموارد البشرية', 'sort_order' => 1, 'team_name' => 'الموارد البشرية'],
+            ['title' => 'اعتماد المدير المباشر', 'sort_order' => 2, 'team_name' => null],
+            ['title' => 'اعتماد الإدارة', 'sort_order' => 3, 'team_name' => null],
+        ];
+
+        foreach ($defaults as $step) {
+            $teamId = null;
+
+            if ($step['team_name']) {
+                $teamId = Team::query()->where('name', $step['team_name'])->value('id');
+            }
+
+            SalaryCertificateApprovalStep::query()->create([
+                'company_id' => $company->id,
+                'title' => $step['title'],
+                'sort_order' => $step['sort_order'],
+                'team_id' => $teamId,
+                'is_active' => true,
+            ]);
+        }
     }
 
     /**
@@ -32,7 +82,7 @@ class SalaryCertificateApprovalService
         User $user,
         Company $company,
     ): array {
-        $steps = $this->leaveApprovalService->activeStepsForCompany($company);
+        $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = SalaryCertificateRequestStepApproval::query()
             ->where('salary_certificate_request_id', $request->id)
             ->with('approver')
@@ -88,7 +138,7 @@ class SalaryCertificateApprovalService
             return null;
         }
 
-        $steps = $this->leaveApprovalService->activeStepsForCompany($company);
+        $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = SalaryCertificateRequestStepApproval::query()
             ->where('salary_certificate_request_id', $request->id)
             ->with('approver')
@@ -177,7 +227,7 @@ class SalaryCertificateApprovalService
     public function allStepsApproved(SalaryCertificateRequest $request): bool
     {
         $companyId = (int) $request->employee()->value('company_id');
-        $stepCount = $this->leaveApprovalService->activeStepsForCompany($companyId)->count();
+        $stepCount = $this->activeStepsForCompany($companyId)->count();
 
         if ($stepCount === 0) {
             return false;
@@ -186,26 +236,26 @@ class SalaryCertificateApprovalService
         return $request->stepApprovals()->count() === $stepCount;
     }
 
-    public function getNextPendingStep(SalaryCertificateRequest $request): ?LeaveApprovalStep
+    public function getNextPendingStep(SalaryCertificateRequest $request): ?SalaryCertificateApprovalStep
     {
         $companyId = (int) $request->employee()->value('company_id');
         $approvedStepIds = $request->stepApprovals()->pluck('approval_step_id');
 
-        return $this->leaveApprovalService->activeStepsForCompany($companyId)->first(
-            fn (LeaveApprovalStep $step) => ! $approvedStepIds->contains($step->id)
+        return $this->activeStepsForCompany($companyId)->first(
+            fn (SalaryCertificateApprovalStep $step) => ! $approvedStepIds->contains($step->id)
         );
     }
 
     public function remainingStepsCount(SalaryCertificateRequest $request): int
     {
         $companyId = (int) $request->employee()->value('company_id');
-        $total = $this->leaveApprovalService->activeStepsForCompany($companyId)->count();
+        $total = $this->activeStepsForCompany($companyId)->count();
         $approved = $request->stepApprovals()->count();
 
         return max(0, $total - $approved);
     }
 
-    public function isLastPendingStep(SalaryCertificateRequest $request, LeaveApprovalStep $step): bool
+    public function isLastPendingStep(SalaryCertificateRequest $request, SalaryCertificateApprovalStep $step): bool
     {
         $next = $this->getNextPendingStep($request);
 
@@ -216,7 +266,7 @@ class SalaryCertificateApprovalService
         User $user,
         Company $company,
         SalaryCertificateRequest $request,
-        LeaveApprovalStep $step,
+        SalaryCertificateApprovalStep $step,
     ): bool {
         if ((int) $step->company_id !== (int) $company->id) {
             return false;
@@ -252,7 +302,7 @@ class SalaryCertificateApprovalService
 
         $stepTeamId = (int) $step->team_id;
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeam($user, $stepTeamId)) {
+        if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
             return false;
         }
 
@@ -265,9 +315,9 @@ class SalaryCertificateApprovalService
 
     public function previousStepsAreApproved(
         SalaryCertificateRequest $request,
-        LeaveApprovalStep $step,
+        SalaryCertificateApprovalStep $step,
     ): bool {
-        $previousStepIds = LeaveApprovalStep::query()
+        $previousStepIds = SalaryCertificateApprovalStep::query()
             ->where('company_id', $step->company_id)
             ->where('is_active', true)
             ->where(function ($query) use ($step) {
@@ -294,7 +344,7 @@ class SalaryCertificateApprovalService
     public function approveStep(
         User $user,
         SalaryCertificateRequest $request,
-        LeaveApprovalStep $step,
+        SalaryCertificateApprovalStep $step,
     ): SalaryCertificateRequestStepApproval {
         return DB::transaction(function () use ($user, $request, $step) {
             if ((int) $step->company_id !== (int) $request->employee()->value('company_id')) {
@@ -321,7 +371,7 @@ class SalaryCertificateApprovalService
     public function rejectStep(
         User $user,
         SalaryCertificateRequest $request,
-        LeaveApprovalStep $step,
+        SalaryCertificateApprovalStep $step,
         string $reason,
     ): SalaryCertificateRequestApprovalRejection {
         return DB::transaction(function () use ($user, $request, $step, $reason) {
@@ -348,6 +398,18 @@ class SalaryCertificateApprovalService
                 'reason' => $reason,
                 'cleared_approvals_count' => $clearedCount,
             ]);
+        });
+    }
+
+    public function reorderStepsForCompany(int $companyId, array $orderedIds): void
+    {
+        DB::transaction(function () use ($companyId, $orderedIds) {
+            foreach (array_values($orderedIds) as $index => $stepId) {
+                SalaryCertificateApprovalStep::query()
+                    ->where('company_id', $companyId)
+                    ->whereKey($stepId)
+                    ->update(['sort_order' => $index + 1]);
+            }
         });
     }
 }

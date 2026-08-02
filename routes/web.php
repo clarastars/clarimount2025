@@ -24,6 +24,7 @@ use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
 use App\Http\Controllers\CompanyLeaveApprovalStepsController;
+use App\Http\Controllers\CompanySalaryCertificateApprovalStepsController;
 use App\Http\Controllers\CompanyLeaveController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
@@ -232,6 +233,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('companies/{company}/leave-approvals/{leaveApprovalStep}', [CompanyLeaveApprovalStepsController::class, 'destroy'])->name('companies.leave-approvals.destroy');
     Route::post('companies/{company}/leave-approvals/reorder', [CompanyLeaveApprovalStepsController::class, 'reorder'])->name('companies.leave-approvals.reorder');
 
+    // Salary certificate approval steps (per company)
+    Route::get('companies/{company}/salary-certificate-approvals', [CompanySalaryCertificateApprovalStepsController::class, 'index'])->name('companies.salary-certificate-approvals.index');
+    Route::post('companies/{company}/salary-certificate-approvals', [CompanySalaryCertificateApprovalStepsController::class, 'store'])->name('companies.salary-certificate-approvals.store');
+    Route::put('companies/{company}/salary-certificate-approvals/{salaryCertificateApprovalStep}', [CompanySalaryCertificateApprovalStepsController::class, 'update'])->name('companies.salary-certificate-approvals.update');
+    Route::delete('companies/{company}/salary-certificate-approvals/{salaryCertificateApprovalStep}', [CompanySalaryCertificateApprovalStepsController::class, 'destroy'])->name('companies.salary-certificate-approvals.destroy');
+    Route::post('companies/{company}/salary-certificate-approvals/reorder', [CompanySalaryCertificateApprovalStepsController::class, 'reorder'])->name('companies.salary-certificate-approvals.reorder');
+
     // Employee portal — self-service leaves
     Route::get('my/leaves', [EmployeePortalLeaveController::class, 'index'])->name('employee.leaves.index');
     Route::post('my/leaves', [EmployeePortalLeaveController::class, 'store'])->name('employee.leaves.store');
@@ -247,8 +255,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('companies/{company}/salary-certificates', [CompanySalaryCertificateController::class, 'index'])->name('companies.salary-certificates.index');
     Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/complete', [CompanySalaryCertificateController::class, 'complete'])->name('companies.salary-certificate-requests.complete');
     Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/reject', [CompanySalaryCertificateController::class, 'reject'])->name('companies.salary-certificate-requests.reject');
-    Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/approval-steps/{leaveApprovalStep}/approve', [CompanySalaryCertificateController::class, 'approveWorkflowStep'])->name('companies.salary-certificate-requests.approve-step');
-    Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/approval-steps/{leaveApprovalStep}/reject', [CompanySalaryCertificateController::class, 'rejectWorkflowStep'])->name('companies.salary-certificate-requests.reject-step');
+    Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/approval-steps/{salaryCertificateApprovalStep}/approve', [CompanySalaryCertificateController::class, 'approveWorkflowStep'])->name('companies.salary-certificate-requests.approve-step');
+    Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/approval-steps/{salaryCertificateApprovalStep}/reject', [CompanySalaryCertificateController::class, 'rejectWorkflowStep'])->name('companies.salary-certificate-requests.reject-step');
     Route::get('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/download', [CompanySalaryCertificateController::class, 'download'])->name('companies.salary-certificate-requests.download');
 
     // Employee Debts routes

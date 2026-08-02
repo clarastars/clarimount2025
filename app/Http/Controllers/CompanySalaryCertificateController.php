@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Company;
-use App\Models\LeaveApprovalStep;
+use App\Models\SalaryCertificateApprovalStep;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use App\Services\SalaryCertificateApprovalNotificationService;
@@ -144,7 +144,7 @@ class CompanySalaryCertificateController extends Controller
         Request $request,
         Company $company,
         SalaryCertificateRequest $salaryCertificateRequest,
-        LeaveApprovalStep $leaveApprovalStep,
+        SalaryCertificateApprovalStep $salaryCertificateApprovalStep,
     ): RedirectResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
@@ -152,19 +152,19 @@ class CompanySalaryCertificateController extends Controller
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
 
-        if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
+        if ((int) $salaryCertificateApprovalStep->company_id !== (int) $company->id) {
             abort(403);
         }
 
-        if (! $leaveApprovalStep->is_active) {
+        if (! $salaryCertificateApprovalStep->is_active) {
             abort(403);
         }
 
-        if (! $this->approvalService->canUserApproveStep($user, $company, $salaryCertificateRequest, $leaveApprovalStep)) {
+        if (! $this->approvalService->canUserApproveStep($user, $company, $salaryCertificateRequest, $salaryCertificateApprovalStep)) {
             abort(403);
         }
 
-        $isLastStep = $this->approvalService->isLastPendingStep($salaryCertificateRequest, $leaveApprovalStep);
+        $isLastStep = $this->approvalService->isLastPendingStep($salaryCertificateRequest, $salaryCertificateApprovalStep);
 
         $validated = $request->validate([
             'certificate' => [$isLastStep ? 'required' : 'nullable', 'file', 'mimes:pdf', 'max:10240'],
@@ -172,7 +172,7 @@ class CompanySalaryCertificateController extends Controller
         ]);
 
         try {
-            $this->approvalService->approveStep($user, $salaryCertificateRequest, $leaveApprovalStep);
+            $this->approvalService->approveStep($user, $salaryCertificateRequest, $salaryCertificateApprovalStep);
         } catch (\RuntimeException $exception) {
             return back()->with('info', $exception->getMessage());
         }
@@ -202,7 +202,7 @@ class CompanySalaryCertificateController extends Controller
         $this->approvalNotificationService->notifyStepApproved(
             $salaryCertificateRequest,
             $company,
-            $leaveApprovalStep,
+            $salaryCertificateApprovalStep,
             $user,
         );
 
@@ -213,7 +213,7 @@ class CompanySalaryCertificateController extends Controller
         Request $request,
         Company $company,
         SalaryCertificateRequest $salaryCertificateRequest,
-        LeaveApprovalStep $leaveApprovalStep,
+        SalaryCertificateApprovalStep $salaryCertificateApprovalStep,
     ): RedirectResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
@@ -221,15 +221,15 @@ class CompanySalaryCertificateController extends Controller
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
 
-        if ((int) $leaveApprovalStep->company_id !== (int) $company->id) {
+        if ((int) $salaryCertificateApprovalStep->company_id !== (int) $company->id) {
             abort(403);
         }
 
-        if (! $leaveApprovalStep->is_active) {
+        if (! $salaryCertificateApprovalStep->is_active) {
             abort(403);
         }
 
-        if (! $this->approvalService->canUserApproveStep($user, $company, $salaryCertificateRequest, $leaveApprovalStep)) {
+        if (! $this->approvalService->canUserApproveStep($user, $company, $salaryCertificateRequest, $salaryCertificateApprovalStep)) {
             abort(403);
         }
 
@@ -241,7 +241,7 @@ class CompanySalaryCertificateController extends Controller
             $this->approvalService->rejectStep(
                 $user,
                 $salaryCertificateRequest,
-                $leaveApprovalStep,
+                $salaryCertificateApprovalStep,
                 $validated['reason']
             );
         } catch (\RuntimeException $exception) {
@@ -252,7 +252,7 @@ class CompanySalaryCertificateController extends Controller
         $this->approvalNotificationService->notifyStepRejected(
             $salaryCertificateRequest,
             $company,
-            $leaveApprovalStep,
+            $salaryCertificateApprovalStep,
             $user,
             $validated['reason'],
         );

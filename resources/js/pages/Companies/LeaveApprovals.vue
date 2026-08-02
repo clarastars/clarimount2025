@@ -157,11 +157,6 @@ const moveStep = (index: number, direction: -1 | 1) => {
                             {{ t('leaves.company_leaves_title') }}
                         </Link>
                     </Button>
-                    <Button variant="outline" as-child>
-                        <Link :href="route('companies.salary-certificates.index', company.id)">
-                            {{ t('salary_certificates.company_title') }}
-                        </Link>
-                    </Button>
                 </div>
             </div>
 

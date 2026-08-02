@@ -7,7 +7,7 @@ namespace App\Services;
 use App\Mail\SalaryCertificateApprovalWorkflowMail;
 use App\Models\Company;
 use App\Models\Employee;
-use App\Models\LeaveApprovalStep;
+use App\Models\SalaryCertificateApprovalStep;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use App\Notifications\SalaryCertificateApprovalWorkflowNotification;
@@ -19,7 +19,6 @@ class SalaryCertificateApprovalNotificationService
 {
     public function __construct(
         private SalaryCertificateApprovalService $approvalService,
-        private LeaveApprovalService $leaveApprovalService,
     ) {}
 
     public function notifyWorkflowStarted(
@@ -53,7 +52,7 @@ class SalaryCertificateApprovalNotificationService
     public function notifyStepApproved(
         SalaryCertificateRequest $certificateRequest,
         Company $company,
-        LeaveApprovalStep $approvedStep,
+        SalaryCertificateApprovalStep $approvedStep,
         User $actor,
     ): void {
         $certificateRequest->refresh();
@@ -107,7 +106,7 @@ class SalaryCertificateApprovalNotificationService
     public function notifyStepRejected(
         SalaryCertificateRequest $certificateRequest,
         Company $company,
-        LeaveApprovalStep $rejectedStep,
+        SalaryCertificateApprovalStep $rejectedStep,
         User $actor,
         string $reason,
     ): void {
@@ -214,7 +213,7 @@ class SalaryCertificateApprovalNotificationService
      */
     public function getWorkflowStakeholders(Company $company, ?Employee $employee = null): Collection
     {
-        $teamIds = $this->leaveApprovalService->activeStepsForCompany($company)
+        $teamIds = $this->approvalService->activeStepsForCompany($company)
             ->pluck('team_id')
             ->filter()
             ->unique()
@@ -251,7 +250,7 @@ class SalaryCertificateApprovalNotificationService
             ->values();
     }
 
-    private function userIsAssignedToApprovalStep(User $user, LeaveApprovalStep $step): bool
+    private function userIsAssignedToApprovalStep(User $user, SalaryCertificateApprovalStep $step): bool
     {
         if ($step->team_id === null) {
             return false;

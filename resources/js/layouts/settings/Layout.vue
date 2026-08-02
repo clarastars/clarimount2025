@@ -74,6 +74,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 href: '/settings/leave-approvals',
             },
             {
+                title: t('settings.salary_certificate_approvals'),
+                href: '/settings/salary-certificate-approvals',
+            },
+            {
                 title: t('settings.user_login'),
                 href: '/settings/user-login',
             },
