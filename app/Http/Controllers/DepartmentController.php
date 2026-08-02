@@ -29,6 +29,7 @@ class DepartmentController extends Controller
         $companyIds = $this->departmentManageableCompanyIds($user);
 
         $query = Department::with('company')
+            ->withCount('employees')
             ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds);
 
         if ($request->filled('company_id')) {

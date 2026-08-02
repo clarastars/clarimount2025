@@ -508,6 +508,7 @@ return [
         'description' => 'Description',
         'description_placeholder' => 'Optional description of the department',
         'company' => 'Company',
+        'employees_count' => 'Employees',
         'select_company' => 'Select a company',
         'company_required' => 'You need to create a company first before adding departments.',
         'create_company' => 'Create Company',

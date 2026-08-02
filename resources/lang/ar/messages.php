@@ -508,6 +508,7 @@ return [
         'description' => 'الوصف',
         'description_placeholder' => 'وصف اختياري للقسم',
         'company' => 'الشركة',
+        'employees_count' => 'الموظفون',
         'select_company' => 'اختر شركة',
         'company_required' => 'تحتاج إلى إنشاء شركة أولاً قبل إضافة الأقسام.',
         'create_company' => 'إنشاء شركة',
