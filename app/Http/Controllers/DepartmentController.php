@@ -6,12 +6,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Employee;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -48,11 +50,53 @@ class DepartmentController extends Controller
                     ->orWhereHas('company', function ($companyQuery) use ($search) {
                         $companyQuery->where('name_en', 'like', "%{$search}%")
                             ->orWhere('name_ar', 'like', "%{$search}%");
+                    })
+                    ->orWhereExists(function ($accessQuery) use ($search) {
+                        $accessQuery->select(DB::raw(1))
+                            ->from('company_user_access as cua')
+                            ->join('teams', 'teams.id', '=', 'cua.team_id')
+                            ->join('users', 'users.id', '=', 'cua.user_id')
+                            ->leftJoin('employees', 'employees.user_id', '=', 'users.id')
+                            ->whereColumn('cua.department_id', 'departments.id')
+                            ->where(function ($inner) use ($search) {
+                                $inner->where('teams.name', 'like', "%{$search}%")
+                                    ->orWhere('users.name', 'like', "%{$search}%")
+                                    ->orWhere('employees.first_name', 'like', "%{$search}%")
+                                    ->orWhere('employees.father_name', 'like', "%{$search}%")
+                                    ->orWhere('employees.last_name', 'like', "%{$search}%")
+                                    ->orWhere('employees.employee_id', 'like', "%{$search}%");
+                            });
                     });
             });
         }
 
         $departments = $query->orderBy('code')->paginate(15)->withQueryString();
+
+        $roleAssigneesByDepartment = $this->roleAssigneesByDepartmentIds(
+            $departments->getCollection()->pluck('id')
+        );
+
+        $departments->getCollection()->transform(function (Department $department) use ($roleAssigneesByDepartment) {
+            $roleAssignees = $roleAssigneesByDepartment->get((string) $department->id, collect())->values()->all();
+
+            return [
+                'id' => $department->id,
+                'name' => $department->name,
+                'code' => $department->code,
+                'description' => $department->description,
+                'company_id' => $department->company_id,
+                'employees_count' => $department->employees_count,
+                'created_at' => $department->created_at,
+                'updated_at' => $department->updated_at,
+                'company' => $department->company ? [
+                    'id' => $department->company->id,
+                    'name_en' => $department->company->name_en,
+                    'name_ar' => $department->company->name_ar,
+                    'company_email' => $department->company->company_email,
+                ] : null,
+                'role_assignees' => $roleAssignees,
+            ];
+        });
 
         $companies = Company::query()
             ->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)
@@ -119,7 +163,7 @@ class DepartmentController extends Controller
 
         Department::create($validated);
 
-        return redirect()->route('departments.index')->with('success', 'Department created successfully.');
+        return redirect()->route('departments.index')->with('success', __('messages.departments.created_successfully'));
     }
 
     /**
@@ -130,10 +174,48 @@ class DepartmentController extends Controller
         $user = Auth::user();
         abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
-        $department->load(['company', 'employees']);
+        $department->load([
+            'company',
+            'employees' => function ($query) {
+                $query->orderBy('first_name')->orderBy('last_name');
+            },
+        ]);
+
+        $employees = $department->employees->map(fn (Employee $employee) => $this->mapEmployeeSummary($employee))->values();
+
+        $statusCounts = $department->employees
+            ->groupBy(fn (Employee $employee) => $employee->employment_status ?: 'unknown')
+            ->map->count();
+
+        $roleAssignees = $this->roleAssigneesByDepartmentIds(collect([(string) $department->id]))
+            ->get((string) $department->id, collect())
+            ->values()
+            ->all();
 
         return Inertia::render('Departments/Show', [
-            'department' => $department,
+            'department' => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'code' => $department->code,
+                'description' => $department->description,
+                'company_id' => $department->company_id,
+                'created_at' => $department->created_at?->toIso8601String(),
+                'updated_at' => $department->updated_at?->toIso8601String(),
+                'company' => $department->company ? [
+                    'id' => $department->company->id,
+                    'name_en' => $department->company->name_en,
+                    'name_ar' => $department->company->name_ar,
+                    'company_email' => $department->company->company_email,
+                ] : null,
+                'role_assignees' => $roleAssignees,
+                'employees' => $employees,
+                'stats' => [
+                    'employees_count' => $employees->count(),
+                    'active_employees_count' => (int) ($statusCounts->get('active') ?? 0),
+                    'role_assignees_count' => count($roleAssignees),
+                    'status_counts' => $statusCounts,
+                ],
+            ],
         ]);
     }
 
@@ -146,7 +228,15 @@ class DepartmentController extends Controller
         abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
         return Inertia::render('Departments/Edit', [
-            'department' => $department,
+            'department' => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'code' => $department->code,
+                'description' => $department->description,
+                'company_id' => $department->company_id,
+                'created_at' => $department->created_at,
+                'updated_at' => $department->updated_at,
+            ],
         ]);
     }
 
@@ -173,7 +263,7 @@ class DepartmentController extends Controller
 
         $department->update($validated);
 
-        return redirect()->route('departments.index')->with('success', 'Department updated successfully.');
+        return redirect()->route('departments.index')->with('success', __('messages.departments.updated_successfully'));
     }
 
     /**
@@ -185,12 +275,12 @@ class DepartmentController extends Controller
         abort_unless($user !== null && $this->canManageDepartment($user, $department), 403);
 
         if ($department->employees()->count() > 0) {
-            return back()->with('error', 'Cannot delete department that has employees assigned.');
+            return back()->with('error', __('messages.departments.cannot_delete_with_employees'));
         }
 
         $department->delete();
 
-        return redirect()->route('departments.index')->with('success', 'Department deleted successfully.');
+        return redirect()->route('departments.index')->with('success', __('messages.departments.deleted_successfully'));
     }
 
     /**
@@ -278,5 +368,92 @@ class DepartmentController extends Controller
         }
 
         return collect(app(EmployeeUserRoleService::class)->companyIdsWhereCan($user, ['departments.manage']));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapEmployeeSummary(Employee $employee): array
+    {
+        return [
+            'id' => $employee->id,
+            'full_name' => $employee->full_name,
+            'employee_id' => $employee->employee_id,
+            'company_id' => $employee->company_id,
+            'job_title' => $employee->job_title,
+            'employment_status' => $employee->employment_status,
+            'email' => $employee->work_email ?: $employee->personal_email,
+        ];
+    }
+
+    /**
+     * Users with a team role scoped specifically to these departments.
+     *
+     * @param  Collection<int, string>  $departmentIds
+     * @return Collection<string, Collection<int, array<string, mixed>>>
+     */
+    private function roleAssigneesByDepartmentIds(Collection $departmentIds): Collection
+    {
+        $ids = $departmentIds
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $rows = DB::table('company_user_access as cua')
+            ->join('teams', 'teams.id', '=', 'cua.team_id')
+            ->join('users', 'users.id', '=', 'cua.user_id')
+            ->leftJoin('employees', 'employees.user_id', '=', 'users.id')
+            ->whereIn('cua.department_id', $ids->all())
+            ->whereNotNull('cua.team_id')
+            ->orderBy('teams.name')
+            ->orderBy('users.name')
+            ->get([
+                'cua.department_id',
+                'cua.user_id',
+                'cua.team_id',
+                'teams.name as team_name',
+                'users.name as user_name',
+                'employees.id as employee_pk',
+                'employees.first_name',
+                'employees.father_name',
+                'employees.last_name',
+                'employees.employee_id as employee_code',
+                'employees.job_title',
+            ]);
+
+        return $rows
+            ->groupBy(fn ($row) => (string) $row->department_id)
+            ->map(function (Collection $group): Collection {
+                return $group
+                    ->map(function ($row): array {
+                        $fullName = trim(implode(' ', array_filter([
+                            $row->first_name,
+                            $row->father_name,
+                            $row->last_name,
+                        ])));
+
+                        if ($fullName === '') {
+                            $fullName = (string) $row->user_name;
+                        }
+
+                        return [
+                            'user_id' => (int) $row->user_id,
+                            'employee_id' => $row->employee_pk !== null ? (int) $row->employee_pk : null,
+                            'full_name' => $fullName,
+                            'employee_code' => $row->employee_code,
+                            'job_title' => $row->job_title,
+                            'team_id' => (int) $row->team_id,
+                            'team_name' => (string) $row->team_name,
+                            'source' => 'role',
+                        ];
+                    })
+                    ->unique(fn (array $item): string => $item['user_id'].'-'.$item['team_id'])
+                    ->values();
+            });
     }
 }

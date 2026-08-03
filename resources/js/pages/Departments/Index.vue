@@ -14,6 +14,14 @@ interface Department {
     company_id: string
     company: Company
     employees_count: number
+    role_assignees?: Array<{
+        user_id: number
+        employee_id?: number | null
+        full_name: string
+        team_name: string
+        job_title?: string | null
+        source: string
+    }>
     created_at: string
     updated_at: string
 }
@@ -193,6 +201,9 @@ const getCompanyName = (company: Company) => {
                                 {{ t('departments.employees_count') }}
                             </th>
                             <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{ t('departments.role_assignees') }}
+                            </th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 {{ t('departments.description') }}
                             </th>
                             <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -213,6 +224,21 @@ const getCompanyName = (company: Company) => {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
                                 <div class="text-sm text-gray-900">{{ department.employees_count ?? 0 }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <div v-if="(department.role_assignees || []).length" class="space-y-1.5">
+                                    <div
+                                        v-for="(person, idx) in department.role_assignees"
+                                        :key="`${department.id}-${person.user_id || person.employee_id || idx}-${person.team_name}`"
+                                        class="text-sm text-gray-900"
+                                    >
+                                        <span class="font-medium">{{ person.full_name }}</span>
+                                        <span class="text-gray-500"> — {{ person.team_name }}</span>
+                                    </div>
+                                </div>
+                                <div v-else class="text-sm text-gray-500">
+                                    {{ t('departments.no_role_assignees') }}
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-center">
                                 <div class="text-sm text-gray-500">{{ department.description || '-' }}</div>

@@ -10,7 +10,7 @@ interface Department {
     name: string
     code: string
     description?: string
-    company_id: string
+    company_id: number
     created_at: string
     updated_at: string
 }
@@ -37,12 +37,12 @@ const submit = () => {
         <div class="max-w-2xl mx-auto p-6">
             <h1 class="text-2xl font-bold mb-6">{{ t('departments.edit_department') }}</h1>
 
-            <form @submit.prevent="submit" class="space-y-4">
+            <form class="space-y-4" @submit.prevent="submit">
                 <div>
                     <label class="block text-sm font-medium mb-1">{{ t('departments.name') }} *</label>
-                    <input 
-                        v-model="form.name" 
-                        type="text" 
+                    <input
+                        v-model="form.name"
+                        type="text"
                         required
                         :placeholder="t('departments.name_placeholder')"
                         class="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -52,9 +52,9 @@ const submit = () => {
 
                 <div>
                     <label class="block text-sm font-medium mb-1">{{ t('departments.code') }} *</label>
-                    <input 
-                        v-model="form.code" 
-                        type="text" 
+                    <input
+                        v-model="form.code"
+                        type="text"
                         required
                         :placeholder="t('departments.code_placeholder')"
                         class="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -67,8 +67,8 @@ const submit = () => {
 
                 <div>
                     <label class="block text-sm font-medium mb-1">{{ t('departments.description') }}</label>
-                    <textarea 
-                        v-model="form.description" 
+                    <textarea
+                        v-model="form.description"
                         rows="3"
                         :placeholder="t('departments.description_placeholder')"
                         class="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -80,8 +80,8 @@ const submit = () => {
                     <a :href="`/departments/${department.id}`" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                         {{ t('departments.cancel') }}
                     </a>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         :disabled="form.processing"
                         class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                     >
@@ -92,4 +92,4 @@ const submit = () => {
             </form>
         </div>
     </AppLayout>
-</template> 
+</template>
