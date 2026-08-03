@@ -358,6 +358,7 @@ return [
         'loading' => 'Loading...',
         'error' => 'An error occurred',
         'success' => 'Success',
+        'notice' => 'Notice',
         'back' => 'Back',
         'creating' => 'Creating...',
         'updating' => 'Updating...',

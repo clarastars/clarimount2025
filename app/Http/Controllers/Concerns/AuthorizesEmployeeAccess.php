@@ -188,7 +188,9 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $this->roleService()->canInAnyAssignedTeam($user, 'leaves.company.view');
+        return $this->roleService()->canInAnyAssignedTeam($user, 'leaves.company.view')
+            || $this->roleService()->canInAnyAssignedTeam($user, 'leaves.approve')
+            || $this->roleService()->canInAnyAssignedTeam($user, 'leaves.create');
     }
 
     protected function canCreateLeaves(User $user): bool
@@ -222,6 +224,38 @@ trait AuthorizesEmployeeAccess
         );
     }
 
+    /**
+     * Permissions that allow seeing/acting on leave & salary-certificate requests for an employee.
+     *
+     * @return array<int, string>
+     */
+    protected function leaveWorkflowAccessPermissions(): array
+    {
+        return [
+            'leaves.approve',
+            'leaves.company.view',
+            'leaves.create',
+        ];
+    }
+
+    protected function canAccessEmployeeForLeaveWorkflow(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAnyAccessEmployeeInCompanyDepartment(
+            $user,
+            $this->leaveWorkflowAccessPermissions(),
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
     protected function canAccessCompanyLeaves(User $user, Company $company): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -234,7 +268,7 @@ trait AuthorizesEmployeeAccess
 
         return $this->roleService()->canAnyForCompany(
             $user,
-            ['leaves.company.view', 'leaves.create'],
+            $this->leaveWorkflowAccessPermissions(),
             (int) $company->id
         );
     }

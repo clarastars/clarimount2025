@@ -90,7 +90,7 @@ class CompanySalaryCertificateController extends Controller
 
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
         $validated = $request->validate([
             'certificate' => ['required', 'file', 'mimes:pdf', 'max:10240'],
@@ -123,7 +123,7 @@ class CompanySalaryCertificateController extends Controller
 
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
         $validated = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
@@ -150,7 +150,7 @@ class CompanySalaryCertificateController extends Controller
         abort_unless($user !== null, 403);
 
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
         if ((int) $salaryCertificateApprovalStep->company_id !== (int) $company->id) {
             abort(403);
@@ -219,7 +219,7 @@ class CompanySalaryCertificateController extends Controller
         abort_unless($user !== null, 403);
 
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
         if ((int) $salaryCertificateApprovalStep->company_id !== (int) $company->id) {
             abort(403);
@@ -269,7 +269,7 @@ class CompanySalaryCertificateController extends Controller
 
         $this->abortUnlessCanViewCompanyLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
-        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
         abort_unless($salaryCertificateRequest->certificate_path, 404);
 
         /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
@@ -298,9 +298,14 @@ class CompanySalaryCertificateController extends Controller
     private function abortUnlessRequestBelongsToCompany(
         SalaryCertificateRequest $request,
         Company $company,
+        User $user,
     ): void {
+        $employee = $request->employee()->first(['id', 'company_id', 'department_id']);
+
         abort_unless(
-            (int) $request->employee()->value('company_id') === (int) $company->id,
+            $employee !== null
+            && (int) $employee->company_id === (int) $company->id
+            && $this->canAccessEmployeeForLeaveWorkflow($user, $employee),
             404
         );
     }
@@ -318,9 +323,16 @@ class CompanySalaryCertificateController extends Controller
     ): array {
         $query = SalaryCertificateRequest::query()
             ->where('status', $status)
-            ->whereHas('employee', fn ($query) => $query->where('company_id', $company->id))
+            ->whereHas('employee', function ($query) use ($company, $user): void {
+                $query->where('company_id', $company->id);
+                $this->applyEmployeePermissionScope(
+                    $query,
+                    $user,
+                    $this->leaveWorkflowAccessPermissions()
+                );
+            })
             ->with([
-                'employee:id,first_name,father_name,last_name,company_id,job_title',
+                'employee:id,first_name,father_name,last_name,company_id,job_title,department_id',
                 'reviewer:id,name',
             ]);
 

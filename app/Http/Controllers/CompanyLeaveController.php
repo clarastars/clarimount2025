@@ -47,7 +47,7 @@ class CompanyLeaveController extends Controller
         $currentLeaves = Leave::query()
             ->whereHas('employee', function ($query) use ($company, $user): void {
                 $query->where('company_id', $company->id);
-                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create']);
+                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create', 'leaves.approve']);
             })
             ->whereDate('start_date', '<=', $today)
             ->whereDate('end_date', '>=', $today)
@@ -312,7 +312,7 @@ class CompanyLeaveController extends Controller
         abort_unless(
             $employee !== null
             && (int) $employee->company_id === (int) $company->id
-            && $this->canAccessEmployee($user, $employee),
+            && $this->canAccessEmployeeForLeaveWorkflow($user, $employee),
             404
         );
     }
@@ -332,7 +332,7 @@ class CompanyLeaveController extends Controller
             ->where('status', $status)
             ->whereHas('employee', function ($query) use ($company, $user): void {
                 $query->where('company_id', $company->id);
-                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create']);
+                $this->applyEmployeePermissionScope($query, $user, ['leaves.company.view', 'leaves.create', 'leaves.approve']);
             })
             ->with([
                 'employee' => function ($query): void {

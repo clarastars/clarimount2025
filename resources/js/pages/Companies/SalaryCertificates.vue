@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { showFlashFeedback } from '@/lib/flashFeedback';
 import type { BreadcrumbItem } from '@/types';
 
 interface ApprovalStepState {
@@ -252,9 +253,17 @@ function submitRejectStep() {
         ]),
         {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
                 closeRejectDialog();
                 closeRequestDetails();
+                const flash = page.props.flash as { success?: string; info?: string } | undefined;
+                if (flash?.success) {
+                    showFlashFeedback(flash.success, 'success');
+                } else if (flash?.info) {
+                    showFlashFeedback(flash.info, 'info');
+                } else {
+                    showFlashFeedback(t('salary_certificates.request_rejected_success'), 'success');
+                }
             },
         },
     );
@@ -286,7 +295,17 @@ function approveWorkflowStep(step: ApprovalStepState) {
             onFinish: () => {
                 approvingStepId.value = null;
             },
-            onSuccess: () => closeRequestDetails(),
+            onSuccess: (page) => {
+                closeRequestDetails();
+                const flash = page.props.flash as { success?: string; info?: string } | undefined;
+                if (flash?.success) {
+                    showFlashFeedback(flash.success, 'success');
+                } else if (flash?.info) {
+                    showFlashFeedback(flash.info, 'info');
+                } else {
+                    showFlashFeedback(t('salary_certificates.approval_saved'), 'success');
+                }
+            },
         },
     );
 }
@@ -312,9 +331,17 @@ function submitCertificateStep() {
         {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
                 closeCertificateStepDialog();
                 closeRequestDetails();
+                const flash = page.props.flash as { success?: string; info?: string } | undefined;
+                if (flash?.success) {
+                    showFlashFeedback(flash.success, 'success');
+                } else if (flash?.info) {
+                    showFlashFeedback(flash.info, 'info');
+                } else {
+                    showFlashFeedback(t('salary_certificates.approval_saved'), 'success');
+                }
             },
         },
     );

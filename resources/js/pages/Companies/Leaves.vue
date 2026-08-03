@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import LeaveFormFields from '@/components/leaves/LeaveFormFields.vue';
+import { showFlashFeedback } from '@/lib/flashFeedback';
 import type { BreadcrumbItem } from '@/types';
 
 interface CurrentLeave {
@@ -316,7 +317,17 @@ function approveWorkflowStep(stepId: number) {
             onFinish: () => {
                 approvingStepId.value = null;
             },
-            onSuccess: () => closeRequestDetails(),
+            onSuccess: (page) => {
+                closeRequestDetails();
+                const flash = page.props.flash as { success?: string; info?: string } | undefined;
+                if (flash?.success) {
+                    showFlashFeedback(flash.success, 'success');
+                } else if (flash?.info) {
+                    showFlashFeedback(flash.info, 'info');
+                } else {
+                    showFlashFeedback(t('leaves.approval_saved'), 'success');
+                }
+            },
         },
     );
 }
@@ -345,9 +356,17 @@ function submitRejectStep() {
         route('companies.leave-requests.reject-step', [props.company.id, selectedRequest.value.id, stepId]),
         {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
                 closeRejectDialog();
                 closeRequestDetails();
+                const flash = page.props.flash as { success?: string; info?: string } | undefined;
+                if (flash?.success) {
+                    showFlashFeedback(flash.success, 'success');
+                } else if (flash?.info) {
+                    showFlashFeedback(flash.info, 'info');
+                } else {
+                    showFlashFeedback(t('leaves.request_rejected_success'), 'success');
+                }
             },
         },
     );
