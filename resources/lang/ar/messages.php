@@ -672,6 +672,8 @@ return [
         'mobile_placeholder' => '+1234567890',
         'department' => 'القسم',
         'department_placeholder' => 'قسم تقنية المعلومات',
+        'no_departments_found' => 'لم يتم العثور على أقسام',
+        'department_any_company_hint' => 'يمكنك تعيين قسم من أي شركة.',
         'job_title' => 'المسمى الوظيفي',
         'job_title_placeholder' => 'مطور برامج',
         'basic_salary' => 'الراتب الأساسي',

@@ -16,12 +16,14 @@ import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSe
 import { EMPLOYEE_DOCUMENT_TYPES, type EmployeeDocumentType } from '@/constants/employeeDocuments'
 import { fetchWithCsrf } from '@/lib/csrf'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 interface Department {
     id: number
     name: string
     company_id: number
+    company_name_en?: string | null
+    company_name_ar?: string | null
 }
 
 interface Country {
@@ -46,6 +48,7 @@ interface Props {
     defaultResidenceCountryId?: number
     shifts?: any[]
     canManagePortalAccount?: boolean
+    canAssignAnyDepartment?: boolean
     availableTeams?: Array<{ id: number; name: string }>
     assignableTeamRoles?: Array<{ name: string; label: string }>
     teamRoleAssignments?: Array<{ team_id: number; role_name: string; company_ids?: number[]; company_departments?: Record<number, string[]> }>
@@ -179,12 +182,28 @@ const removeDebt = (index: number) => {
 }
 
 const companyDepartments = computed(() => {
+    if (props.canAssignAnyDepartment) {
+        return props.departments
+    }
+
     if (!form.company_id) {
         return [] as Department[]
     }
 
     return props.departments.filter((department: Department) => department.company_id === Number(form.company_id))
 })
+
+const departmentOptionLabel = (department: Department): string => {
+    if (!props.canAssignAnyDepartment) {
+        return department.name
+    }
+
+    const companyName = locale.value === 'ar'
+        ? (department.company_name_ar || department.company_name_en)
+        : (department.company_name_en || department.company_name_ar)
+
+    return companyName ? `${department.name} — ${companyName}` : department.name
+}
 
 const selectedDepartment = computed(() => {
     if (!form.department_id) {
@@ -209,8 +228,12 @@ const completedSections = computed(() => {
     return sections
 })
 
-// Watch for company changes to clear department selection
+// Watch for company changes to clear department selection (unless any-department assignment is allowed)
 watch(() => form.company_id, (newCompanyId: number | null | string, oldCompanyId: number | null | string) => {
+    if (props.canAssignAnyDepartment) {
+        return
+    }
+
     if (oldCompanyId !== undefined && newCompanyId !== oldCompanyId) {
         form.department_id = null
     }
@@ -1212,25 +1235,28 @@ const formatCurrency = (amount: number) => {
                                         <select
                                             id="department"
                                             v-model="form.department_id"
-                                            :disabled="!form.company_id"
+                                            :disabled="!form.company_id && !canAssignAnyDepartment"
                                             :class="[
                                                 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
                                                 form.errors.department_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
                                             ]"
                                         >
                                             <option :value="null">
-                                                {{ form.company_id ? t('employees.department_placeholder') : t('employees.select_company') }}
+                                                {{ form.company_id || canAssignAnyDepartment ? t('employees.department_placeholder') : t('employees.select_company') }}
                                             </option>
                                             <option
                                                 v-for="department in companyDepartments"
                                                 :key="department.id"
                                                 :value="department.id"
                                             >
-                                                {{ department.name }}
+                                                {{ departmentOptionLabel(department) }}
                                             </option>
                                         </select>
-                                        <p v-if="form.company_id && companyDepartments.length === 0" class="mt-2 text-sm text-muted-foreground">
+                                        <p v-if="(form.company_id || canAssignAnyDepartment) && companyDepartments.length === 0" class="mt-2 text-sm text-muted-foreground">
                                             {{ t('employees.no_departments_found') }}
+                                        </p>
+                                        <p v-else-if="canAssignAnyDepartment" class="mt-2 text-sm text-muted-foreground">
+                                            {{ t('employees.department_any_company_hint') }}
                                         </p>
                                         <div v-if="form.errors.department_id" class="flex items-center gap-1 text-red-600 text-sm mt-1 font-medium">
                                             <Icon name="AlertCircle" class="h-4 w-4" />

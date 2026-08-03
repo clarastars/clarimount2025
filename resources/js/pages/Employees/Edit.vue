@@ -393,28 +393,31 @@
                                         <select
                                             id="department"
                                             v-model="form.department_id"
-                                            :disabled="!form.company_id"
+                                            :disabled="!form.company_id && !canAssignAnyDepartment"
                                             :class="[
                                                 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
                                                 form.errors.department_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
                                             ]"
                                         >
                                             <option :value="null">
-                                                {{ form.company_id ? t('employees.department_placeholder') : t('employees.select_company') }}
+                                                {{ form.company_id || canAssignAnyDepartment ? t('employees.department_placeholder') : t('employees.select_company') }}
                                             </option>
                                             <option
                                                 v-for="department in companyDepartments"
                                                 :key="department.id"
                                                 :value="department.id"
                                             >
-                                                {{ department.name }}
+                                                {{ departmentOptionLabel(department) }}
                                             </option>
                                         </select>
-                                        <p v-if="form.company_id && companyDepartments.length === 0" class="mt-2 text-sm text-muted-foreground">
+                                        <p v-if="(form.company_id || canAssignAnyDepartment) && companyDepartments.length === 0" class="mt-2 text-sm text-muted-foreground">
                                             {{ t('employees.no_departments_found') }}
                                         </p>
+                                        <p v-else-if="canAssignAnyDepartment" class="mt-2 text-sm text-muted-foreground">
+                                            {{ t('employees.department_any_company_hint') }}
+                                        </p>
                                         <div v-if="selectedDepartment" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                            <div class="text-sm font-medium text-blue-800">{{ t('common.selected') }}: {{ selectedDepartment.name }}</div>
+                                            <div class="text-sm font-medium text-blue-800">{{ t('common.selected') }}: {{ departmentOptionLabel(selectedDepartment) }}</div>
                                         </div>
                                         <div v-if="form.errors.department_id" class="text-red-500 text-sm mt-1">{{ translateValidationError(form.errors.department_id || "") }}</div>
                                     </div>
@@ -1063,9 +1066,9 @@ import Icon from '@/components/Icon.vue';
 import EmployeeTeamAssignmentsFields from '@/components/employees/EmployeeTeamAssignmentsFields.vue';
 import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
 import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
-import type { Employee, Department, Company, BreadcrumbItem } from '@/types';
+import type { Employee, Company, BreadcrumbItem } from '@/types';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const page = usePage();
 
 interface Country {
@@ -1080,6 +1083,14 @@ interface Nationality {
     code: string
 }
 
+interface DepartmentOption {
+    id: number
+    name: string
+    company_id: number
+    company_name_en?: string | null
+    company_name_ar?: string | null
+}
+
 interface Props {
     employee: Employee;
     documents?: EmployeeDocumentItem[];
@@ -1088,7 +1099,8 @@ interface Props {
     countries: Country[];
     nationalities: Nationality[];
     defaultResidenceCountryId?: number;
-    departments: Department[];
+    departments: DepartmentOption[];
+    canAssignAnyDepartment?: boolean;
     shifts?: any[];
     canManagePortalAccount?: boolean;
     portalAccount?: {
@@ -1107,12 +1119,28 @@ const props = defineProps<Props>();
 const employeeDocuments = ref<EmployeeDocumentItem[]>([...(props.documents ?? [])]);
 
 const companyDepartments = computed(() => {
-    if (!form.company_id) {
-        return [] as Department[]
+    if (props.canAssignAnyDepartment) {
+        return props.departments
     }
 
-    return props.departments.filter((department: Department) => department.company_id === Number(form.company_id))
+    if (!form.company_id) {
+        return [] as DepartmentOption[]
+    }
+
+    return props.departments.filter((department: DepartmentOption) => department.company_id === Number(form.company_id))
 })
+
+const departmentOptionLabel = (department: DepartmentOption): string => {
+    if (!props.canAssignAnyDepartment) {
+        return department.name
+    }
+
+    const companyName = locale.value === 'ar'
+        ? (department.company_name_ar || department.company_name_en)
+        : (department.company_name_en || department.company_name_ar)
+
+    return companyName ? `${department.name} — ${companyName}` : department.name
+}
 
 /**
  * Laravel date casts serialize as ISO-8601 strings. HTML date inputs only accept yyyy-MM-dd.
@@ -1339,7 +1367,7 @@ const selectedDepartment = computed(() => {
         return null
     }
 
-    return companyDepartments.value.find((department: Department) => department.id === Number(form.department_id)) ?? null
+    return companyDepartments.value.find((department: DepartmentOption) => department.id === Number(form.department_id)) ?? null
 })
 
 // Form completion tracking
@@ -1357,8 +1385,12 @@ const completedSections = computed(() => {
     return sections
 })
 
-// Watch for company changes to clear department selection
+// Watch for company changes to clear department selection (unless any-department assignment is allowed)
 watch(() => form.company_id, (newCompanyId: number | null | string, oldCompanyId: number | null | string) => {
+    if (props.canAssignAnyDepartment) {
+        return
+    }
+
     if (oldCompanyId !== undefined && newCompanyId !== oldCompanyId) {
         form.department_id = null
     }

@@ -282,10 +282,8 @@ class EmployeeController extends Controller
 
         $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
-        $departments = Department::query()
-            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'company_id']);
+        $canAssignAnyDepartment = $this->canAssignAnyDepartment($user);
+        $departments = $this->departmentsForEmployeeForm($user, $companyIds, $canAssignAnyDepartment);
         $currentCompany = $user->currentCompany();
 
         if ($companies->isEmpty()) {
@@ -299,6 +297,7 @@ class EmployeeController extends Controller
         return Inertia::render('Employees/Create', [
             'companies' => $companies,
             'departments' => $departments,
+            'canAssignAnyDepartment' => $canAssignAnyDepartment,
             'currentCompany' => $currentCompany,
             'defaultCompanyId' => $currentCompany?->id,
             'countries' => Country::active()->orderByName()->get(),
@@ -410,11 +409,13 @@ class EmployeeController extends Controller
 
         $validated['department'] = null;
 
-        // Validate department belongs to selected company if specified
+        // Validate department selection (same company, or any company when permitted)
         if (! empty($validated['department_id'])) {
-            $department = \App\Models\Department::where('id', $validated['department_id'])
-                ->where('company_id', $validated['company_id'])
-                ->first();
+            $department = $this->resolveAssignableDepartment(
+                $user,
+                (string) $validated['department_id'],
+                (int) $validated['company_id'],
+            );
 
             if (! $department) {
                 return back()->withErrors(['department_id' => 'Invalid department selection for the chosen company.']);
@@ -550,10 +551,8 @@ class EmployeeController extends Controller
 
         $companyIds = $this->employeeManageableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
-        $departments = Department::query()
-            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'company_id']);
+        $canAssignAnyDepartment = $this->canAssignAnyDepartment($user);
+        $departments = $this->departmentsForEmployeeForm($user, $companyIds, $canAssignAnyDepartment);
 
         // Get Saudi Arabia as default residence country
         $saudiArabia = Country::where('code', 'SA')->first();
@@ -569,6 +568,7 @@ class EmployeeController extends Controller
             'nationalities' => Nationality::active()->orderByName()->get(),
             'defaultResidenceCountryId' => $saudiArabia?->id,
             'departments' => $departments,
+            'canAssignAnyDepartment' => $canAssignAnyDepartment,
             'locations' => \App\Models\Location::all(),
             'shifts' => Shift::orderBy('name')->get(),
             'canManagePortalAccount' => $user->hasRole('super-admin'),
@@ -695,11 +695,13 @@ class EmployeeController extends Controller
 
         $validated['department'] = null;
 
-        // Validate department belongs to selected company if specified
+        // Validate department selection (same company, or any company when permitted)
         if (! empty($validated['department_id'])) {
-            $department = \App\Models\Department::where('id', $validated['department_id'])
-                ->where('company_id', $validated['company_id'])
-                ->first();
+            $department = $this->resolveAssignableDepartment(
+                $user,
+                (string) $validated['department_id'],
+                (int) $validated['company_id'],
+            );
 
             if (! $department) {
                 return back()->withErrors(['department_id' => 'Invalid department selection for the chosen company.']);
@@ -1031,5 +1033,43 @@ class EmployeeController extends Controller
             null,
             $roleService->assignedGlobalRoleNames($portalUser),
         );
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int|string>  $companyIds
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>|\Illuminate\Database\Eloquent\Collection<int, Department>
+     */
+    private function departmentsForEmployeeForm($user, $companyIds, bool $canAssignAnyDepartment)
+    {
+        if ($canAssignAnyDepartment) {
+            return Department::query()
+                ->with('company:id,name_en,name_ar')
+                ->orderBy('name')
+                ->get()
+                ->map(static fn (Department $department): array => [
+                    'id' => $department->id,
+                    'name' => $department->name,
+                    'company_id' => $department->company_id,
+                    'company_name_en' => $department->company?->name_en,
+                    'company_name_ar' => $department->company?->name_ar,
+                ])
+                ->values();
+        }
+
+        return Department::query()
+            ->whereIn('company_id', $companyIds->isEmpty() ? [-1] : $companyIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_id']);
+    }
+
+    private function resolveAssignableDepartment($user, string $departmentId, int $companyId): ?Department
+    {
+        $query = Department::query()->whereKey($departmentId);
+
+        if (! $this->canAssignAnyDepartment($user)) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query->first();
     }
 }

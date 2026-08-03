@@ -151,6 +151,15 @@ trait AuthorizesEmployeeAccess
         return $this->roleService()->canInAnyAssignedTeam($user, 'employees.manage');
     }
 
+    protected function canAssignAnyDepartment(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.assign-any-department');
+    }
+
     protected function canManageEmployee(User $user, Employee $employee): bool
     {
         if ($user->hasRole('super-admin')) {

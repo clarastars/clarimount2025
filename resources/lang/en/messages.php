@@ -675,6 +675,7 @@ return [
         'department' => 'Department',
         'department_placeholder' => 'Search for a department...',
         'no_departments_found' => 'No departments found',
+        'department_any_company_hint' => 'You can assign a department from any company.',
         'job_title' => 'Job Title',
         'job_title_placeholder' => 'Software Engineer',
         'basic_salary' => 'Basic Salary',
