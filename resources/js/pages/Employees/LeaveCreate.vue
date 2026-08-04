@@ -15,6 +15,7 @@
                     <form @submit.prevent="submit" class="space-y-6">
                         <LeaveFormFields
                             :form="form"
+                            :leave-types="leaveTypes"
                             @attachment-change="onAttachmentChange"
                         />
 
@@ -45,11 +46,15 @@ import Icon from '@/components/Icon.vue';
 import LeaveFormFields from '@/components/leaves/LeaveFormFields.vue';
 import type { BreadcrumbItem } from '@/types';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = defineProps<{
     employee: { id: number; full_name: string };
-    leaveTypes: string[];
+    leaveTypes: Array<{
+        key: string;
+        label: string;
+        min_notice_days: number;
+    }>;
 }>();
 
 const { employee } = props;
@@ -71,11 +76,37 @@ const form = useForm({
     attachment: null as File | null,
 });
 
+const selectedLeaveType = computed(() =>
+    props.leaveTypes.find((item) => item.key === form.leave_type) ?? null,
+);
+
+const formatLocalizedNumber = (value: number) =>
+    new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(value);
+
 function onAttachmentChange(file: File | null) {
     form.attachment = file;
 }
 
 const submit = () => {
+    const leaveType = selectedLeaveType.value;
+    if (leaveType && leaveType.min_notice_days > 0 && form.start_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const startDate = new Date(form.start_date);
+        startDate.setHours(0, 0, 0, 0);
+
+        const diffInDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+        if (diffInDays < leaveType.min_notice_days) {
+            form.setError('start_date', t('leaves.min_notice_days_not_met_frontend', {
+                leave_type: leaveType.label,
+                days: formatLocalizedNumber(leaveType.min_notice_days),
+            }));
+            return;
+        }
+    }
+
+    form.clearErrors('start_date');
     form.post(route('employees.leaves.store', employee.id), {
         forceFormData: true,
     });

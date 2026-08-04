@@ -25,13 +25,16 @@
                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <option value="">{{ t('leaves.select_leave_type') }}</option>
-                <option value="annual">{{ t('leaves.type_annual') }}</option>
-                <option value="sick">{{ t('leaves.type_sick') }}</option>
-                <option value="marriage">{{ t('leaves.type_marriage') }}</option>
-                <option value="emergency">{{ t('leaves.type_emergency') }}</option>
-                <option value="maternity">{{ t('leaves.type_maternity') }}</option>
-                <option value="bereavement">{{ t('leaves.type_bereavement') }}</option>
+                <option v-for="leaveType in leaveTypes" :key="leaveType.key" :value="leaveType.key">
+                    {{ leaveType.label }}
+                </option>
             </select>
+            <p
+                v-if="selectedLeaveType && selectedLeaveType.min_notice_days > 0"
+                class="text-xs text-muted-foreground mt-1"
+            >
+                {{ t('leaves.min_notice_days_hint_frontend', { days: formattedMinNoticeDays }) }}
+            </p>
             <p v-if="form.errors.leave_type" class="text-red-500 text-sm mt-1">{{ form.errors.leave_type }}</p>
         </div>
 
@@ -131,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -138,6 +142,12 @@ import { Label } from '@/components/ui/label';
 interface EmployeeOption {
     id: number;
     full_name: string;
+}
+
+interface LeaveTypeOption {
+    key: string;
+    label: string;
+    min_notice_days: number;
 }
 
 interface LeaveForm {
@@ -152,17 +162,26 @@ interface LeaveForm {
     errors: Record<string, string>;
 }
 
-defineProps<{
-    form: LeaveForm;
-    showEmployeeSelect?: boolean;
-    employees?: EmployeeOption[];
-}>();
-
 const emit = defineEmits<{
     attachmentChange: [file: File | null];
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+const props = defineProps<{
+    form: LeaveForm;
+    showEmployeeSelect?: boolean;
+    employees?: EmployeeOption[];
+    leaveTypes: LeaveTypeOption[];
+}>();
+
+const selectedLeaveType = computed(() => props.leaveTypes.find((item) => item.key === props.form.leave_type) ?? null);
+const formattedMinNoticeDays = computed(() => {
+    if (!selectedLeaveType.value) {
+        return '';
+    }
+
+    return new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(selectedLeaveType.value.min_notice_days);
+});
 
 function onAttachmentChange(event: Event) {
     const target = event.target as HTMLInputElement;

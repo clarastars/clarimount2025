@@ -18,6 +18,7 @@ import type { BreadcrumbItem } from '@/types';
 interface CurrentLeave {
     id: number;
     leave_type: string;
+    leave_type_label?: string;
     start_date: string;
     end_date: string;
     days: number;
@@ -59,6 +60,7 @@ interface LatestRejectionState {
 interface LeaveRequestItem {
     id: number;
     leave_type: string;
+    leave_type_label?: string;
     start_date: string;
     end_date: string;
     days: number;
@@ -87,6 +89,12 @@ interface CompanyItem {
     name_ar: string;
 }
 
+interface LeaveTypeOption {
+    key: string;
+    label: string;
+    min_notice_days: number;
+}
+
 const props = withDefaults(defineProps<{
     company: CompanyItem;
     currentLeaves: CurrentLeave[];
@@ -98,7 +106,7 @@ const props = withDefaults(defineProps<{
     canReviewLeaveRequests?: boolean;
     hasLeaveApprovalWorkflow?: boolean;
     isReadOnly?: boolean;
-    leaveTypes: string[];
+    leaveTypes: LeaveTypeOption[];
 }>(), {
     pendingRequests: () => [],
     approvedRequests: () => [],
@@ -124,11 +132,13 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('leaves.company_leaves_title'), href: route('companies.leaves.index', props.company.id) },
 ]);
 
-const leaveTypeLabel = (type: string) => {
-    const key = `leaves.type_${type}`;
-    const translated = t(key);
-    return translated === key ? type : translated;
-};
+const leaveTypeLabel = (type: string, fallbackLabel?: string | null) =>
+    fallbackLabel
+    || props.leaveTypes.find((item) => item.key === type)?.label
+    || type;
+
+const formatLocalizedNumber = (value: number) =>
+    new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(value);
 
 const form = useForm({
     employee_id: '' as string | number,
@@ -140,6 +150,10 @@ const form = useForm({
     notes: '',
     attachment: null as File | null,
 });
+
+const selectedLeaveType = computed(() =>
+    props.leaveTypes.find((item) => item.key === form.leave_type) ?? null,
+);
 
 const createFormOpen = ref(false);
 const detailsDialogOpen = ref(false);
@@ -206,6 +220,25 @@ function onAttachmentChange(file: File | null) {
 }
 
 const submit = () => {
+    const leaveType = selectedLeaveType.value;
+    if (leaveType && leaveType.min_notice_days > 0 && form.start_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const startDate = new Date(form.start_date);
+        startDate.setHours(0, 0, 0, 0);
+
+        const diffInDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+        if (diffInDays < leaveType.min_notice_days) {
+            form.setError('start_date', t('leaves.min_notice_days_not_met_frontend', {
+                leave_type: leaveType.label,
+                days: formatLocalizedNumber(leaveType.min_notice_days),
+            }));
+            return;
+        }
+    }
+
+    form.clearErrors('start_date');
     form.post(route('companies.leaves.store', props.company.id), {
         forceFormData: true,
         onSuccess: () => closeCreateForm(),
@@ -439,7 +472,7 @@ function submitRejectStep() {
                                             {{ leave.employee.full_name }}
                                         </Link>
                                     </td>
-                                    <td class="py-3 px-2">{{ leaveTypeLabel(leave.leave_type) }}</td>
+                                    <td class="py-3 px-2">{{ leaveTypeLabel(leave.leave_type, leave.leave_type_label) }}</td>
                                     <td class="py-3 px-2">{{ leave.start_date }}</td>
                                     <td class="py-3 px-2">{{ leave.end_date }}</td>
                                     <td class="py-3 px-2">{{ leave.days }}</td>
@@ -516,7 +549,7 @@ function submitRejectStep() {
                                         </Badge>
                                     </div>
                                     <p class="text-sm text-muted-foreground mt-1">
-                                        {{ leaveTypeLabel(request.leave_type) }} — {{ request.start_date }} → {{ request.end_date }} ({{ request.days }} {{ t('leaves.days') }})
+                                        {{ leaveTypeLabel(request.leave_type, request.leave_type_label) }} — {{ request.start_date }} → {{ request.end_date }} ({{ request.days }} {{ t('leaves.days') }})
                                     </p>
                                     <p v-if="request.reviewed_at" class="text-xs text-muted-foreground mt-1">
                                         {{ t('leaves.request_reviewed_at') }}: {{ formatDateTime(request.reviewed_at) }}
@@ -542,7 +575,7 @@ function submitRejectStep() {
                 </CardContent>
             </Card>
 
-            <Dialog :open="detailsDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeRequestDetails())">
+            <Dialog :open="detailsDialogOpen" @update:open="(open) => (open ? undefined : closeRequestDetails())">
                 <DialogContent class="max-w-xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader class="space-y-1">
                         <DialogTitle>{{ t('leaves.request_details') }}</DialogTitle>
@@ -568,7 +601,7 @@ function submitRejectStep() {
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div class="rounded-md border px-3 py-2.5">
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.leave_type') }}</p>
-                                <p class="font-medium">{{ leaveTypeLabel(selectedRequest.leave_type) }}</p>
+                                <p class="font-medium">{{ leaveTypeLabel(selectedRequest.leave_type, selectedRequest.leave_type_label) }}</p>
                             </div>
                             <div class="rounded-md border px-3 py-2.5">
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.days') }}</p>
@@ -726,7 +759,7 @@ function submitRejectStep() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog :open="rejectDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeRejectDialog())">
+            <Dialog :open="rejectDialogOpen" @update:open="(open) => (open ? undefined : closeRejectDialog())">
                 <DialogContent class="max-w-md">
                     <DialogHeader>
                         <DialogTitle>{{ t('leaves.approval_reject_confirm_title') }}</DialogTitle>
@@ -758,7 +791,7 @@ function submitRejectStep() {
             <Dialog
                 v-if="canCreateLeaves"
                 :open="createFormOpen"
-                @update:open="(open: boolean) => (open ? openCreateForm() : closeCreateForm())"
+                @update:open="(open) => (open ? openCreateForm() : closeCreateForm())"
             >
                 <DialogContent class="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -774,6 +807,7 @@ function submitRejectStep() {
                             :form="form"
                             show-employee-select
                             :employees="employees"
+                            :leave-types="leaveTypes"
                             @attachment-change="onAttachmentChange"
                         />
 

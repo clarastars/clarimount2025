@@ -10,6 +10,7 @@ use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
 use App\Services\LeaveRequestService;
+use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +22,7 @@ class EmployeePortalLeaveController extends Controller
     public function __construct(
         private LeaveRequestService $leaveRequestService,
         private LeaveApprovalService $leaveApprovalService,
+        private LeaveTypeService $leaveTypeService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -60,7 +62,7 @@ class EmployeePortalLeaveController extends Controller
             ],
             'approvedLeaves' => $approvedLeaves,
             'leaveRequests' => $leaveRequests,
-            'leaveTypes' => Leave::TYPES,
+            'leaveTypes' => $this->leaveTypeService->activeOptions(app()->getLocale()),
         ]);
     }
 
@@ -112,6 +114,7 @@ class EmployeePortalLeaveController extends Controller
         return [
             'id' => $leave->id,
             'leave_type' => $leave->leave_type,
+            'leave_type_label' => $this->leaveTypeService->labelForKey($leave->leave_type),
             'start_date' => $leave->start_date->format('Y-m-d'),
             'end_date' => $leave->end_date->format('Y-m-d'),
             'days' => $leave->days,
@@ -126,6 +129,7 @@ class EmployeePortalLeaveController extends Controller
         $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
+            'leave_type_label' => $this->leaveTypeService->labelForKey($leaveRequest->leave_type),
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
             'end_date' => $leaveRequest->end_date->format('Y-m-d'),
             'days' => $leaveRequest->days,

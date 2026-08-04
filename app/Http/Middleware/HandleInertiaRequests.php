@@ -65,6 +65,7 @@ class HandleInertiaRequests extends Middleware
                 'is_super_admin' => $isSuperAdmin,
                 'permissions' => $permissionNames,
                 'can_access_settings' => $isSuperAdmin || in_array('settings.access', $permissionNames, true),
+                'can_manage_leave_types' => $isSuperAdmin || in_array('leave-types.manage', $permissionNames, true),
                 'can_access_asset_inventory' => $isSuperAdmin || in_array('asset-inventory.access', $permissionNames, true),
                 'can_view_company_readonly' => $isSuperAdmin || in_array('company.readonly', $permissionNames, true),
                 'can_view_employees_readonly' => $isSuperAdmin || in_array('employees.readonly', $permissionNames, true) || in_array('employees.manage', $permissionNames, true),

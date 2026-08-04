@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Employee;
-use App\Models\Leave;
 use App\Services\LeaveStoreService;
+use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +20,7 @@ class LeaveController extends Controller
 
     public function __construct(
         private LeaveStoreService $leaveStoreService,
+        private LeaveTypeService $leaveTypeService,
     ) {}
 
     public function create(Employee $employee): Response|RedirectResponse
@@ -34,7 +35,7 @@ class LeaveController extends Controller
 
         return Inertia::render('Employees/LeaveCreate', [
             'employee' => $employee,
-            'leaveTypes' => Leave::TYPES,
+            'leaveTypes' => $this->leaveTypeService->activeOptions(app()->getLocale()),
         ]);
     }
 

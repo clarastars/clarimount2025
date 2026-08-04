@@ -64,10 +64,13 @@ class LeaveApprovalWorkflowMail extends Mailable
 
     private function buildMessageText(): string
     {
-        $leaveTypeKey = 'messages.leaves.type_'.($this->payload['leave_type'] ?? '');
-        $leaveTypeLabel = __($leaveTypeKey);
-        if ($leaveTypeLabel === $leaveTypeKey) {
-            $leaveTypeLabel = (string) ($this->payload['leave_type'] ?? '');
+        $leaveTypeLabel = (string) ($this->payload['leave_type_label'] ?? '');
+        if ($leaveTypeLabel === '') {
+            $leaveTypeKey = 'messages.leaves.type_'.($this->payload['leave_type'] ?? '');
+            $leaveTypeLabel = __($leaveTypeKey);
+            if ($leaveTypeLabel === $leaveTypeKey) {
+                $leaveTypeLabel = (string) ($this->payload['leave_type'] ?? '');
+            }
         }
 
         $replacements = [

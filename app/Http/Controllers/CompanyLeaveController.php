@@ -15,6 +15,7 @@ use App\Services\LeaveApprovalNotificationService;
 use App\Services\LeaveApprovalService;
 use App\Services\LeaveRequestService;
 use App\Services\LeaveStoreService;
+use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,6 +32,7 @@ class CompanyLeaveController extends Controller
         private LeaveRequestService $leaveRequestService,
         private LeaveApprovalService $leaveApprovalService,
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
+        private LeaveTypeService $leaveTypeService,
     ) {}
 
     public function index(Company $company): Response
@@ -57,6 +59,7 @@ class CompanyLeaveController extends Controller
             ->map(fn (Leave $leave): array => [
                 'id' => $leave->id,
                 'leave_type' => $leave->leave_type,
+                'leave_type_label' => $this->leaveTypeService->labelForKey($leave->leave_type),
                 'start_date' => $leave->start_date->format('Y-m-d'),
                 'end_date' => $leave->end_date->format('Y-m-d'),
                 'days' => $leave->days,
@@ -115,7 +118,7 @@ class CompanyLeaveController extends Controller
                 : $canCreateLeaves,
             'hasLeaveApprovalWorkflow' => $hasLeaveApprovalWorkflow,
             'isReadOnly' => ! $canCreateLeaves && ! $this->canApproveLeaveWorkflow($user),
-            'leaveTypes' => Leave::TYPES,
+            'leaveTypes' => $this->leaveTypeService->activeOptions(app()->getLocale()),
         ]);
     }
 
@@ -387,6 +390,7 @@ class CompanyLeaveController extends Controller
         $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
+            'leave_type_label' => $this->leaveTypeService->labelForKey($leaveRequest->leave_type),
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
             'end_date' => $leaveRequest->end_date->format('Y-m-d'),
             'days' => $leaveRequest->days,

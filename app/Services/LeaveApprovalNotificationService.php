@@ -19,6 +19,7 @@ class LeaveApprovalNotificationService
 {
     public function __construct(
         private LeaveApprovalService $approvalService,
+        private LeaveTypeService $leaveTypeService,
     ) {}
 
     public function notifyWorkflowStarted(LeaveRequest $leaveRequest, Company $company, User $actor): void
@@ -278,6 +279,7 @@ class LeaveApprovalNotificationService
             'company_id' => $company->id,
             'company_name' => $company->name_ar ?: $company->name_en,
             'leave_type' => $leaveRequest->leave_type,
+            'leave_type_label' => $this->leaveTypeService->labelForKey($leaveRequest->leave_type),
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
             'end_date' => $leaveRequest->end_date->format('Y-m-d'),
             'days' => $leaveRequest->days,

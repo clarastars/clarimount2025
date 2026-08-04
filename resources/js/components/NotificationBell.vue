@@ -17,6 +17,7 @@ interface NotificationData {
     salary_certificate_request_id?: number;
     employee_name?: string;
     leave_type?: string;
+    leave_type_label?: string;
     purpose?: string;
     start_date?: string;
     end_date?: string;
@@ -95,14 +96,17 @@ const periodLabel = (notification: NotificationItem): string => {
 
 const formatNotificationMessage = (notification: NotificationItem): string => {
     const data = notification.data;
-
-    if (data.event_type === 'leave_request_submitted') {
+    const leaveTypeValue = data.leave_type_label || (() => {
         const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
         const leaveType = t(leaveTypeKey);
+        return leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType;
+    })();
+
+    if (data.event_type === 'leave_request_submitted') {
         return t('notifications.leave_request_submitted', {
             employee: data.employee_name ?? '',
             company: data.company_name ?? '',
-            type: leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType,
+            type: leaveTypeValue,
             start: data.start_date ?? '',
             end: data.end_date ?? '',
             days: data.days ?? '',
@@ -110,15 +114,13 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
     }
 
     if (data.event_type === 'leave_request_approved' || (data.event_type === 'leave_request_rejected' && !data.step_title)) {
-        const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
-        const leaveType = t(leaveTypeKey);
         const messageKey = data.event_type === 'leave_request_approved'
             ? 'notifications.leave_request_approved'
             : 'notifications.leave_request_rejected';
 
         let message = t(messageKey, {
             company: data.company_name ?? '',
-            type: leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType,
+            type: leaveTypeValue,
             start: data.start_date ?? '',
             end: data.end_date ?? '',
             days: data.days ?? '',
@@ -140,14 +142,10 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
     ];
 
     if (leaveWorkflowTypes.includes(data.event_type) || (data.event_type === 'leave_request_rejected' && data.step_title)) {
-        const leaveTypeKey = `leaves.type_${data.leave_type ?? ''}`;
-        const leaveType = t(leaveTypeKey);
-        const typeLabel = leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType;
-
         const params = {
             employee: data.employee_name ?? '',
             company: data.company_name ?? '',
-            type: typeLabel,
+            type: leaveTypeValue,
             start: data.start_date ?? '',
             end: data.end_date ?? '',
             days: data.days ?? '',

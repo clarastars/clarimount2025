@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\LeaveApprovalStepsController;
+use App\Http\Controllers\Settings\LeaveTypeController;
 use App\Http\Controllers\Settings\SalaryCertificateApprovalStepsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
@@ -23,8 +24,16 @@ Route::middleware('auth')->group(function () {
             || $user->employee()->exists()
         );
 
-        if ($isEmployee && ! $user->hasRole('super-admin') && ! $user->can('settings.access')) {
+        if ($isEmployee && ! $user->hasRole('super-admin') && ! $user->can('settings.access') && ! $user->can('leave-types.manage')) {
             return redirect()->route('profile.edit');
+        }
+
+        if ($user?->hasRole('super-admin') || $user?->can('settings.access')) {
+            return redirect()->route('profile.edit');
+        }
+
+        if ($user?->can('leave-types.manage')) {
+            return redirect()->route('settings.leave-types.index');
         }
 
         return redirect()->route('profile.edit');
@@ -52,6 +61,12 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/salary-run-approvals', [SalaryRunApprovalStepsController::class, 'index'])->name('settings.salary-run-approvals.index');
     Route::get('settings/leave-approvals', [LeaveApprovalStepsController::class, 'index'])->name('settings.leave-approvals.index');
     Route::get('settings/salary-certificate-approvals', [SalaryCertificateApprovalStepsController::class, 'index'])->name('settings.salary-certificate-approvals.index');
+    Route::middleware('role_or_permission:super-admin|settings.access|leave-types.manage')->group(function () {
+        Route::get('settings/leave-types', [LeaveTypeController::class, 'index'])->name('settings.leave-types.index');
+        Route::post('settings/leave-types', [LeaveTypeController::class, 'store'])->name('settings.leave-types.store');
+        Route::put('settings/leave-types/{leaveType}', [LeaveTypeController::class, 'update'])->name('settings.leave-types.update');
+        Route::delete('settings/leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('settings.leave-types.destroy');
+    });
 
     Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {
         Route::get('settings/employee-reference-data', [EmployeeReferenceDataController::class, 'index'])->name('settings.employee-reference-data.index');

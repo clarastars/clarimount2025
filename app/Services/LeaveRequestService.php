@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LeaveRequestService
@@ -19,12 +20,13 @@ class LeaveRequestService
         private LeaveRequestNotificationService $notificationService,
         private LeaveApprovalService $leaveApprovalService,
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
+        private LeaveTypeService $leaveTypeService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request): LeaveRequest
     {
         $validated = $request->validate([
-            'leave_type' => ['required', 'string', 'in:'.implode(',', Leave::TYPES)],
+            'leave_type' => ['required', 'string', Rule::in($this->leaveTypeService->activeKeys())],
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:start_date',
             'deduct_from_balance' => 'required|boolean',
@@ -32,6 +34,15 @@ class LeaveRequestService
             'notes' => 'nullable|string|max:2000',
             'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        $leaveType = $this->leaveTypeService->findActiveByKey((string) $validated['leave_type']);
+        if ($leaveType === null) {
+            throw ValidationException::withMessages([
+                'leave_type' => [__('messages.leaves.invalid_leave_type')],
+            ]);
+        }
+
+        $this->leaveTypeService->ensureMinimumNoticeDays($leaveType, (string) $validated['start_date']);
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);

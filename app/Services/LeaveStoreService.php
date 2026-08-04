@@ -8,14 +8,19 @@ use App\Models\Employee;
 use App\Models\Leave;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class LeaveStoreService
 {
+    public function __construct(
+        private LeaveTypeService $leaveTypeService,
+    ) {}
+
     public function validateAndCreate(Request $request, Employee $employee): Leave
     {
         $validated = $request->validate([
-            'leave_type' => ['required', 'string', 'in:'.implode(',', Leave::TYPES)],
+            'leave_type' => ['required', 'string', Rule::in($this->leaveTypeService->activeKeys())],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'deduct_from_balance' => 'required|boolean',
@@ -23,6 +28,12 @@ class LeaveStoreService
             'notes' => 'nullable|string|max:2000',
             'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        if ($this->leaveTypeService->findActiveByKey((string) $validated['leave_type']) === null) {
+            throw ValidationException::withMessages([
+                'leave_type' => [__('messages.leaves.invalid_leave_type')],
+            ]);
+        }
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);

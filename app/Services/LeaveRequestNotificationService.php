@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Mail;
 
 class LeaveRequestNotificationService
 {
+    public function __construct(
+        private LeaveTypeService $leaveTypeService,
+    ) {}
+
     public function notifySubmitted(LeaveRequest $leaveRequest): void
     {
         $leaveRequest->loadMissing(['employee.company']);
@@ -150,6 +154,7 @@ class LeaveRequestNotificationService
             'company_id' => $company->id,
             'company_name' => $company->name_ar ?: $company->name_en,
             'leave_type' => $leaveRequest->leave_type,
+            'leave_type_label' => $this->leaveTypeService->labelForKey($leaveRequest->leave_type),
             'start_date' => $leaveRequest->start_date->format('Y-m-d'),
             'end_date' => $leaveRequest->end_date->format('Y-m-d'),
             'days' => $leaveRequest->days,

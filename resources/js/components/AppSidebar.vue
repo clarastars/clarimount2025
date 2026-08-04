@@ -15,6 +15,7 @@ const page = usePage();
 const authProps = computed(() => (page.props.auth as {
     is_employee?: boolean;
     can_access_settings?: boolean;
+    can_manage_leave_types?: boolean;
     can_access_asset_inventory?: boolean;
     can_view_company_readonly?: boolean;
     can_view_employees_readonly?: boolean;
@@ -23,6 +24,8 @@ const authProps = computed(() => (page.props.auth as {
 }) ?? {});
 const isEmployee = computed(() => authProps.value.is_employee ?? false);
 const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
+const canManageLeaveTypes = computed(() => authProps.value.can_manage_leave_types ?? false);
+const canOpenSettingsArea = computed(() => canAccessSettings.value || canManageLeaveTypes.value);
 const canAccessAssetInventory = computed(() => authProps.value.can_access_asset_inventory ?? false);
 const canViewCompanyReadOnly = computed(() => authProps.value.can_view_company_readonly ?? false);
 const canViewEmployees = computed(() => authProps.value.can_view_employees_readonly ?? false);
@@ -85,53 +88,69 @@ const assetInventoryNavItems = computed((): NavItem[] => [
     },
 ]);
 
-const settingsNavItems = computed((): NavItem[] => [
-    {
-        title: t('nav.shifts'),
-        href: '/shifts',
-        icon: Clock,
-    },
-    {
-        title: t('nav.labor_law_rules'),
-        href: '/labor-law-rules',
-        icon: Scale,
-    },
-    {
-        title: t('nav.email_test'),
-        href: '/settings/email-test',
-        icon: Mail,
-    },
-    {
-        title: t('settings.operational_month'),
-        href: '/settings/operational-month',
-        icon: Clock,
-    },
-    {
-        title: t('settings.employee_global_search'),
-        href: '/settings/employee-global-search',
-        icon: Users,
-    },
-    {
-        title: t('settings.permissions_teams'),
-        href: '/settings/permissions-teams',
-        icon: Users,
-    },
-    {
-        title: t('settings.salary_run_approvals'),
-        href: '/settings/salary-run-approvals',
-        icon: Users,
-    },
-    {
-        title: t('settings.leave_approvals'),
-        href: '/settings/leave-approvals',
-        icon: Users,
-    },
-    {
-        title: t('settings.salary_certificate_approvals'),
-        href: '/settings/salary-certificate-approvals',
-        icon: Users,
-    },
-]);
+const settingsNavItems = computed((): NavItem[] => {
+    const items: NavItem[] = [];
+
+    if (canAccessSettings.value) {
+        items.push(
+            {
+                title: t('nav.shifts'),
+                href: '/shifts',
+                icon: Clock,
+            },
+            {
+                title: t('nav.labor_law_rules'),
+                href: '/labor-law-rules',
+                icon: Scale,
+            },
+            {
+                title: t('nav.email_test'),
+                href: '/settings/email-test',
+                icon: Mail,
+            },
+            {
+                title: t('settings.operational_month'),
+                href: '/settings/operational-month',
+                icon: Clock,
+            },
+            {
+                title: t('settings.employee_global_search'),
+                href: '/settings/employee-global-search',
+                icon: Users,
+            },
+            {
+                title: t('settings.permissions_teams'),
+                href: '/settings/permissions-teams',
+                icon: Users,
+            },
+            {
+                title: t('settings.salary_run_approvals'),
+                href: '/settings/salary-run-approvals',
+                icon: Users,
+            },
+            {
+                title: t('settings.leave_approvals'),
+                href: '/settings/leave-approvals',
+                icon: Users,
+            },
+            {
+                title: t('settings.salary_certificate_approvals'),
+                href: '/settings/salary-certificate-approvals',
+                icon: Users,
+            },
+        );
+    }
+
+    if (canOpenSettingsArea.value) {
+        items.push({
+            title: t('settings.leave_types'),
+            href: '/settings/leave-types',
+            icon: CalendarDays,
+        });
+    }
+
+    return items;
+});
 
 const footerNavItems = computed((): NavItem[] => [
     {
@@ -177,7 +196,7 @@ const footerNavItems = computed((): NavItem[] => [
                         && (item.href !== '/departments' || canManageDepartments))"
             />
             <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />
-            <NavMain v-if="canAccessSettings" :items="settingsNavItems" :label="t('nav.settings')" />
+            <NavMain v-if="canOpenSettingsArea" :items="settingsNavItems" :label="t('nav.settings')" />
         </SidebarContent>
 
         <SidebarFooter>

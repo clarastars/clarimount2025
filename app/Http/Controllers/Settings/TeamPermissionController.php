@@ -28,6 +28,7 @@ class TeamPermissionController extends Controller
         ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
         ['name' => 'employees.assign-any-department', 'label' => 'تعيين أي قسم للموظف (كل الأقسام وليس فقط أقسام شركته)'],
         ['name' => 'departments.manage', 'label' => 'إدارة الأقسام (عرض وإضافة وتعديل وحذف)'],
+        ['name' => 'leave-types.manage', 'label' => 'إدارة أنواع الإجازات وحدّ الطلب الأدنى'],
         ['name' => 'leaves.company.view', 'label' => 'الاطلاع على إجازات الشركة وطلبات تعريف الراتب (قراءة فقط)'],
         ['name' => 'leaves.create', 'label' => 'إنشاء الإجازات وإكمال طلبات تعريف الراتب'],
         ['name' => 'leaves.approve', 'label' => 'اعتماد طلبات الإجازة وتعريف الراتب (سلسلة الاعتمادات)'],

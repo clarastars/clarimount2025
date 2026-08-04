@@ -81,6 +81,16 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($can('leave-types.manage')) {
+            $allowed = array_merge($allowed, [
+                'settings.leave-types.*',
+                'settings',
+                'appearance',
+                'password.*',
+                'profile.*',
+            ]);
+        }
+
         if ($can('company.readonly')) {
             $allowed = array_merge($allowed, [
                 'companies.index',

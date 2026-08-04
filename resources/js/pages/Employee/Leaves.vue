@@ -15,6 +15,7 @@ import type { BreadcrumbItem } from '@/types';
 interface LeaveRow {
     id: number;
     leave_type: string;
+    leave_type_label?: string;
     start_date: string;
     end_date: string;
     days: number;
@@ -55,6 +56,12 @@ interface LeaveRequestRow extends LeaveRow {
     approval_progress?: ApprovalProgress | null;
 }
 
+interface LeaveTypeOption {
+    key: string;
+    label: string;
+    min_notice_days: number;
+}
+
 interface EmployeeSummary {
     id: number;
     full_name: string;
@@ -69,11 +76,12 @@ const props = defineProps<{
     employee: EmployeeSummary;
     approvedLeaves: LeaveRow[];
     leaveRequests: LeaveRequestRow[];
-    leaveTypes: string[];
+    leaveTypes: LeaveTypeOption[];
 }>();
 
 const { t, locale } = useI18n();
 const page = usePage();
+const flashSuccess = computed(() => ((page.props.flash as { success?: string } | undefined)?.success) ?? '');
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },
@@ -92,11 +100,17 @@ const form = useForm({
     attachment: null as File | null,
 });
 
-const leaveTypeLabel = (type: string) => {
-    const key = `leaves.type_${type}`;
-    const translated = t(key);
-    return translated === key ? type : translated;
-};
+const selectedLeaveType = computed(() =>
+    props.leaveTypes.find((item) => item.key === form.leave_type) ?? null,
+);
+
+const leaveTypeLabel = (type: string, fallbackLabel?: string | null) =>
+    fallbackLabel
+    || props.leaveTypes.find((item) => item.key === type)?.label
+    || type;
+
+const formatLocalizedNumber = (value: number) =>
+    new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(value);
 
 const statusLabel = (status: string) => {
     const key = `leaves.request_status_${status}`;
@@ -157,6 +171,25 @@ function onAttachmentChange(file: File | null) {
 }
 
 const submit = () => {
+    const leaveType = selectedLeaveType.value;
+    if (leaveType && leaveType.min_notice_days > 0 && form.start_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const startDate = new Date(form.start_date);
+        startDate.setHours(0, 0, 0, 0);
+
+        const diffInDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+        if (diffInDays < leaveType.min_notice_days) {
+            form.setError('start_date', t('leaves.min_notice_days_not_met_frontend', {
+                leave_type: leaveType.label,
+                days: formatLocalizedNumber(leaveType.min_notice_days),
+            }));
+            return;
+        }
+    }
+
+    form.clearErrors('start_date');
     form.post(route('employee.leaves.store'), {
         forceFormData: true,
         onSuccess: () => closeCreateForm(),
@@ -214,8 +247,8 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                 </Button>
             </div>
 
-            <div v-if="(page.props.flash as { success?: string })?.success" class="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                {{ (page.props.flash as { success?: string }).success }}
+            <div v-if="flashSuccess" class="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                {{ flashSuccess }}
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -269,7 +302,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             <tbody>
                                 <template v-for="request in leaveRequests" :key="request.id">
                                     <tr class="border-b last:border-0">
-                                        <td class="py-3 px-2">{{ leaveTypeLabel(request.leave_type) }}</td>
+                                        <td class="py-3 px-2">{{ leaveTypeLabel(request.leave_type, request.leave_type_label) }}</td>
                                         <td class="py-3 px-2">{{ request.start_date }}</td>
                                         <td class="py-3 px-2">{{ request.end_date }}</td>
                                         <td class="py-3 px-2">{{ request.days }}</td>
@@ -421,7 +454,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             </thead>
                             <tbody>
                                 <tr v-for="leave in approvedLeaves" :key="leave.id" class="border-b last:border-0">
-                                    <td class="py-3 px-2">{{ leaveTypeLabel(leave.leave_type) }}</td>
+                                    <td class="py-3 px-2">{{ leaveTypeLabel(leave.leave_type, leave.leave_type_label) }}</td>
                                     <td class="py-3 px-2">{{ leave.start_date }}</td>
                                     <td class="py-3 px-2">{{ leave.end_date }}</td>
                                     <td class="py-3 px-2">{{ leave.days }}</td>
@@ -437,7 +470,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                 </CardContent>
             </Card>
 
-            <Dialog :open="createFormOpen" @update:open="(open: boolean) => (open ? openCreateForm() : closeCreateForm())">
+            <Dialog :open="createFormOpen" @update:open="(open) => (open ? openCreateForm() : closeCreateForm())">
                 <DialogContent class="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{{ t('leaves.request_leave') }}</DialogTitle>
@@ -445,7 +478,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                     </DialogHeader>
 
                     <form @submit.prevent="submit" class="space-y-6">
-                        <LeaveFormFields :form="form" @attachment-change="onAttachmentChange" />
+                        <LeaveFormFields :form="form" :leave-types="leaveTypes" @attachment-change="onAttachmentChange" />
 
                         <DialogFooter>
                             <Button type="button" variant="outline" @click="closeCreateForm">

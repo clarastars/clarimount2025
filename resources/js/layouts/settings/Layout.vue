@@ -7,15 +7,26 @@ import { Link, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 
+interface Props {
+    contentWidth?: 'default' | 'wide';
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    contentWidth: 'default',
+});
+
 const { t } = useI18n();
 const page = usePage();
 const authProps = computed(() => (page.props.auth as {
     can_access_settings?: boolean;
+    can_manage_leave_types?: boolean;
     is_employee?: boolean;
     is_super_admin?: boolean;
 }) ?? {});
 
 const canAccessSettings = computed(() => authProps.value.can_access_settings ?? false);
+const canManageLeaveTypes = computed(() => authProps.value.can_manage_leave_types ?? false);
+const canOpenSettingsArea = computed(() => canAccessSettings.value || canManageLeaveTypes.value);
 const isEmployeePortal = computed(() => authProps.value.is_employee ?? false);
 const isSuperAdmin = computed(() => authProps.value.is_super_admin ?? false);
 
@@ -39,7 +50,7 @@ const sidebarNavItems = computed((): NavItem[] => {
         href: '/settings/appearance',
     });
 
-    if (isEmployeePortal.value && ! canAccessSettings.value) {
+    if (isEmployeePortal.value && ! canOpenSettingsArea.value) {
         return personal;
     }
 
@@ -84,6 +95,13 @@ const sidebarNavItems = computed((): NavItem[] => {
         );
     }
 
+    if (canOpenSettingsArea.value) {
+        items.push({
+            title: t('settings.leave_types'),
+            href: '/settings/leave-types',
+        });
+    }
+
     if (isSuperAdmin.value) {
         items.push({
             title: t('settings.missing_hire_date_export'),
@@ -95,6 +113,9 @@ const sidebarNavItems = computed((): NavItem[] => {
 });
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
+const contentWidthClass = computed(() =>
+    props.contentWidth === 'wide' ? 'max-w-6xl' : 'max-w-xl',
+);
 </script>
 
 <template>
@@ -120,8 +141,8 @@ const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.locati
 
             <Separator class="my-6 md:hidden" />
 
-            <div class="flex-1 md:max-w-2xl">
-                <section class="max-w-xl space-y-12">
+            <div :class="['flex-1', props.contentWidth === 'wide' ? 'md:max-w-6xl' : 'md:max-w-2xl']">
+                <section :class="[contentWidthClass, 'space-y-12']">
                     <slot />
                 </section>
             </div>
