@@ -121,7 +121,7 @@ class LeaveAccrualService
     public function initializeAccruedBalanceForEmployee(Employee $employee, bool $replaceExistingLogs = true): float
     {
         $employee->refresh();
-        $asOf = Carbon::now(self::TZ)->startOfDay();
+        $asOf = $this->resolveAccrualAsOfDate($employee);
         $monthlyDays = $this->monthlyAccrualDays($employee);
 
         if ($monthlyDays <= 0) {
@@ -138,15 +138,76 @@ class LeaveAccrualService
         $logRows = [];
 
         foreach ($periods as $period) {
-            $runningBalance = round($runningBalance + $monthlyDays, 2);
+            $daysForPeriod = $this->accrualDaysForPeriod($employee, $period, $hireDate, $asOf);
+
+            if ($daysForPeriod <= 0) {
+                continue;
+            }
+
+            $runningBalance = round($runningBalance + $daysForPeriod, 2);
             $logRows[] = [
                 'accrual_period' => $period,
-                'days_accrued' => $monthlyDays,
+                'days_accrued' => $daysForPeriod,
                 'balance_after' => $runningBalance,
             ];
         }
 
         return $this->persistAccruedBalance($employee, $runningBalance, $logRows, $replaceExistingLogs);
+    }
+
+    /**
+     * Accrued days for a calendar month, pro-rated when the hire or departure date falls mid-month.
+     */
+    public function accrualDaysForPeriod(
+        Employee $employee,
+        string $period,
+        ?Carbon $hireDate = null,
+        ?Carbon $asOf = null,
+    ): float {
+        if (! preg_match('/^\d{4}-\d{2}$/', $period)) {
+            throw new \InvalidArgumentException('Accrual period must be in YYYY-MM format.');
+        }
+
+        $monthlyDays = $this->monthlyAccrualDays($employee);
+
+        if ($monthlyDays <= 0) {
+            return 0.0;
+        }
+
+        $periodStart = Carbon::createFromFormat('Y-m-d', $period.'-01', self::TZ)->startOfDay();
+        $periodEnd = $periodStart->copy()->endOfMonth()->startOfDay();
+        $daysInMonth = $periodStart->daysInMonth;
+
+        $hireDate ??= $this->resolveHireDate($employee);
+        if ($hireDate === null) {
+            return $monthlyDays;
+        }
+
+        $asOf ??= $this->resolveAccrualAsOfDate($employee);
+        $departureDate = $this->resolveDepartureDate($employee);
+
+        if ($hireDate->gt($periodEnd) || $asOf->lt($periodStart)) {
+            return 0.0;
+        }
+
+        $rangeStart = $hireDate->gt($periodStart) ? $hireDate->copy()->startOfDay() : $periodStart->copy();
+        $rangeEnd = $periodEnd->copy();
+
+        if ($departureDate !== null && $departureDate->lt($rangeEnd)) {
+            $rangeEnd = $departureDate->copy()->startOfDay();
+        }
+
+        if ($rangeStart->gt($rangeEnd)) {
+            return 0.0;
+        }
+
+        $daysInRange = (int) $rangeStart->diffInDays($rangeEnd) + 1;
+
+        if ($daysInRange >= $daysInMonth) {
+            return $monthlyDays;
+        }
+
+        return round(($daysInRange / $daysInMonth) * $monthlyDays, 2);
     }
 
     public function isEmployeeEligibleForAccrualPeriod(
@@ -167,10 +228,7 @@ class LeaveAccrualService
             return ! $requireHireDate;
         }
 
-        $periodStart = Carbon::createFromFormat('Y-m-d', $period.'-01', self::TZ)->startOfDay();
-        $periodEnd = $periodStart->copy()->endOfMonth()->endOfDay();
-
-        return $hireDate->lte($periodEnd);
+        return $this->accrualDaysForPeriod($employee, $period, $hireDate) > 0;
     }
 
     /**
@@ -209,9 +267,9 @@ class LeaveAccrualService
             return null;
         }
 
-        $monthlyDays = $this->monthlyAccrualDays($employee);
+        $daysForPeriod = $this->accrualDaysForPeriod($employee, $period);
 
-        if ($monthlyDays <= 0) {
+        if ($daysForPeriod <= 0) {
             return null;
         }
 
@@ -225,7 +283,7 @@ class LeaveAccrualService
             return null;
         }
 
-        return DB::transaction(function () use ($employee, $period, $monthlyDays, $force): LeaveAccrualLog {
+        return DB::transaction(function () use ($employee, $period, $daysForPeriod, $force): LeaveAccrualLog {
             if ($force) {
                 LeaveAccrualLog::query()
                     ->where('employee_id', $employee->id)
@@ -234,7 +292,7 @@ class LeaveAccrualService
             }
 
             $lockedEmployee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
-            $newBalance = round((float) $lockedEmployee->leave_accrued_balance + $monthlyDays, 2);
+            $newBalance = round((float) $lockedEmployee->leave_accrued_balance + $daysForPeriod, 2);
 
             $lockedEmployee->update([
                 'leave_accrued_balance' => $newBalance,
@@ -243,7 +301,7 @@ class LeaveAccrualService
             return LeaveAccrualLog::query()->create([
                 'employee_id' => $lockedEmployee->id,
                 'accrual_period' => $period,
-                'days_accrued' => $monthlyDays,
+                'days_accrued' => $daysForPeriod,
                 'annual_entitlement' => (int) $lockedEmployee->annual_leave_balance,
                 'balance_after' => $newBalance,
             ]);
@@ -257,6 +315,29 @@ class LeaveAccrualService
         }
 
         return Carbon::parse($employee->hire_date, self::TZ)->startOfDay();
+    }
+
+    private function resolveDepartureDate(Employee $employee): ?Carbon
+    {
+        $rawDate = $employee->departure_date ?? $employee->termination_date;
+
+        if ($rawDate === null) {
+            return null;
+        }
+
+        return Carbon::parse($rawDate, self::TZ)->startOfDay();
+    }
+
+    private function resolveAccrualAsOfDate(Employee $employee, ?Carbon $date = null): Carbon
+    {
+        $asOf = ($date ?? Carbon::now(self::TZ))->copy()->startOfDay();
+        $departureDate = $this->resolveDepartureDate($employee);
+
+        if ($departureDate !== null && $departureDate->lt($asOf)) {
+            return $departureDate;
+        }
+
+        return $asOf;
     }
 
     /**
