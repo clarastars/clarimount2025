@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +28,7 @@ class SalaryCertificateRequestService
             'purpose' => ['required', 'string', 'max:500'],
             'addressed_to' => ['nullable', 'string', 'max:255'],
             'language' => ['required', 'string', Rule::in(SalaryCertificateRequest::LANGUAGES)],
+            'attestation_type' => ['required', 'string', Rule::in(SalaryCertificateRequest::ATTESTATION_TYPES)],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -35,6 +37,7 @@ class SalaryCertificateRequestService
             'purpose' => $validated['purpose'],
             'addressed_to' => $validated['addressed_to'] ?? null,
             'language' => $validated['language'],
+            'attestation_type' => $validated['attestation_type'],
             'notes' => $validated['notes'] ?? null,
             'status' => SalaryCertificateRequest::STATUS_PENDING,
         ]);
@@ -57,6 +60,7 @@ class SalaryCertificateRequestService
         User $reviewer,
         ?string $reviewNotes = null,
         bool $skipEmployeeNotification = false,
+        ?UploadedFile $uploadedCertificate = null,
     ): SalaryCertificateRequest {
         if (! $certificateRequest->isPending()) {
             throw ValidationException::withMessages([
@@ -67,7 +71,17 @@ class SalaryCertificateRequestService
         $previousDisk = $certificateRequest->certificateDisk();
         $previousPath = $certificateRequest->certificate_path;
 
-        $stored = $this->documentService->storeGeneratedPdf($certificateRequest);
+        if ($certificateRequest->requiresChamberAttestation()) {
+            if ($uploadedCertificate === null) {
+                throw ValidationException::withMessages([
+                    'certificate' => [__('messages.salary_certificates.chamber_upload_required')],
+                ]);
+            }
+
+            $stored = $this->storeUploadedCertificate($certificateRequest, $uploadedCertificate);
+        } else {
+            $stored = $this->documentService->storeGeneratedPdf($certificateRequest);
+        }
 
         if ($previousPath && Storage::disk($previousDisk)->exists($previousPath)) {
             Storage::disk($previousDisk)->delete($previousPath);
@@ -138,5 +152,36 @@ class SalaryCertificateRequestService
     public function certificateDiskName(): string
     {
         return (string) config('filesystems.cloud', 's3');
+    }
+
+    /**
+     * @return array{disk: string, path: string, name: string}
+     */
+    private function storeUploadedCertificate(
+        SalaryCertificateRequest $certificateRequest,
+        UploadedFile $certificate,
+    ): array {
+        $diskName = $this->certificateDiskName();
+        $extension = $certificate->getClientOriginalExtension() ?: 'pdf';
+        $filename = sprintf(
+            'salary-certificate-%d-%s.%s',
+            $certificateRequest->id,
+            now()->format('YmdHis'),
+            $extension,
+        );
+
+        $path = $certificate->storeAs(
+            'salary-certificates/'.$certificateRequest->employee_id,
+            $filename,
+            ['disk' => $diskName, 'visibility' => 'private'],
+        );
+
+        $originalName = trim((string) $certificate->getClientOriginalName());
+
+        return [
+            'disk' => $diskName,
+            'path' => $path,
+            'name' => $originalName !== '' ? $originalName : $filename,
+        ];
     }
 }

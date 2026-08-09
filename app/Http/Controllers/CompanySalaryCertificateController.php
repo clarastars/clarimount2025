@@ -16,6 +16,7 @@ use App\Services\SalaryCertificateRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -95,7 +96,10 @@ class CompanySalaryCertificateController extends Controller
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
+        $requiresUpload = $salaryCertificateRequest->requiresChamberAttestation();
+
         $validated = $request->validate([
+            'certificate' => [$requiresUpload ? 'required' : 'nullable', 'file', 'mimes:pdf', 'max:10240'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -103,6 +107,7 @@ class CompanySalaryCertificateController extends Controller
             $salaryCertificateRequest,
             $user,
             $validated['review_notes'] ?? null,
+            uploadedCertificate: $this->uploadedCertificateFile($request),
         );
 
         return redirect()
@@ -165,7 +170,11 @@ class CompanySalaryCertificateController extends Controller
             abort(403);
         }
 
+        $isLastStep = $this->approvalService->isLastPendingStep($salaryCertificateRequest, $salaryCertificateApprovalStep);
+        $requiresUpload = $isLastStep && $salaryCertificateRequest->requiresChamberAttestation();
+
         $validated = $request->validate([
+            'certificate' => [$requiresUpload ? 'required' : 'nullable', 'file', 'mimes:pdf', 'max:10240'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -183,6 +192,7 @@ class CompanySalaryCertificateController extends Controller
                 $user,
                 $validated['review_notes'] ?? null,
                 skipEmployeeNotification: true,
+                uploadedCertificate: $this->uploadedCertificateFile($request),
             );
 
             $this->approvalNotificationService->notifyWorkflowFinalized(
@@ -289,6 +299,13 @@ class CompanySalaryCertificateController extends Controller
         );
 
         return $this->certificateFileResponse($salaryCertificateRequest, download: true);
+    }
+
+    private function uploadedCertificateFile(Request $request): ?UploadedFile
+    {
+        $file = $request->file('certificate');
+
+        return $file instanceof UploadedFile ? $file : null;
     }
 
     private function certificateFileResponse(
@@ -412,6 +429,7 @@ class CompanySalaryCertificateController extends Controller
             'purpose' => $request->purpose,
             'addressed_to' => $request->addressed_to,
             'language' => $request->language,
+            'attestation_type' => $request->attestation_type ?: SalaryCertificateRequest::ATTESTATION_NONE,
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,

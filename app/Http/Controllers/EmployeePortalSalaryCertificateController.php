@@ -51,6 +51,7 @@ class EmployeePortalSalaryCertificateController extends Controller
             ],
             'requests' => $requests,
             'languages' => SalaryCertificateRequest::LANGUAGES,
+            'attestationTypes' => SalaryCertificateRequest::ATTESTATION_TYPES,
         ]);
     }
 
@@ -155,6 +156,7 @@ class EmployeePortalSalaryCertificateController extends Controller
             'purpose' => $request->purpose,
             'addressed_to' => $request->addressed_to,
             'language' => $request->language,
+            'attestation_type' => $request->attestation_type ?: SalaryCertificateRequest::ATTESTATION_NONE,
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,

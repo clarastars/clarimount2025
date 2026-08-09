@@ -42,6 +42,7 @@ interface CertificateRequestRow {
     purpose: string | null;
     addressed_to: string | null;
     language: string;
+    attestation_type?: string;
     notes?: string | null;
     status: string;
     review_notes?: string | null;
@@ -61,6 +62,7 @@ const props = defineProps<{
     employee: EmployeeSummary;
     requests: CertificateRequestRow[];
     languages: string[];
+    attestationTypes?: string[];
 }>();
 
 const { t, locale } = useI18n();
@@ -79,6 +81,7 @@ const form = useForm({
     purpose: '',
     addressed_to: '',
     language: 'ar',
+    attestation_type: 'none',
     notes: '',
 });
 
@@ -100,6 +103,14 @@ const languageLabel = (language: string) => {
     const translated = t(key);
     return translated === key ? language : translated;
 };
+
+const attestationLabel = (type: string | null | undefined) => {
+    const key = `salary_certificates.attestation_${type || 'none'}`;
+    const translated = t(key);
+    return translated === key ? (type || 'none') : translated;
+};
+
+const attestationOptions = computed(() => props.attestationTypes?.length ? props.attestationTypes : ['none', 'chamber']);
 
 const displayValue = (value: unknown) => (value === null || value === undefined || value === '' ? '—' : value);
 
@@ -124,6 +135,7 @@ function closeCreateForm() {
     form.reset();
     form.clearErrors();
     form.language = 'ar';
+    form.attestation_type = 'none';
 }
 
 const submit = () => {
@@ -217,6 +229,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                     <th class="py-3 px-2 text-start font-medium">{{ t('salary_certificates.purpose') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('salary_certificates.addressed_to') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('salary_certificates.language') }}</th>
+                                    <th class="py-3 px-2 text-start font-medium">{{ t('salary_certificates.attestation_type') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('salary_certificates.request_status') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('common.actions') }}</th>
                                 </tr>
@@ -227,6 +240,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         <td class="py-3 px-2">{{ displayValue(request.purpose) }}</td>
                                         <td class="py-3 px-2">{{ displayValue(request.addressed_to) }}</td>
                                         <td class="py-3 px-2">{{ languageLabel(request.language) }}</td>
+                                        <td class="py-3 px-2">{{ attestationLabel(request.attestation_type) }}</td>
                                         <td class="py-3 px-2">
                                             <Badge :variant="statusVariant(request.status)">
                                                 {{ statusLabel(request.status) }}
@@ -296,7 +310,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         v-if="request.approval_progress && isApprovalDetailsOpen(request.id)"
                                         class="border-b last:border-0 bg-muted/20"
                                     >
-                                        <td colspan="5" class="px-2 pb-4 pt-1">
+                                        <td colspan="6" class="px-2 pb-4 pt-1">
                                             <div class="rounded-lg border bg-background p-3 space-y-3">
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                                     <p class="text-sm font-medium">{{ t('leaves.approval_workflow_title') }}</p>
@@ -399,6 +413,28 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                 v-model="form.addressed_to"
                             />
                             <p v-if="form.errors.addressed_to" class="text-sm text-red-600">{{ form.errors.addressed_to }}</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label>{{ t('salary_certificates.attestation_type') }}</Label>
+                            <div class="space-y-2">
+                                <label
+                                    v-for="type in attestationOptions"
+                                    :key="type"
+                                    class="flex items-start gap-3 rounded-md border p-3 cursor-pointer"
+                                    :class="form.attestation_type === type ? 'border-primary bg-muted/40' : ''"
+                                >
+                                    <input
+                                        v-model="form.attestation_type"
+                                        type="radio"
+                                        :value="type"
+                                        class="mt-1"
+                                        required
+                                    >
+                                    <span class="font-medium">{{ attestationLabel(type) }}</span>
+                                </label>
+                            </div>
+                            <p v-if="form.errors.attestation_type" class="text-sm text-red-600">{{ form.errors.attestation_type }}</p>
                         </div>
 
                         <div class="space-y-2">

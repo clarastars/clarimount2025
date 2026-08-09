@@ -27,11 +27,21 @@ class SalaryCertificateRequest extends Model
 
     public const LANGUAGES = ['ar', 'en', 'both'];
 
+    public const ATTESTATION_NONE = 'none';
+
+    public const ATTESTATION_CHAMBER = 'chamber';
+
+    public const ATTESTATION_TYPES = [
+        self::ATTESTATION_NONE,
+        self::ATTESTATION_CHAMBER,
+    ];
+
     protected $fillable = [
         'employee_id',
         'purpose',
         'addressed_to',
         'language',
+        'attestation_type',
         'notes',
         'status',
         'certificate_path',
@@ -69,6 +79,11 @@ class SalaryCertificateRequest extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    public function requiresChamberAttestation(): bool
+    {
+        return $this->attestation_type === self::ATTESTATION_CHAMBER;
     }
 
     /**

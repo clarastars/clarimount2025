@@ -116,7 +116,8 @@ class SalaryCertificateApprovalService
                 'can_approve' => $canApprove,
                 'can_reject' => $canApprove,
                 'waiting_previous' => ! $previousStepsApproved && ! $isApproved,
-                'requires_certificate' => $isLastStep,
+                'is_final_step' => $isLastStep,
+                'requires_certificate' => $isLastStep && $request->requiresChamberAttestation(),
             ];
 
             if (! $isApproved) {
