@@ -171,6 +171,71 @@ const showDirectReviewActions = computed(() =>
     props.canReviewRequests && ! props.hasApprovalWorkflow,
 );
 
+function actionableStep(request: CertificateRequestItem): ApprovalStepState | null {
+    return request.approval_steps?.find((step) => step.can_approve || step.can_reject) ?? null;
+}
+
+function canReviewOnList(request: CertificateRequestItem): boolean {
+    if (requestsTab.value !== 'pending') {
+        return false;
+    }
+
+    if (showDirectReviewActions.value) {
+        return true;
+    }
+
+    return actionableStep(request) !== null;
+}
+
+function listApproveLabel(request: CertificateRequestItem): string {
+    if (! props.hasApprovalWorkflow) {
+        return isChamberRequest(request)
+            ? t('salary_certificates.upload_and_issue')
+            : t('salary_certificates.approve_and_issue');
+    }
+
+    const step = actionableStep(request);
+    if (step?.requires_certificate) {
+        return t('salary_certificates.upload_and_issue');
+    }
+
+    if (step?.is_final_step) {
+        return t('salary_certificates.approve_and_issue');
+    }
+
+    return t('salary_runs.approval_approve');
+}
+
+function approveFromList(request: CertificateRequestItem) {
+    if (! props.hasApprovalWorkflow) {
+        openCompleteDialog(request);
+        return;
+    }
+
+    const step = actionableStep(request);
+    if (! step?.can_approve) {
+        return;
+    }
+
+    selectedRequest.value = request;
+    approveWorkflowStep(step);
+}
+
+function rejectFromList(request: CertificateRequestItem) {
+    if (! props.hasApprovalWorkflow) {
+        rejectRequest(request.id);
+        return;
+    }
+
+    const step = actionableStep(request);
+    if (! step?.can_reject) {
+        return;
+    }
+
+    selectedRequest.value = request;
+    openRejectDialog(step.id);
+}
+
 const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
 
@@ -532,11 +597,22 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                             {{ t('salary_certificates.download_certificate') }}
                                         </a>
                                     </Button>
-                                    <template v-if="requestsTab === 'pending' && showDirectReviewActions">
-                                        <Button size="sm" @click="openCompleteDialog(request)">
-                                            {{ isChamberRequest(request) ? t('salary_certificates.upload_and_issue') : t('salary_certificates.approve_and_issue') }}
+                                    <template v-if="canReviewOnList(request)">
+                                        <Button
+                                            v-if="!hasApprovalWorkflow || actionableStep(request)?.can_approve"
+                                            size="sm"
+                                            :disabled="approvingStepId !== null || rejectingStepId !== null"
+                                            @click="approveFromList(request)"
+                                        >
+                                            {{ listApproveLabel(request) }}
                                         </Button>
-                                        <Button size="sm" variant="destructive" :disabled="reviewForm.processing" @click="rejectRequest(request.id)">
+                                        <Button
+                                            v-if="!hasApprovalWorkflow || actionableStep(request)?.can_reject"
+                                            size="sm"
+                                            variant="destructive"
+                                            :disabled="reviewForm.processing || approvingStepId !== null || rejectingStepId !== null"
+                                            @click="rejectFromList(request)"
+                                        >
                                             {{ t('salary_certificates.reject_request') }}
                                         </Button>
                                     </template>

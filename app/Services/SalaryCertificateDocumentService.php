@@ -63,7 +63,7 @@ class SalaryCertificateDocumentService
     .sheet { font-family: aealarabiya; font-size: 12pt; color: #1f2937; }
     .logo-wrap { text-align: center; margin-bottom: 10px; }
     .greeting { text-align: center; font-family: aealarabiya; font-size: 15pt; margin: 12px 0 16px; }
-    .intro, .closing { text-align: right; font-family: aealarabiya; font-size: 12pt; line-height: 1.9; margin: 0 0 14px; }
+    .intro { text-align: right; font-family: aealarabiya; font-size: 12pt; line-height: 1.9; margin: 0 0 14px; }
     .value { font-family: aealarabiya; text-decoration: underline; }
     .thanks { text-align: center; font-family: aealarabiya; font-size: 14pt; margin-top: 22px; }
     table.salary-table { border-collapse: collapse; font-family: aealarabiya; }
