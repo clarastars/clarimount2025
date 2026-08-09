@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\Company;
+use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -87,5 +89,39 @@ class SalaryCertificateApprovalWorkflowMail extends Mailable
         };
 
         return strtr(__($translationKey), $replacements);
+    }
+
+    /**
+     * @return array<int, Attachment>
+     */
+    public function attachments(): array
+    {
+        if (! in_array($this->eventType, ['completed', 'finalized'], true)) {
+            return [];
+        }
+
+        $requestId = (int) ($this->payload['salary_certificate_request_id'] ?? 0);
+        if ($requestId < 1) {
+            return [];
+        }
+
+        $certificateRequest = SalaryCertificateRequest::query()->find($requestId);
+        if ($certificateRequest === null || ! filled($certificateRequest->certificate_path)) {
+            return [];
+        }
+
+        $disk = Storage::disk($certificateRequest->certificateDisk());
+        if (! $disk->exists($certificateRequest->certificate_path)) {
+            return [];
+        }
+
+        return [
+            Attachment::fromStorageDisk(
+                $certificateRequest->certificateDisk(),
+                $certificateRequest->certificate_path,
+            )
+                ->as($certificateRequest->certificateDownloadName())
+                ->withMime('application/pdf'),
+        ];
     }
 }

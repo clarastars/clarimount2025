@@ -8,9 +8,11 @@ use App\Models\Company;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use App\Services\SalaryCertificateApprovalService;
+use App\Services\SalaryCertificateDocumentService;
 use App\Services\SalaryCertificateRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -22,6 +24,7 @@ class EmployeePortalSalaryCertificateController extends Controller
     public function __construct(
         private SalaryCertificateRequestService $requestService,
         private SalaryCertificateApprovalService $approvalService,
+        private SalaryCertificateDocumentService $documentService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -75,21 +78,52 @@ class EmployeePortalSalaryCertificateController extends Controller
             ->with('success', __('messages.salary_certificates.request_cancelled_success'));
     }
 
-    public function download(SalaryCertificateRequest $salaryCertificateRequest): StreamedResponse
+    public function preview(SalaryCertificateRequest $salaryCertificateRequest): HttpResponse|StreamedResponse
     {
+        return $this->certificateFileResponse($salaryCertificateRequest, download: false);
+    }
+
+    public function download(SalaryCertificateRequest $salaryCertificateRequest): HttpResponse|StreamedResponse
+    {
+        return $this->certificateFileResponse($salaryCertificateRequest, download: true);
+    }
+
+    private function certificateFileResponse(
+        SalaryCertificateRequest $salaryCertificateRequest,
+        bool $download,
+    ): HttpResponse|StreamedResponse {
         $employee = $this->resolvePortalEmployee();
         abort_unless($employee !== null, 403);
         abort_unless((int) $salaryCertificateRequest->employee_id === (int) $employee->id, 403);
-        abort_unless($salaryCertificateRequest->isCompleted() && $salaryCertificateRequest->certificate_path, 404);
+        abort_unless($salaryCertificateRequest->isCompleted(), 404);
 
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-        $disk = Storage::disk($salaryCertificateRequest->certificateDisk());
-        abort_unless($disk->exists($salaryCertificateRequest->certificate_path), 404);
+        $filename = $salaryCertificateRequest->certificateDownloadName();
 
-        return $disk->download(
-            $salaryCertificateRequest->certificate_path,
-            $salaryCertificateRequest->certificateDownloadName()
-        );
+        if (filled($salaryCertificateRequest->certificate_path)) {
+            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+            $disk = Storage::disk($salaryCertificateRequest->certificateDisk());
+
+            if ($disk->exists($salaryCertificateRequest->certificate_path)) {
+                if ($download) {
+                    return $disk->download($salaryCertificateRequest->certificate_path, $filename);
+                }
+
+                return $disk->response($salaryCertificateRequest->certificate_path, $filename, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                ]);
+            }
+        }
+
+        if (! $download) {
+            return response($this->documentService->previewHtml($salaryCertificateRequest))
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        return response($this->documentService->renderPdf($salaryCertificateRequest), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     private function resolvePortalEmployee()
@@ -124,7 +158,7 @@ class EmployeePortalSalaryCertificateController extends Controller
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,
-            'has_certificate' => $request->isCompleted() && filled($request->certificate_path),
+            'has_certificate' => $request->isCompleted(),
             'created_at' => $request->created_at?->toIso8601String(),
             'reviewed_at' => $request->reviewed_at?->toIso8601String(),
         ];

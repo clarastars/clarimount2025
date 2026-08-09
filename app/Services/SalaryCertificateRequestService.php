@@ -8,9 +8,7 @@ use App\Models\Employee;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -20,6 +18,7 @@ class SalaryCertificateRequestService
         private SalaryCertificateRequestNotificationService $notificationService,
         private SalaryCertificateApprovalService $approvalService,
         private SalaryCertificateApprovalNotificationService $approvalNotificationService,
+        private SalaryCertificateDocumentService $documentService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request): SalaryCertificateRequest
@@ -56,7 +55,6 @@ class SalaryCertificateRequestService
     public function complete(
         SalaryCertificateRequest $certificateRequest,
         User $reviewer,
-        UploadedFile $certificate,
         ?string $reviewNotes = null,
         bool $skipEmployeeNotification = false,
     ): SalaryCertificateRequest {
@@ -69,12 +67,7 @@ class SalaryCertificateRequestService
         $previousDisk = $certificateRequest->certificateDisk();
         $previousPath = $certificateRequest->certificate_path;
 
-        $diskName = $this->certificateDiskName();
-        $path = $certificate->storeAs(
-            'salary-certificates/'.$certificateRequest->employee_id,
-            $this->buildCertificateFilename($certificate),
-            ['disk' => $diskName, 'visibility' => 'private'],
-        );
+        $stored = $this->documentService->storeGeneratedPdf($certificateRequest);
 
         if ($previousPath && Storage::disk($previousDisk)->exists($previousPath)) {
             Storage::disk($previousDisk)->delete($previousPath);
@@ -82,9 +75,9 @@ class SalaryCertificateRequestService
 
         $certificateRequest->update([
             'status' => SalaryCertificateRequest::STATUS_COMPLETED,
-            'certificate_path' => $path,
-            'certificate_disk' => $diskName,
-            'certificate_name' => $certificate->getClientOriginalName(),
+            'certificate_path' => $stored['path'],
+            'certificate_disk' => $stored['disk'],
+            'certificate_name' => $stored['name'],
             'reviewed_by' => $reviewer->id,
             'reviewed_at' => now(),
             'review_notes' => $reviewNotes,
@@ -145,17 +138,5 @@ class SalaryCertificateRequestService
     public function certificateDiskName(): string
     {
         return (string) config('filesystems.cloud', 's3');
-    }
-
-    private function buildCertificateFilename(UploadedFile $certificate): string
-    {
-        $extension = $certificate->getClientOriginalExtension() ?: 'pdf';
-        $baseName = Str::slug(pathinfo($certificate->getClientOriginalName(), PATHINFO_FILENAME));
-
-        if ($baseName === '') {
-            $baseName = 'salary-certificate';
-        }
-
-        return $baseName.'-'.now()->format('YmdHis').'.'.$extension;
     }
 }

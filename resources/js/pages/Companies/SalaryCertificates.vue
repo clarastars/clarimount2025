@@ -2,7 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Download, FileBadge } from 'lucide-vue-next';
+import { Download, Eye, FileBadge } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ interface CertificateRequestItem {
     status?: string;
     review_notes?: string | null;
     has_certificate?: boolean;
+    can_preview?: boolean;
     created_at?: string | null;
     reviewed_at?: string | null;
     reviewer_name?: string | null;
@@ -158,7 +159,6 @@ const approvalList = computed(() => selectedRequest.value?.approval_steps ?? [])
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
 
 const completeForm = useForm({
-    certificate: null as File | null,
     review_notes: '',
 });
 
@@ -171,7 +171,6 @@ const reviewForm = useForm({
 });
 
 const stepApproveForm = useForm({
-    certificate: null as File | null,
     review_notes: '',
 });
 
@@ -207,7 +206,6 @@ function submitComplete() {
     completeForm.post(
         route('companies.salary-certificate-requests.complete', [props.company.id, completingRequestId.value]),
         {
-            forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
                 closeCompleteDialog();
@@ -329,7 +327,6 @@ function submitCertificateStep() {
             approvingStepId.value,
         ]),
         {
-            forceFormData: true,
             preserveScroll: true,
             onSuccess: (page) => {
                 closeCertificateStepDialog();
@@ -486,16 +483,23 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                     <Button size="sm" variant="outline" @click="openRequestDetails(request)">
                                         {{ t('salary_certificates.request_details') }}
                                     </Button>
-                                    <template v-if="requestsTab === 'pending' && showDirectReviewActions">
-                                        <Button size="sm" @click="openCompleteDialog(request.id)">
-                                            {{ t('salary_certificates.attach_and_complete') }}
-                                        </Button>
-                                        <Button size="sm" variant="destructive" :disabled="reviewForm.processing" @click="rejectRequest(request.id)">
-                                            {{ t('salary_certificates.reject_request') }}
-                                        </Button>
-                                    </template>
                                     <Button
-                                        v-if="request.has_certificate"
+                                        v-if="request.can_preview"
+                                        size="sm"
+                                        variant="outline"
+                                        as-child
+                                    >
+                                        <a
+                                            :href="route('companies.salary-certificate-requests.preview', [company.id, request.id])"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            <Eye class="mr-1 h-3.5 w-3.5" />
+                                            {{ t('salary_certificates.view_certificate') }}
+                                        </a>
+                                    </Button>
+                                    <Button
+                                        v-if="request.can_preview"
                                         size="sm"
                                         variant="outline"
                                         as-child
@@ -505,6 +509,14 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                             {{ t('salary_certificates.download_certificate') }}
                                         </a>
                                     </Button>
+                                    <template v-if="requestsTab === 'pending' && showDirectReviewActions">
+                                        <Button size="sm" @click="openCompleteDialog(request.id)">
+                                            {{ t('salary_certificates.approve_and_issue') }}
+                                        </Button>
+                                        <Button size="sm" variant="destructive" :disabled="reviewForm.processing" @click="rejectRequest(request.id)">
+                                            {{ t('salary_certificates.reject_request') }}
+                                        </Button>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -588,7 +600,7 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                         {{ approval.team_name }}
                                     </div>
                                     <p v-if="approval.requires_certificate && !approval.approved_at" class="text-xs text-amber-700 dark:text-amber-400 mb-2">
-                                        {{ t('salary_certificates.final_step_requires_pdf') }}
+                                        {{ t('salary_certificates.final_step_issues_certificate') }}
                                     </p>
                                     <div v-if="approval.approved_at" class="text-sm space-y-1">
                                         <div class="text-muted-foreground">
@@ -615,7 +627,7 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                                 :disabled="approvingStepId === approval.id || rejectingStepId === approval.id"
                                                 @click="approveWorkflowStep(approval)"
                                             >
-                                                {{ approvingStepId === approval.id ? '...' : (approval.requires_certificate ? t('salary_certificates.attach_and_complete') : t('salary_runs.approval_approve')) }}
+                                                {{ approvingStepId === approval.id ? '...' : (approval.requires_certificate ? t('salary_certificates.approve_and_issue') : t('salary_runs.approval_approve')) }}
                                             </Button>
                                             <Button
                                                 v-if="approval.can_reject"
@@ -634,7 +646,31 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                         </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter class="flex-wrap gap-2">
+                        <Button
+                            v-if="selectedRequest?.can_preview"
+                            variant="outline"
+                            as-child
+                        >
+                            <a
+                                :href="route('companies.salary-certificate-requests.preview', [company.id, selectedRequest.id])"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Eye class="mr-1 h-3.5 w-3.5" />
+                                {{ t('salary_certificates.view_certificate') }}
+                            </a>
+                        </Button>
+                        <Button
+                            v-if="selectedRequest?.can_preview"
+                            variant="outline"
+                            as-child
+                        >
+                            <a :href="route('companies.salary-certificate-requests.download', [company.id, selectedRequest.id])">
+                                <Download class="mr-1 h-3.5 w-3.5" />
+                                {{ t('salary_certificates.download_certificate') }}
+                            </a>
+                        </Button>
                         <Button variant="outline" @click="closeRequestDetails">
                             {{ t('common.close') }}
                         </Button>
@@ -645,21 +681,10 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
             <Dialog :open="completeDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeCompleteDialog())">
                 <DialogContent class="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{{ t('salary_certificates.attach_and_complete') }}</DialogTitle>
-                        <DialogDescription>{{ t('salary_certificates.attach_pdf_hint') }}</DialogDescription>
+                        <DialogTitle>{{ t('salary_certificates.approve_and_issue') }}</DialogTitle>
+                        <DialogDescription>{{ t('salary_certificates.approve_and_issue_hint') }}</DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitComplete">
-                        <div class="space-y-2">
-                            <Label for="certificate">{{ t('salary_certificates.certificate_pdf') }}</Label>
-                            <Input
-                                id="certificate"
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                required
-                                @change="(e: Event) => { completeForm.certificate = (e.target as HTMLInputElement).files?.[0] ?? null }"
-                            />
-                            <p v-if="completeForm.errors.certificate" class="text-sm text-red-600">{{ completeForm.errors.certificate }}</p>
-                        </div>
                         <div class="space-y-2">
                             <Label for="review_notes">{{ t('salary_certificates.review_notes') }}</Label>
                             <textarea
@@ -674,7 +699,7 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                 {{ t('common.cancel') }}
                             </Button>
                             <Button type="submit" :disabled="completeForm.processing">
-                                {{ completeForm.processing ? t('common.saving') : t('salary_certificates.attach_and_complete') }}
+                                {{ completeForm.processing ? t('common.saving') : t('salary_certificates.approve_and_issue') }}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -684,21 +709,10 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
             <Dialog :open="certificateStepDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeCertificateStepDialog())">
                 <DialogContent class="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{{ t('salary_certificates.attach_and_complete') }}</DialogTitle>
-                        <DialogDescription>{{ t('salary_certificates.final_step_requires_pdf') }}</DialogDescription>
+                        <DialogTitle>{{ t('salary_certificates.approve_and_issue') }}</DialogTitle>
+                        <DialogDescription>{{ t('salary_certificates.final_step_issues_certificate') }}</DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitCertificateStep">
-                        <div class="space-y-2">
-                            <Label for="step-certificate">{{ t('salary_certificates.certificate_pdf') }}</Label>
-                            <Input
-                                id="step-certificate"
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                required
-                                @change="(e: Event) => { stepApproveForm.certificate = (e.target as HTMLInputElement).files?.[0] ?? null }"
-                            />
-                            <p v-if="stepApproveForm.errors.certificate" class="text-sm text-red-600">{{ stepApproveForm.errors.certificate }}</p>
-                        </div>
                         <div class="space-y-2">
                             <Label for="step-review-notes">{{ t('salary_certificates.review_notes') }}</Label>
                             <textarea
@@ -713,7 +727,7 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                 {{ t('common.cancel') }}
                             </Button>
                             <Button type="submit" :disabled="stepApproveForm.processing">
-                                {{ stepApproveForm.processing ? t('common.saving') : t('salary_certificates.attach_and_complete') }}
+                                {{ stepApproveForm.processing ? t('common.saving') : t('salary_certificates.approve_and_issue') }}
                             </Button>
                         </DialogFooter>
                     </form>

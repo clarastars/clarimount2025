@@ -50,6 +50,7 @@ class RedirectIfEmployeePortalUser
             'employee.salary-certificates.index',
             'employee.salary-certificates.store',
             'employee.salary-certificates.destroy',
+            'employee.salary-certificates.preview',
             'employee.salary-certificates.download',
             'api.notifications.index',
             'api.notifications.read',
@@ -160,6 +161,7 @@ class RedirectIfEmployeePortalUser
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
                 'companies.salary-certificates.index',
+                'companies.salary-certificate-requests.preview',
                 'companies.salary-certificate-requests.download',
             ]);
         }
@@ -168,6 +170,7 @@ class RedirectIfEmployeePortalUser
             $allowed = array_merge($allowed, [
                 'companies.leaves.index',
                 'companies.salary-certificates.index',
+                'companies.salary-certificate-requests.preview',
                 'companies.salary-certificate-requests.download',
                 'api.notifications.index',
                 'api.notifications.read',
@@ -183,6 +186,7 @@ class RedirectIfEmployeePortalUser
                 'companies.salary-certificates.index',
                 'companies.salary-certificate-requests.approve-step',
                 'companies.salary-certificate-requests.reject-step',
+                'companies.salary-certificate-requests.preview',
                 'companies.salary-certificate-requests.download',
             ]);
         }

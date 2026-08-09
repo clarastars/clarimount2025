@@ -11,9 +11,11 @@ use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use App\Services\SalaryCertificateApprovalNotificationService;
 use App\Services\SalaryCertificateApprovalService;
+use App\Services\SalaryCertificateDocumentService;
 use App\Services\SalaryCertificateRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -28,6 +30,7 @@ class CompanySalaryCertificateController extends Controller
         private SalaryCertificateRequestService $requestService,
         private SalaryCertificateApprovalService $approvalService,
         private SalaryCertificateApprovalNotificationService $approvalNotificationService,
+        private SalaryCertificateDocumentService $documentService,
     ) {}
 
     public function index(Company $company): Response
@@ -93,14 +96,12 @@ class CompanySalaryCertificateController extends Controller
         $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
 
         $validated = $request->validate([
-            'certificate' => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $this->requestService->complete(
             $salaryCertificateRequest,
             $user,
-            $request->file('certificate'),
             $validated['review_notes'] ?? null,
         );
 
@@ -164,10 +165,7 @@ class CompanySalaryCertificateController extends Controller
             abort(403);
         }
 
-        $isLastStep = $this->approvalService->isLastPendingStep($salaryCertificateRequest, $salaryCertificateApprovalStep);
-
         $validated = $request->validate([
-            'certificate' => [$isLastStep ? 'required' : 'nullable', 'file', 'mimes:pdf', 'max:10240'],
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -180,12 +178,9 @@ class CompanySalaryCertificateController extends Controller
         $salaryCertificateRequest->refresh();
 
         if ($this->approvalService->allStepsApproved($salaryCertificateRequest)) {
-            abort_unless($request->hasFile('certificate'), 422);
-
             $this->requestService->complete(
                 $salaryCertificateRequest,
                 $user,
-                $request->file('certificate'),
                 $validated['review_notes'] ?? null,
                 skipEmployeeNotification: true,
             );
@@ -260,26 +255,73 @@ class CompanySalaryCertificateController extends Controller
         return back()->with('success', __('messages.salary_certificates.approval_rejection_saved'));
     }
 
-    public function download(
+    public function preview(
         Company $company,
         SalaryCertificateRequest $salaryCertificateRequest,
-    ): StreamedResponse {
+    ): HttpResponse|StreamedResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
         $this->abortUnlessCanViewCompanyLeaves($user);
         $this->abortUnlessCanAccessCompanyLeaves($user, $company);
         $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
-        abort_unless($salaryCertificateRequest->certificate_path, 404);
-
-        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
-        $disk = Storage::disk($salaryCertificateRequest->certificateDisk());
-        abort_unless($disk->exists($salaryCertificateRequest->certificate_path), 404);
-
-        return $disk->download(
-            $salaryCertificateRequest->certificate_path,
-            $salaryCertificateRequest->certificateDownloadName()
+        abort_unless(
+            $salaryCertificateRequest->isPending() || $salaryCertificateRequest->isCompleted(),
+            404
         );
+
+        return $this->certificateFileResponse($salaryCertificateRequest, download: false);
+    }
+
+    public function download(
+        Company $company,
+        SalaryCertificateRequest $salaryCertificateRequest,
+    ): HttpResponse|StreamedResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $this->abortUnlessCanViewCompanyLeaves($user);
+        $this->abortUnlessCanAccessCompanyLeaves($user, $company);
+        $this->abortUnlessRequestBelongsToCompany($salaryCertificateRequest, $company, $user);
+        abort_unless(
+            $salaryCertificateRequest->isPending() || $salaryCertificateRequest->isCompleted(),
+            404
+        );
+
+        return $this->certificateFileResponse($salaryCertificateRequest, download: true);
+    }
+
+    private function certificateFileResponse(
+        SalaryCertificateRequest $salaryCertificateRequest,
+        bool $download,
+    ): HttpResponse|StreamedResponse {
+        $filename = $salaryCertificateRequest->certificateDownloadName();
+
+        if ($salaryCertificateRequest->isCompleted() && filled($salaryCertificateRequest->certificate_path)) {
+            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+            $disk = Storage::disk($salaryCertificateRequest->certificateDisk());
+
+            if ($disk->exists($salaryCertificateRequest->certificate_path)) {
+                if ($download) {
+                    return $disk->download($salaryCertificateRequest->certificate_path, $filename);
+                }
+
+                return $disk->response($salaryCertificateRequest->certificate_path, $filename, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                ]);
+            }
+        }
+
+        if (! $download) {
+            return response($this->documentService->previewHtml($salaryCertificateRequest))
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        return response($this->documentService->renderPdf($salaryCertificateRequest), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     private function canApproveLeaveWorkflow(?User $user): bool
@@ -373,7 +415,8 @@ class CompanySalaryCertificateController extends Controller
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,
-            'has_certificate' => filled($request->certificate_path),
+            'has_certificate' => $request->isCompleted() && filled($request->certificate_path),
+            'can_preview' => $request->isPending() || $request->isCompleted(),
             'created_at' => $request->created_at?->toIso8601String(),
             'reviewed_at' => $request->reviewed_at?->toIso8601String(),
             'reviewer_name' => $request->reviewer?->name,

@@ -2,7 +2,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { CheckCircle2, Circle, Clock, Download, FileBadge } from 'lucide-vue-next';
+import { CheckCircle2, Circle, Clock, Download, Eye, FileBadge } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -252,6 +252,21 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                                     @click="toggleApprovalDetails(request.id)"
                                                 >
                                                     {{ isApprovalDetailsOpen(request.id) ? t('common.close') : t('leaves.request_details') }}
+                                                </Button>
+                                                <Button
+                                                    v-if="request.has_certificate"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    as-child
+                                                >
+                                                    <a
+                                                        :href="route('employee.salary-certificates.preview', request.id)"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                    >
+                                                        <Eye class="mr-1 h-3.5 w-3.5" />
+                                                        {{ t('salary_certificates.view_certificate') }}
+                                                    </a>
                                                 </Button>
                                                 <Button
                                                     v-if="request.has_certificate"
