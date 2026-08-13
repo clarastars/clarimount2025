@@ -191,6 +191,10 @@ class SalaryRunService
                 }
 
                 $debtDeductions = $existingItem?->debt_deductions ?? [];
+                if ($salaryRun->isDraft()) {
+                    $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $debtDeductions);
+                }
+
                 $debtDeductionsTotal = 0;
 
                 // Calculate total debt deductions
@@ -432,6 +436,95 @@ class SalaryRunService
         }
 
         return 'other';
+    }
+
+    /**
+     * Auto-include remaining attested salary-certificate debts in a draft run.
+     *
+     * @param  mixed  $existing
+     * @return list<array{debt_id: int, debt_type: string|null, amount: float, original_amount: float}>
+     */
+    public function mergeCertificateAttestationDebtDeductions(Employee $employee, mixed $existing): array
+    {
+        $deductions = is_array($existing) ? array_values($existing) : [];
+        $existingIds = [];
+
+        foreach ($deductions as $deduction) {
+            if (isset($deduction['debt_id'])) {
+                $existingIds[] = (int) $deduction['debt_id'];
+            }
+        }
+
+        $autoDebts = EmployeeDebt::query()
+            ->where('employee_id', $employee->id)
+            ->whereNotNull('salary_certificate_request_id')
+            ->where('amount', '>', 0)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($autoDebts as $debt) {
+            if (in_array((int) $debt->id, $existingIds, true)) {
+                continue;
+            }
+
+            $amount = round((float) $debt->amount, 2);
+            $deductions[] = [
+                'debt_id' => $debt->id,
+                'debt_type' => $debt->debt_type,
+                'amount' => $amount,
+                'original_amount' => $amount,
+            ];
+        }
+
+        return $deductions;
+    }
+
+    public function includeCertificateAttestationDebtInOpenDraft(EmployeeDebt $debt): void
+    {
+        $debt->loadMissing('employee');
+        $employee = $debt->employee;
+        if ($employee === null || $employee->company_id === null) {
+            return;
+        }
+
+        $salaryRun = SalaryRun::query()
+            ->where('company_id', $employee->company_id)
+            ->where('status', 'draft')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->first();
+
+        if ($salaryRun === null) {
+            return;
+        }
+
+        $item = SalaryRunItem::query()
+            ->where('salary_run_id', $salaryRun->id)
+            ->where('employee_id', $employee->id)
+            ->first();
+
+        if ($item === null) {
+            return;
+        }
+
+        $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $item->debt_deductions);
+        $totalDeduction = 0.0;
+
+        foreach ($debtDeductions as $deduction) {
+            $totalDeduction += (float) ($deduction['amount'] ?? 0);
+        }
+
+        $netSalary = (float) $item->gross_salary
+            + (float) $item->additions_total
+            - (float) $item->penalties_total
+            - (float) $item->unpaid_leave_total
+            - (float) $item->social_insurance_deduction_total
+            - $totalDeduction;
+
+        $item->update([
+            'debt_deductions' => $debtDeductions,
+            'net_salary' => round($netSalary, 2),
+        ]);
     }
 
     /**

@@ -43,6 +43,7 @@ interface CertificateRequestRow {
     addressed_to: string | null;
     language: string;
     attestation_type?: string;
+    attestation_fee?: number | null;
     notes?: string | null;
     status: string;
     review_notes?: string | null;
@@ -63,6 +64,7 @@ const props = defineProps<{
     requests: CertificateRequestRow[];
     languages: string[];
     attestationTypes?: string[];
+    chamberFee?: number;
 }>();
 
 const { t, locale } = useI18n();
@@ -111,6 +113,13 @@ const attestationLabel = (type: string | null | undefined) => {
 };
 
 const attestationOptions = computed(() => props.attestationTypes?.length ? props.attestationTypes : ['none', 'chamber']);
+
+const chamberFee = computed(() => Number(props.chamberFee ?? 0));
+
+const formatFee = (amount: number) => `${Number(amount).toFixed(2)} SAR`;
+
+const hasAttestationFee = (request: CertificateRequestRow) =>
+    request.attestation_type === 'chamber' && Number(request.attestation_fee ?? 0) > 0;
 
 const displayValue = (value: unknown) => (value === null || value === undefined || value === '' ? '—' : value);
 
@@ -240,7 +249,15 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         <td class="py-3 px-2">{{ displayValue(request.purpose) }}</td>
                                         <td class="py-3 px-2">{{ displayValue(request.addressed_to) }}</td>
                                         <td class="py-3 px-2">{{ languageLabel(request.language) }}</td>
-                                        <td class="py-3 px-2">{{ attestationLabel(request.attestation_type) }}</td>
+                                        <td class="py-3 px-2">
+                                            <div>{{ attestationLabel(request.attestation_type) }}</div>
+                                            <p
+                                                v-if="hasAttestationFee(request)"
+                                                class="text-xs text-muted-foreground mt-1"
+                                            >
+                                                {{ t('salary_certificates.attestation_fee') }}: {{ formatFee(Number(request.attestation_fee)) }}
+                                            </p>
+                                        </td>
                                         <td class="py-3 px-2">
                                             <Badge :variant="statusVariant(request.status)">
                                                 {{ statusLabel(request.status) }}
@@ -431,7 +448,15 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         class="mt-1"
                                         required
                                     >
-                                    <span class="font-medium">{{ attestationLabel(type) }}</span>
+                                    <span class="flex flex-col gap-1">
+                                        <span class="font-medium">{{ attestationLabel(type) }}</span>
+                                        <span
+                                            v-if="type === 'chamber' && chamberFee > 0"
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{ t('salary_certificates.chamber_fee_notice', { amount: formatFee(chamberFee) }) }}
+                                        </span>
+                                    </span>
                                 </label>
                             </div>
                             <p v-if="form.errors.attestation_type" class="text-sm text-red-600">{{ form.errors.attestation_type }}</p>

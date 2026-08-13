@@ -430,6 +430,7 @@ class CompanySalaryCertificateController extends Controller
             'addressed_to' => $request->addressed_to,
             'language' => $request->language,
             'attestation_type' => $request->attestation_type ?: SalaryCertificateRequest::ATTESTATION_NONE,
+            'attestation_fee' => $request->attestation_fee !== null ? (float) $request->attestation_fee : null,
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,

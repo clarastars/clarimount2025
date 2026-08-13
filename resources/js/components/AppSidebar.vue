@@ -138,6 +138,11 @@ const settingsNavItems = computed((): NavItem[] => {
                 href: '/settings/salary-certificate-approvals',
                 icon: Users,
             },
+            {
+                title: t('settings.salary_certificate_fee'),
+                href: '/settings/salary-certificate-fee',
+                icon: FileBadge,
+            },
         );
     }
 

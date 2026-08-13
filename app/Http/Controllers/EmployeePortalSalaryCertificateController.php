@@ -9,6 +9,7 @@ use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use App\Services\SalaryCertificateApprovalService;
 use App\Services\SalaryCertificateDocumentService;
+use App\Services\SalaryCertificateFeeService;
 use App\Services\SalaryCertificateRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class EmployeePortalSalaryCertificateController extends Controller
         private SalaryCertificateRequestService $requestService,
         private SalaryCertificateApprovalService $approvalService,
         private SalaryCertificateDocumentService $documentService,
+        private SalaryCertificateFeeService $feeService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -52,6 +54,7 @@ class EmployeePortalSalaryCertificateController extends Controller
             'requests' => $requests,
             'languages' => SalaryCertificateRequest::LANGUAGES,
             'attestationTypes' => SalaryCertificateRequest::ATTESTATION_TYPES,
+            'chamberFee' => $this->feeService->chamberFee(),
         ]);
     }
 
@@ -157,6 +160,7 @@ class EmployeePortalSalaryCertificateController extends Controller
             'addressed_to' => $request->addressed_to,
             'language' => $request->language,
             'attestation_type' => $request->attestation_type ?: SalaryCertificateRequest::ATTESTATION_NONE,
+            'attestation_fee' => $request->attestation_fee !== null ? (float) $request->attestation_fee : null,
             'notes' => $request->notes,
             'status' => $request->status,
             'review_notes' => $request->review_notes,

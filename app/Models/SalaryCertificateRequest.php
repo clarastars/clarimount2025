@@ -42,6 +42,7 @@ class SalaryCertificateRequest extends Model
         'addressed_to',
         'language',
         'attestation_type',
+        'attestation_fee',
         'notes',
         'status',
         'certificate_path',
@@ -53,6 +54,7 @@ class SalaryCertificateRequest extends Model
     ];
 
     protected $casts = [
+        'attestation_fee' => 'decimal:2',
         'reviewed_at' => 'datetime',
     ];
 

@@ -44,6 +44,7 @@ interface CertificateRequestItem {
     addressed_to: string | null;
     language: string;
     attestation_type?: string;
+    attestation_fee?: number | null;
     notes?: string | null;
     status?: string;
     review_notes?: string | null;
@@ -161,6 +162,11 @@ const attestationLabel = (type: string | null | undefined) => {
 
 const isChamberRequest = (request: CertificateRequestItem | null | undefined): boolean =>
     request?.attestation_type === 'chamber';
+
+const formatFee = (amount: number) => `${Number(amount).toFixed(2)} SAR`;
+
+const hasAttestationFee = (request: CertificateRequestItem | null | undefined): boolean =>
+    isChamberRequest(request) && Number(request?.attestation_fee ?? 0) > 0;
 
 const completingRequest = computed(() =>
     props.pendingRequests.find((item) => item.id === completingRequestId.value)
@@ -562,6 +568,12 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                     <Badge variant="outline" class="mt-2">
                                         {{ attestationLabel(request.attestation_type) }}
                                     </Badge>
+                                    <p
+                                        v-if="hasAttestationFee(request)"
+                                        class="text-xs text-muted-foreground mt-1"
+                                    >
+                                        {{ t('salary_certificates.attestation_fee') }}: {{ formatFee(Number(request.attestation_fee)) }}
+                                    </p>
                                     <p v-if="request.reviewed_at" class="text-xs text-muted-foreground mt-1">
                                         {{ t('salary_certificates.request_reviewed_at') }}: {{ formatDateTime(request.reviewed_at) }}
                                         <span v-if="request.reviewer_name"> — {{ request.reviewer_name }}</span>
@@ -649,6 +661,12 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                             <div class="rounded-md border px-3 py-2.5 sm:col-span-2">
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('salary_certificates.attestation_type') }}</p>
                                 <p class="font-medium">{{ attestationLabel(selectedRequest.attestation_type) }}</p>
+                                <p
+                                    v-if="hasAttestationFee(selectedRequest)"
+                                    class="text-xs text-muted-foreground mt-1"
+                                >
+                                    {{ t('salary_certificates.chamber_fee_will_be_charged', { amount: formatFee(Number(selectedRequest.attestation_fee)) }) }}
+                                </p>
                             </div>
                             <div class="rounded-md border px-3 py-2.5 sm:col-span-2">
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('salary_certificates.request_submitted_at') }}</p>
@@ -795,6 +813,12 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                         </DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitComplete">
+                        <p
+                            v-if="hasAttestationFee(completingRequest)"
+                            class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+                        >
+                            {{ t('salary_certificates.chamber_fee_will_be_charged', { amount: formatFee(Number(completingRequest?.attestation_fee)) }) }}
+                        </p>
                         <div v-if="isChamberRequest(completingRequest)" class="space-y-2">
                             <Label for="certificate">{{ t('salary_certificates.stamped_certificate_pdf') }}</Label>
                             <Input
@@ -838,6 +862,12 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                         </DialogDescription>
                     </DialogHeader>
                     <form class="space-y-4" @submit.prevent="submitCertificateStep">
+                        <p
+                            v-if="hasAttestationFee(selectedRequest)"
+                            class="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+                        >
+                            {{ t('salary_certificates.chamber_fee_will_be_charged', { amount: formatFee(Number(selectedRequest?.attestation_fee)) }) }}
+                        </p>
                         <div v-if="isChamberRequest(selectedRequest)" class="space-y-2">
                             <Label for="step-certificate">{{ t('salary_certificates.stamped_certificate_pdf') }}</Label>
                             <Input

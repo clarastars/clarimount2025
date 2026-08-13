@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\EmployeeDebt;
 use App\Models\SalaryCertificateRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +22,8 @@ class SalaryCertificateRequestService
         private SalaryCertificateApprovalService $approvalService,
         private SalaryCertificateApprovalNotificationService $approvalNotificationService,
         private SalaryCertificateDocumentService $documentService,
+        private SalaryCertificateFeeService $feeService,
+        private SalaryRunService $salaryRunService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request): SalaryCertificateRequest
@@ -32,12 +36,15 @@ class SalaryCertificateRequestService
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $isChamber = $validated['attestation_type'] === SalaryCertificateRequest::ATTESTATION_CHAMBER;
+
         $certificateRequest = SalaryCertificateRequest::query()->create([
             'employee_id' => $employee->id,
             'purpose' => $validated['purpose'],
             'addressed_to' => $validated['addressed_to'] ?? null,
             'language' => $validated['language'],
             'attestation_type' => $validated['attestation_type'],
+            'attestation_fee' => $isChamber ? $this->feeService->chamberFee() : null,
             'notes' => $validated['notes'] ?? null,
             'status' => SalaryCertificateRequest::STATUS_PENDING,
         ]);
@@ -87,17 +94,25 @@ class SalaryCertificateRequestService
             Storage::disk($previousDisk)->delete($previousPath);
         }
 
-        $certificateRequest->update([
-            'status' => SalaryCertificateRequest::STATUS_COMPLETED,
-            'certificate_path' => $stored['path'],
-            'certificate_disk' => $stored['disk'],
-            'certificate_name' => $stored['name'],
-            'reviewed_by' => $reviewer->id,
-            'reviewed_at' => now(),
-            'review_notes' => $reviewNotes,
-        ]);
+        $fresh = DB::transaction(function () use ($certificateRequest, $stored, $reviewer, $reviewNotes): SalaryCertificateRequest {
+            $certificateRequest->update([
+                'status' => SalaryCertificateRequest::STATUS_COMPLETED,
+                'certificate_path' => $stored['path'],
+                'certificate_disk' => $stored['disk'],
+                'certificate_name' => $stored['name'],
+                'reviewed_by' => $reviewer->id,
+                'reviewed_at' => now(),
+                'review_notes' => $reviewNotes,
+            ]);
 
-        $fresh = $certificateRequest->fresh();
+            $updated = $certificateRequest->fresh();
+
+            if ($updated !== null && $updated->requiresChamberAttestation()) {
+                $this->chargeChamberAttestationFee($updated);
+            }
+
+            return $updated ?? $certificateRequest;
+        });
 
         if (! $skipEmployeeNotification) {
             $this->notificationService->notifyEmployeeCompleted($fresh);
@@ -183,5 +198,27 @@ class SalaryCertificateRequestService
             'path' => $path,
             'name' => $originalName !== '' ? $originalName : $filename,
         ];
+    }
+
+    private function chargeChamberAttestationFee(SalaryCertificateRequest $certificateRequest): void
+    {
+        $fee = $certificateRequest->attestation_fee !== null
+            ? (float) $certificateRequest->attestation_fee
+            : $this->feeService->chamberFee();
+
+        if ($fee <= 0) {
+            return;
+        }
+
+        $debt = EmployeeDebt::query()->firstOrCreate(
+            ['salary_certificate_request_id' => $certificateRequest->id],
+            [
+                'employee_id' => $certificateRequest->employee_id,
+                'amount' => round($fee, 2),
+                'debt_type' => __('messages.debts.salary_certificate_attestation'),
+            ],
+        );
+
+        $this->salaryRunService->includeCertificateAttestationDebtInOpenDraft($debt);
     }
 }

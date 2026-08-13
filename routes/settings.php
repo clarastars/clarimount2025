@@ -7,6 +7,7 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
+use App\Http\Controllers\Settings\SalaryCertificateFeeSettingsController;
 use App\Http\Controllers\Settings\MissingHireDateExportController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -82,6 +83,8 @@ Route::middleware('auth')->group(function () {
         Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
         Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
+        Route::get('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'edit'])->name('settings.salary-certificate-fee.edit');
+        Route::put('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'update'])->name('settings.salary-certificate-fee.update');
 
         Route::get('settings/user-login', [UserLoginSettingsController::class, 'index'])->name('settings.user-login.index');
         Route::put('settings/user-login/{user}', [UserLoginSettingsController::class, 'update'])->name('settings.user-login.update');
