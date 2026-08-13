@@ -428,6 +428,8 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             <Input
                                 id="addressed_to"
                                 v-model="form.addressed_to"
+                                :placeholder="t('salary_certificates.addressed_to_placeholder')"
+                                required
                             />
                             <p v-if="form.errors.addressed_to" class="text-sm text-red-600">{{ form.errors.addressed_to }}</p>
                         </div>

@@ -30,10 +30,15 @@ class SalaryCertificateRequestService
     {
         $validated = $request->validate([
             'purpose' => ['required', 'string', 'max:500'],
-            'addressed_to' => ['nullable', 'string', 'max:255'],
+            'addressed_to' => ['required', 'string', 'max:255'],
             'language' => ['required', 'string', Rule::in(SalaryCertificateRequest::LANGUAGES)],
             'attestation_type' => ['required', 'string', Rule::in(SalaryCertificateRequest::ATTESTATION_TYPES)],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'purpose.required' => __('messages.validation.required'),
+            'addressed_to.required' => __('messages.salary_certificates.addressed_to_required'),
+            'language.required' => __('messages.validation.required'),
+            'attestation_type.required' => __('messages.validation.required'),
         ]);
 
         $isChamber = $validated['attestation_type'] === SalaryCertificateRequest::ATTESTATION_CHAMBER;
@@ -41,7 +46,7 @@ class SalaryCertificateRequestService
         $certificateRequest = SalaryCertificateRequest::query()->create([
             'employee_id' => $employee->id,
             'purpose' => $validated['purpose'],
-            'addressed_to' => $validated['addressed_to'] ?? null,
+            'addressed_to' => $validated['addressed_to'],
             'language' => $validated['language'],
             'attestation_type' => $validated['attestation_type'],
             'attestation_fee' => $isChamber ? $this->feeService->chamberFee() : null,

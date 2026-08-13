@@ -1119,6 +1119,7 @@ return [
         'purpose_placeholder' => 'e.g. Bank application / government authority',
         'addressed_to' => 'Addressed to',
         'addressed_to_placeholder' => 'e.g. To whom it may concern / organization name',
+        'addressed_to_required' => 'The Addressed to field is required.',
         'language' => 'Certificate language',
         'language_ar' => 'Arabic',
         'language_en' => 'English',

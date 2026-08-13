@@ -27,6 +27,7 @@
         .logo-wrap { text-align: center; margin-bottom: 16px; }
         .logo-wrap img { max-height: 90px; max-width: 220px; }
         .greeting { text-align: center; font-size: 18px; font-weight: 700; margin: 16px 0 22px; }
+        .addressee { text-align: right; margin: 0 0 16px; font-size: 15px; }
         .intro { text-align: right; margin: 0 0 18px; font-size: 15px; }
         .value { font-weight: bold; text-decoration: underline; }
         table.salary-table {

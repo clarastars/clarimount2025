@@ -1117,6 +1117,7 @@ return [
         'purpose_placeholder' => 'مثال: تقديم للبنك / جهة حكومية',
         'addressed_to' => 'موجّه إلى',
         'addressed_to_placeholder' => 'مثال: لمن يهمه الأمر / اسم الجهة',
+        'addressed_to_required' => 'حقل موجّه إلى مطلوب.',
         'language' => 'لغة التعريف',
         'language_ar' => 'العربية',
         'language_en' => 'الإنجليزية',

@@ -7,6 +7,11 @@
 
     <p class="greeting">السلام عليكم ورحمة الله وبركاته؛؛؛</p>
 
+    <p class="addressee">
+        السادة /
+        <span class="value">{{ $addressedTo }}</span>
+    </p>
+
     <p class="intro">
         نفيدكم نحن
         <span class="value">{{ $companyName }}</span>

@@ -63,6 +63,7 @@ class SalaryCertificateDocumentService
     .sheet { font-family: aealarabiya; font-size: 12pt; color: #1f2937; }
     .logo-wrap { text-align: center; margin-bottom: 10px; }
     .greeting { text-align: center; font-family: aealarabiya; font-size: 15pt; margin: 12px 0 16px; }
+    .addressee { text-align: right; font-family: aealarabiya; font-size: 12pt; margin: 0 0 12px; }
     .intro { text-align: right; font-family: aealarabiya; font-size: 12pt; line-height: 1.9; margin: 0 0 14px; }
     .value { font-family: aealarabiya; text-decoration: underline; }
     .thanks { text-align: center; font-family: aealarabiya; font-size: 14pt; margin-top: 22px; }
@@ -100,6 +101,7 @@ HTML;
             'forPdf' => $forPdf,
             'companyName' => $companyName !== '' ? $companyName : '—',
             'logoSrc' => $this->resolveLogoSrc($company?->logo, $forPdf),
+            'addressedTo' => filled($certificateRequest->addressed_to) ? trim((string) $certificateRequest->addressed_to) : '—',
             'employeeName' => trim((string) $employee->full_name) !== '' ? $employee->full_name : '—',
             'nationality' => $employee->nationality?->name_ar ?: $employee->nationality?->name_en ?: '—',
             'idNumber' => filled($employee->id_number) ? (string) $employee->id_number : '—',
