@@ -32,9 +32,15 @@ class LeaveController extends Controller
         $this->abortUnlessCanCreateLeaveForEmployee($user, $employee);
 
         $employee->load(['company']);
+        $employee->append('remaining_annual_leave_balance');
 
         return Inertia::render('Employees/LeaveCreate', [
-            'employee' => $employee,
+            'employee' => [
+                'id' => $employee->id,
+                'full_name' => $employee->full_name,
+                'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
+                'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
+            ],
             'leaveTypes' => $this->leaveTypeService->activeOptions(app()->getLocale()),
         ]);
     }

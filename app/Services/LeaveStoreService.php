@@ -15,6 +15,7 @@ class LeaveStoreService
 {
     public function __construct(
         private LeaveTypeService $leaveTypeService,
+        private LeaveBalanceService $leaveBalanceService,
     ) {}
 
     public function validateAndCreate(Request $request, Employee $employee): Leave
@@ -40,15 +41,7 @@ class LeaveStoreService
         $days = (int) ($startDate->diffInDays($endDate) + 1);
 
         if ($validated['deduct_from_balance']) {
-            $remaining = (float) $employee->remaining_annual_leave_balance;
-            if ($remaining < $days) {
-                throw ValidationException::withMessages([
-                    'start_date' => [__('messages.leaves.insufficient_balance', [
-                        'remaining' => $remaining,
-                        'requested' => $days,
-                    ])],
-                ]);
-            }
+            $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
         $attachmentPath = null;

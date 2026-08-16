@@ -81,3 +81,26 @@ it('returns the full monthly amount for a complete month', function (): void {
 
     expect($service->accrualDaysForPeriod($employee, '2026-06'))->toBe(2.5);
 });
+
+it('projects full monthly accrual through a future start date', function (): void {
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual([
+        'hire_date' => '2026-01-01',
+        'annual_leave_balance' => 30,
+    ]);
+
+    $asOf = Carbon::parse('2026-11-01', 'Asia/Riyadh');
+    $projected = $service->projectedAccruedBalanceAsOf($employee, $asOf);
+
+    expect($projected)->toBe(27.5);
+});
+
+it('includes the hire-month pro-rate when projecting a future leave date', function (): void {
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual();
+
+    $asOf = Carbon::parse('2026-11-01', 'Asia/Riyadh');
+    $projected = $service->projectedAccruedBalanceAsOf($employee, $asOf);
+
+    expect($projected)->toBe(10.48);
+});

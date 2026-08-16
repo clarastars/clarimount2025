@@ -21,6 +21,7 @@ class LeaveRequestService
         private LeaveApprovalService $leaveApprovalService,
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
         private LeaveTypeService $leaveTypeService,
+        private LeaveBalanceService $leaveBalanceService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request): LeaveRequest
@@ -51,18 +52,9 @@ class LeaveRequestService
         $this->assertNoOverlappingRequests($employee, $startDate, $endDate);
         $this->assertNoOverlappingApprovedLeaves($employee, $startDate, $endDate);
 
+        $forecast = null;
         if ($validated['deduct_from_balance']) {
-            $pendingDays = $this->pendingDeductibleDaysForEmployee($employee);
-            $remaining = (float) $employee->remaining_annual_leave_balance - $pendingDays;
-
-            if ($remaining < $days) {
-                throw ValidationException::withMessages([
-                    'start_date' => [__('messages.leaves.insufficient_balance', [
-                        'remaining' => max($remaining, 0),
-                        'requested' => $days,
-                    ])],
-                ]);
-            }
+            $forecast = $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
         $attachmentPath = null;
@@ -76,6 +68,8 @@ class LeaveRequestService
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'days' => $days,
+            'current_remaining_at_submit' => $forecast['current_remaining'] ?? null,
+            'projected_remaining_at_start' => $forecast['projected_remaining'] ?? null,
             'deduct_from_balance' => $validated['deduct_from_balance'],
             'is_paid' => $validated['is_paid'],
             'notes' => $validated['notes'] ?? null,
@@ -109,20 +103,14 @@ class LeaveRequestService
         }
 
         $employee = $leaveRequest->employee;
-        $employee->append('remaining_annual_leave_balance');
 
         if ($leaveRequest->deduct_from_balance) {
-            $pendingDays = $this->pendingDeductibleDaysForEmployee($employee, $leaveRequest->id);
-            $remaining = (float) $employee->remaining_annual_leave_balance - $pendingDays;
-
-            if ($remaining < $leaveRequest->days) {
-                throw ValidationException::withMessages([
-                    'start_date' => [__('messages.leaves.insufficient_balance', [
-                        'remaining' => max($remaining, 0),
-                        'requested' => $leaveRequest->days,
-                    ])],
-                ]);
-            }
+            $this->leaveBalanceService->assertSufficientBalance(
+                $employee,
+                $leaveRequest->start_date,
+                (float) $leaveRequest->days,
+                $leaveRequest->id,
+            );
         }
 
         $leave = DB::transaction(function () use ($leaveRequest, $reviewer, $reviewNotes, $employee): Leave {
@@ -192,16 +180,6 @@ class LeaveRequestService
         ]);
 
         $leaveRequest->stepApprovals()->delete();
-    }
-
-    private function pendingDeductibleDaysForEmployee(Employee $employee, ?int $excludeRequestId = null): int
-    {
-        return (int) LeaveRequest::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', LeaveRequest::STATUS_PENDING)
-            ->where('deduct_from_balance', true)
-            ->when($excludeRequestId !== null, fn ($query) => $query->where('id', '!=', $excludeRequestId))
-            ->sum('days');
     }
 
     private function assertNoOverlappingRequests(Employee $employee, Carbon $startDate, Carbon $endDate): void

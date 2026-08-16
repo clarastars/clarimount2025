@@ -33,6 +33,8 @@ interface CurrentLeave {
 interface EmployeeOption {
     id: number;
     full_name: string;
+    remaining_annual_leave_balance?: number | null;
+    monthly_leave_accrual?: number | null;
 }
 
 interface ApprovalStepState {
@@ -66,6 +68,10 @@ interface LeaveRequestItem {
     days: number;
     is_paid: boolean;
     deduct_from_balance: boolean;
+    current_remaining_at_submit?: number | null;
+    projected_remaining_at_start?: number | null;
+    future_accrual_days?: number | null;
+    uses_future_accrual?: boolean;
     notes?: string | null;
     status?: string;
     review_notes?: string | null;
@@ -139,6 +145,14 @@ const leaveTypeLabel = (type: string, fallbackLabel?: string | null) =>
 
 const formatLocalizedNumber = (value: number) =>
     new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(value);
+
+const formatBalance = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    return formatLocalizedNumber(Number(value));
+};
 
 const form = useForm({
     employee_id: '' as string | number,
@@ -551,6 +565,15 @@ function submitRejectStep() {
                                     <p class="text-sm text-muted-foreground mt-1">
                                         {{ leaveTypeLabel(request.leave_type, request.leave_type_label) }} — {{ request.start_date }} → {{ request.end_date }} ({{ request.days }} {{ t('leaves.days') }})
                                     </p>
+                                    <p
+                                        v-if="request.deduct_from_balance && request.projected_remaining_at_start != null"
+                                        class="text-xs mt-1"
+                                        :class="request.uses_future_accrual ? 'text-sky-700 dark:text-sky-400' : 'text-muted-foreground'"
+                                    >
+                                        {{ t('leaves.projected_balance_at_start') }}:
+                                        {{ formatLocalizedNumber(Number(request.projected_remaining_at_start)) }}
+                                        {{ t('leaves.days') }}
+                                    </p>
                                     <p v-if="request.reviewed_at" class="text-xs text-muted-foreground mt-1">
                                         {{ t('leaves.request_reviewed_at') }}: {{ formatDateTime(request.reviewed_at) }}
                                         <span v-if="request.reviewer_name"> — {{ request.reviewer_name }}</span>
@@ -585,17 +608,32 @@ function submitRejectStep() {
                     </DialogHeader>
 
                     <div v-if="selectedRequest" class="space-y-4">
-                        <div class="rounded-lg border bg-muted/40 px-4 py-3 flex items-center justify-between gap-3">
-                            <div>
-                                <p class="text-xs text-muted-foreground">{{ t('leaves.current_entitled_leave_days') }}</p>
-                                <p class="text-lg font-semibold tabular-nums">
-                                    {{ selectedRequest.employee.remaining_annual_leave_balance ?? '—' }}
+                        <div class="rounded-lg border bg-muted/40 px-4 py-3 space-y-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-xs text-muted-foreground">{{ t('leaves.current_entitled_leave_days') }}</p>
+                                    <p class="text-lg font-semibold tabular-nums">
+                                        {{ formatBalance(selectedRequest.employee.remaining_annual_leave_balance ?? selectedRequest.current_remaining_at_submit) }}
+                                        <span class="text-sm font-normal text-muted-foreground">{{ t('leaves.days') }}</span>
+                                    </p>
+                                </div>
+                                <Badge v-if="selectedRequest.status" :variant="statusVariant(selectedRequest.status)">
+                                    {{ statusLabel(selectedRequest.status) }}
+                                </Badge>
+                            </div>
+                            <div v-if="selectedRequest.deduct_from_balance && selectedRequest.projected_remaining_at_start != null">
+                                <p class="text-xs text-muted-foreground">{{ t('leaves.projected_balance_at_start') }}</p>
+                                <p class="text-lg font-semibold tabular-nums text-sky-800 dark:text-sky-300">
+                                    {{ formatBalance(selectedRequest.projected_remaining_at_start) }}
                                     <span class="text-sm font-normal text-muted-foreground">{{ t('leaves.days') }}</span>
                                 </p>
                             </div>
-                            <Badge v-if="selectedRequest.status" :variant="statusVariant(selectedRequest.status)">
-                                {{ statusLabel(selectedRequest.status) }}
-                            </Badge>
+                            <p
+                                v-if="selectedRequest.uses_future_accrual"
+                                class="text-xs leading-relaxed text-sky-800 dark:text-sky-300"
+                            >
+                                {{ t('leaves.balance_forecast_note') }}
+                            </p>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">

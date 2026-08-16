@@ -54,6 +54,9 @@ interface LeaveRequestRow extends LeaveRow {
     created_at?: string | null;
     reviewed_at?: string | null;
     approval_progress?: ApprovalProgress | null;
+    current_remaining_at_submit?: number | null;
+    projected_remaining_at_start?: number | null;
+    uses_future_accrual?: boolean;
 }
 
 interface LeaveTypeOption {
@@ -305,7 +308,16 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         <td class="py-3 px-2">{{ leaveTypeLabel(request.leave_type, request.leave_type_label) }}</td>
                                         <td class="py-3 px-2">{{ request.start_date }}</td>
                                         <td class="py-3 px-2">{{ request.end_date }}</td>
-                                        <td class="py-3 px-2">{{ request.days }}</td>
+                                        <td class="py-3 px-2">
+                                            {{ request.days }}
+                                            <p
+                                                v-if="request.deduct_from_balance && request.projected_remaining_at_start != null"
+                                                class="text-xs text-muted-foreground mt-1"
+                                            >
+                                                {{ t('leaves.projected_balance_at_start') }}:
+                                                {{ formatLocalizedNumber(Number(request.projected_remaining_at_start)) }}
+                                            </p>
+                                        </td>
                                         <td class="py-3 px-2">
                                             <Badge :variant="statusVariant(request.status)">
                                                 {{ statusLabel(request.status) }}
@@ -478,7 +490,13 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                     </DialogHeader>
 
                     <form @submit.prevent="submit" class="space-y-6">
-                        <LeaveFormFields :form="form" :leave-types="leaveTypes" @attachment-change="onAttachmentChange" />
+                        <LeaveFormFields
+                            :form="form"
+                            :leave-types="leaveTypes"
+                            :current-remaining="employee.remaining_annual_leave_balance"
+                            :monthly-accrual="employee.monthly_leave_accrual"
+                            @attachment-change="onAttachmentChange"
+                        />
 
                         <DialogFooter>
                             <Button type="button" variant="outline" @click="closeCreateForm">

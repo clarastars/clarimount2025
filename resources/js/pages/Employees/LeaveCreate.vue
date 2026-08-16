@@ -16,6 +16,8 @@
                         <LeaveFormFields
                             :form="form"
                             :leave-types="leaveTypes"
+                            :current-remaining="employee.remaining_annual_leave_balance"
+                            :monthly-accrual="employee.monthly_leave_accrual"
                             @attachment-change="onAttachmentChange"
                         />
 
@@ -49,7 +51,7 @@ import type { BreadcrumbItem } from '@/types';
 const { t, locale } = useI18n();
 
 const props = defineProps<{
-    employee: { id: number; full_name: string };
+    employee: { id: number; full_name: string; remaining_annual_leave_balance?: number | string | null; monthly_leave_accrual?: number | string | null };
     leaveTypes: Array<{
         key: string;
         label: string;

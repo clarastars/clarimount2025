@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
+use App\Services\LeaveBalanceService;
 use App\Services\LeaveRequestService;
 use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +25,7 @@ class EmployeePortalLeaveController extends Controller
         private LeaveRequestService $leaveRequestService,
         private LeaveApprovalService $leaveApprovalService,
         private LeaveTypeService $leaveTypeService,
+        private LeaveBalanceService $leaveBalanceService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -45,7 +48,7 @@ class EmployeePortalLeaveController extends Controller
         $leaveRequests = $employee->leaveRequests()
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (LeaveRequest $request): array => $this->mapLeaveRequest($request, $employee->company))
+            ->map(fn (LeaveRequest $request): array => $this->mapLeaveRequest($request, $employee, $employee->company))
             ->values()
             ->all();
 
@@ -124,8 +127,16 @@ class EmployeePortalLeaveController extends Controller
         ];
     }
 
-    private function mapLeaveRequest(LeaveRequest $leaveRequest, ?Company $company = null): array
+    private function mapLeaveRequest(LeaveRequest $leaveRequest, Employee $employee, ?Company $company = null): array
     {
+        $forecast = $leaveRequest->deduct_from_balance && $leaveRequest->isPending()
+            ? $this->leaveBalanceService->forecastForDate(
+                $employee,
+                $leaveRequest->start_date,
+                $leaveRequest->id,
+            )
+            : null;
+
         $payload = [
             'id' => $leaveRequest->id,
             'leave_type' => $leaveRequest->leave_type,
@@ -140,6 +151,18 @@ class EmployeePortalLeaveController extends Controller
             'review_notes' => $leaveRequest->review_notes,
             'created_at' => $leaveRequest->created_at?->toIso8601String(),
             'reviewed_at' => $leaveRequest->reviewed_at?->toIso8601String(),
+            'current_remaining_at_submit' => $leaveRequest->current_remaining_at_submit !== null
+                ? (float) $leaveRequest->current_remaining_at_submit
+                : null,
+            'projected_remaining_at_start' => $forecast['projected_remaining']
+                ?? ($leaveRequest->projected_remaining_at_start !== null
+                    ? (float) $leaveRequest->projected_remaining_at_start
+                    : null),
+            'uses_future_accrual' => (bool) ($forecast['uses_future_accrual'] ?? (
+                $leaveRequest->current_remaining_at_submit !== null
+                && $leaveRequest->projected_remaining_at_start !== null
+                && (float) $leaveRequest->projected_remaining_at_start > (float) $leaveRequest->current_remaining_at_submit
+            )),
         ];
 
         if ($company !== null) {

@@ -13,6 +13,7 @@ use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\LeaveApprovalNotificationService;
 use App\Services\LeaveApprovalService;
+use App\Services\LeaveBalanceService;
 use App\Services\LeaveRequestService;
 use App\Services\LeaveStoreService;
 use App\Services\LeaveTypeService;
@@ -33,6 +34,7 @@ class CompanyLeaveController extends Controller
         private LeaveApprovalService $leaveApprovalService,
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
         private LeaveTypeService $leaveTypeService,
+        private LeaveBalanceService $leaveBalanceService,
     ) {}
 
     public function index(Company $company): Response
@@ -96,11 +98,17 @@ class CompanyLeaveController extends Controller
             $this->applyEmployeePermissionScope($employeeQuery, $user, ['leaves.create']);
 
             $employees = $employeeQuery
-                ->get(['id', 'first_name', 'father_name', 'last_name'])
-                ->map(fn (Employee $employee): array => [
-                    'id' => $employee->id,
-                    'full_name' => $employee->full_name,
-                ])
+                ->get(['id', 'first_name', 'father_name', 'last_name', 'annual_leave_balance', 'leave_accrued_balance', 'leave_days_used'])
+                ->map(function (Employee $employee): array {
+                    $employee->append('remaining_annual_leave_balance');
+
+                    return [
+                        'id' => $employee->id,
+                        'full_name' => $employee->full_name,
+                        'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
+                        'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
+                    ];
+                })
                 ->values()
                 ->all();
         }
@@ -345,6 +353,10 @@ class CompanyLeaveController extends Controller
                         'father_name',
                         'last_name',
                         'company_id',
+                        'hire_date',
+                        'departure_date',
+                        'termination_date',
+                        'annual_leave_balance',
                         'leave_accrued_balance',
                         'leave_days_used',
                     )->withSum([
@@ -386,6 +398,13 @@ class CompanyLeaveController extends Controller
         $previouslyUsed = (float) ($employee->leave_days_used ?? 0);
         $deductedDays = (float) ($employee->leave_days_deducted ?? 0);
         $remainingBalance = max(0, round($accruedBalance - $previouslyUsed - $deductedDays, 2));
+        $forecast = $leaveRequest->deduct_from_balance && $leaveRequest->isPending()
+            ? $this->leaveBalanceService->forecastForDate(
+                $employee,
+                $leaveRequest->start_date,
+                $leaveRequest->id,
+            )
+            : null;
 
         $payload = [
             'id' => $leaveRequest->id,
@@ -396,6 +415,19 @@ class CompanyLeaveController extends Controller
             'days' => $leaveRequest->days,
             'is_paid' => $leaveRequest->is_paid,
             'deduct_from_balance' => $leaveRequest->deduct_from_balance,
+            'current_remaining_at_submit' => $leaveRequest->current_remaining_at_submit !== null
+                ? (float) $leaveRequest->current_remaining_at_submit
+                : null,
+            'projected_remaining_at_start' => $forecast['projected_remaining']
+                ?? ($leaveRequest->projected_remaining_at_start !== null
+                    ? (float) $leaveRequest->projected_remaining_at_start
+                    : null),
+            'future_accrual_days' => $forecast['future_accrual_days'] ?? null,
+            'uses_future_accrual' => (bool) ($forecast['uses_future_accrual'] ?? (
+                $leaveRequest->current_remaining_at_submit !== null
+                && $leaveRequest->projected_remaining_at_start !== null
+                && (float) $leaveRequest->projected_remaining_at_start > (float) $leaveRequest->current_remaining_at_submit
+            )),
             'notes' => $leaveRequest->notes,
             'status' => $leaveRequest->status,
             'review_notes' => $leaveRequest->review_notes,
