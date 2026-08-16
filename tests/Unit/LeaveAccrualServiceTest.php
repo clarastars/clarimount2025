@@ -104,3 +104,31 @@ it('includes the hire-month pro-rate when projecting a future leave date', funct
 
     expect($projected)->toBe(10.48);
 });
+
+it('treats a UTC midnight hire date as the same calendar day in Riyadh', function (): void {
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual([
+        'hire_date' => Carbon::parse('2025-11-09 00:00:00', 'UTC'),
+        'annual_leave_balance' => 21,
+    ]);
+
+    expect($service->accrualDaysForPeriod($employee, '2025-11'))->toBe(1.28);
+});
+
+it('adds only later months onto stored accrual instead of rebuilding from hire date', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-08-16', 'Asia/Riyadh'));
+
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual([
+        'hire_date' => '2024-08-02',
+        'annual_leave_balance' => 30,
+        'leave_accrued_balance' => 26,
+    ]);
+
+    $futureDays = $service->futureAccrualDaysUntil(
+        $employee,
+        Carbon::parse('2026-09-20', 'Asia/Riyadh'),
+    );
+
+    expect($futureDays)->toBe(2.5);
+});

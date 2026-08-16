@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Employee;
-use App\Models\Leave;
 use App\Models\LeaveRequest;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -35,10 +34,10 @@ class LeaveBalanceService
 
         $currentRemaining = round((float) $employee->remaining_annual_leave_balance, 2);
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
-        $projectedAccrued = $this->leaveAccrualService->projectedAccruedBalanceAsOf($employee, $asOfDate);
-        $reservedDays = $this->reservedDaysAsOf($employee, $asOfDate, $excludeRequestId);
-        $projectedRemaining = max(0, round($projectedAccrued - $reservedDays, 2));
-        $futureAccrualDays = max(0, round($projectedAccrued - $currentAccrued, 2));
+        $futureAccrualDays = $this->leaveAccrualService->futureAccrualDaysUntil($employee, $asOfDate);
+        $pendingDays = $this->pendingDeductibleDaysOnOrBefore($employee, $asOfDate, $excludeRequestId);
+        $projectedAccrued = round($currentAccrued + $futureAccrualDays, 2);
+        $projectedRemaining = max(0, round($currentRemaining + $futureAccrualDays - $pendingDays, 2));
 
         return [
             'as_of' => $asOfDate->toDateString(),
@@ -81,33 +80,32 @@ class LeaveBalanceService
         return $forecast;
     }
 
-    private function reservedDaysAsOf(Employee $employee, Carbon $asOf, ?int $excludeRequestId = null): float
+    private function pendingDeductibleDaysOnOrBefore(Employee $employee, Carbon $asOf, ?int $excludeRequestId = null): float
     {
-        $legacyUsed = (float) ($employee->leave_days_used ?? 0);
+        if ($employee->id === null) {
+            return 0.0;
+        }
 
-        $approvedDays = (float) Leave::query()
-            ->where('employee_id', $employee->id)
-            ->where('deduct_from_balance', true)
-            ->whereDate('start_date', '<=', $asOf->toDateString())
-            ->sum('days');
-
-        $pendingDays = (float) LeaveRequest::query()
+        return round((float) LeaveRequest::query()
             ->where('employee_id', $employee->id)
             ->where('status', LeaveRequest::STATUS_PENDING)
             ->where('deduct_from_balance', true)
             ->whereDate('start_date', '<=', $asOf->toDateString())
             ->when($excludeRequestId !== null, fn ($query) => $query->where('id', '!=', $excludeRequestId))
-            ->sum('days');
-
-        return round($legacyUsed + $approvedDays + $pendingDays, 2);
+            ->sum('days'), 2);
     }
 
     private function parseDate(Carbon|string $asOf): Carbon
     {
         if ($asOf instanceof Carbon) {
-            return $asOf->copy()->timezone(self::TZ)->startOfDay();
+            return Carbon::createFromFormat('Y-m-d', $asOf->format('Y-m-d'), self::TZ)->startOfDay();
         }
 
-        return Carbon::parse($asOf, self::TZ)->startOfDay();
+        $raw = trim((string) $asOf);
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $matches) === 1) {
+            return Carbon::createFromFormat('Y-m-d', $matches[1], self::TZ)->startOfDay();
+        }
+
+        return Carbon::parse($raw, self::TZ)->startOfDay();
     }
 }

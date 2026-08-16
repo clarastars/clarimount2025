@@ -110,6 +110,37 @@ class LeaveAccrualService
         return round($entitlement / 12, 2);
     }
 
+    /**
+     * Extra leave days that will accrue after the current month through the as-of month.
+     * Uses the stored monthly rate; does not rebuild history from hire date.
+     */
+    public function futureAccrualDaysUntil(Employee $employee, Carbon $asOf): float
+    {
+        $monthlyDays = $this->monthlyAccrualDays($employee);
+
+        if ($monthlyDays <= 0) {
+            return 0.0;
+        }
+
+        $asOf = $this->resolveAccrualAsOfDate($employee, $asOf);
+        $today = $this->resolveAccrualAsOfDate($employee, Carbon::now(self::TZ)->startOfDay());
+
+        if ($asOf->lte($today->copy()->endOfMonth()->startOfDay())) {
+            return 0.0;
+        }
+
+        $cursor = $today->copy()->startOfMonth()->addMonth();
+        $asOfMonth = $asOf->copy()->startOfMonth();
+        $extra = 0.0;
+
+        while ($cursor->lte($asOfMonth)) {
+            $extra = round($extra + $monthlyDays, 2);
+            $cursor->addMonth();
+        }
+
+        return $extra;
+    }
+
     public function resolveCurrentAccrualPeriod(?Carbon $date = null): string
     {
         return ($date ?? Carbon::now(self::TZ))->format('Y-m');
@@ -238,7 +269,7 @@ class LeaveAccrualService
             return 0.0;
         }
 
-        $daysInRange = (int) $rangeStart->diffInDays($rangeEnd) + 1;
+        $daysInRange = (int) round($rangeStart->diffInDays($rangeEnd, false)) + 1;
 
         if ($daysInRange >= $daysInMonth) {
             return $monthlyDays;
@@ -368,27 +399,20 @@ class LeaveAccrualService
 
     private function resolveHireDate(Employee $employee): ?Carbon
     {
-        if ($employee->hire_date === null) {
-            return null;
-        }
-
-        return Carbon::parse($employee->hire_date, self::TZ)->startOfDay();
+        return $this->calendarDateInRiyadh($employee->hire_date);
     }
 
     private function resolveDepartureDate(Employee $employee): ?Carbon
     {
-        $rawDate = $employee->departure_date ?? $employee->termination_date;
-
-        if ($rawDate === null) {
-            return null;
-        }
-
-        return Carbon::parse($rawDate, self::TZ)->startOfDay();
+        return $this->calendarDateInRiyadh($employee->departure_date ?? $employee->termination_date);
     }
 
     private function resolveAccrualAsOfDate(Employee $employee, ?Carbon $date = null): Carbon
     {
-        $asOf = ($date ?? Carbon::now(self::TZ))->copy()->startOfDay();
+        $asOf = $date === null
+            ? Carbon::now(self::TZ)->startOfDay()
+            : $this->calendarDateInRiyadh($date) ?? Carbon::now(self::TZ)->startOfDay();
+
         $departureDate = $this->resolveDepartureDate($employee);
 
         if ($departureDate !== null && $departureDate->lt($asOf)) {
@@ -396,6 +420,26 @@ class LeaveAccrualService
         }
 
         return $asOf;
+    }
+
+    private function calendarDateInRiyadh(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            $date = $value->format('Y-m-d');
+        } else {
+            $raw = trim((string) $value);
+            if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $matches) === 1) {
+                $date = $matches[1];
+            } else {
+                $date = Carbon::parse($raw)->format('Y-m-d');
+            }
+        }
+
+        return Carbon::createFromFormat('Y-m-d', $date, self::TZ)->startOfDay();
     }
 
     /**
