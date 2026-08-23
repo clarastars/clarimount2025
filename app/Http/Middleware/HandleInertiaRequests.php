@@ -68,7 +68,10 @@ class HandleInertiaRequests extends Middleware
                 'can_manage_leave_types' => $isSuperAdmin || in_array('leave-types.manage', $permissionNames, true),
                 'can_access_asset_inventory' => $isSuperAdmin || in_array('asset-inventory.access', $permissionNames, true),
                 'can_view_company_readonly' => $isSuperAdmin || in_array('company.readonly', $permissionNames, true),
-                'can_view_employees_readonly' => $isSuperAdmin || in_array('employees.readonly', $permissionNames, true) || in_array('employees.manage', $permissionNames, true),
+                'can_view_employees_readonly' => $isSuperAdmin
+                    || in_array('employees.readonly', $permissionNames, true)
+                    || in_array('employees.manage', $permissionNames, true)
+                    || in_array('employees.entitlements.settle', $permissionNames, true),
                 'can_manage_employees' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.manage', $permissionNames, true),
@@ -86,6 +89,9 @@ class HandleInertiaRequests extends Middleware
                 'can_update_employee_custody' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.custody.update', $permissionNames, true),
+                'can_settle_employee_entitlements' => $isSuperAdmin
+                    || ($user !== null && $user->ownedCompanies()->exists())
+                    || in_array('employees.entitlements.settle', $permissionNames, true),
                 'can_view_attendance_readonly' => $isSuperAdmin || in_array('attendance.readonly', $permissionNames, true),
                 'can_manage_attendance_adjustments' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())

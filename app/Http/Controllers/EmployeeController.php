@@ -515,6 +515,7 @@ class EmployeeController extends Controller
             'canManageEmployees' => $this->canManageEmployees($user),
             'canCreateLeaves' => $this->canCreateLeaves($user),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
+            'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
         ]);
     }

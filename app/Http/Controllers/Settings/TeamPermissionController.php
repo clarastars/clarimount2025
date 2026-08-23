@@ -34,6 +34,7 @@ class TeamPermissionController extends Controller
         ['name' => 'leaves.approve', 'label' => 'اعتماد طلبات الإجازة وتعريف الراتب (سلسلة الاعتمادات)'],
         ['name' => 'leaves.requests.receive-email', 'label' => 'استقبال إيميلات طلب الإجازة وتعريف الراتب من موظفين الشركة'],
         ['name' => 'employees.custody.update', 'label' => 'إمكانية تحديث العهدة'],
+        ['name' => 'employees.entitlements.settle', 'label' => 'تسوية مستحقات الموظف'],
         ['name' => 'employees.global-search', 'label' => 'البحث العلوي عن الموظفين (شركات الدور فقط)'],
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
         ['name' => 'attendance.adjustments.manage', 'label' => 'إدارة الخصومات والإضافات واعتماد ورفض الجزاءات'],

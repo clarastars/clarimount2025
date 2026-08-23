@@ -43,7 +43,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSyncEmployeeFingerprintMonth"
+                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -55,6 +55,26 @@
                             <Button v-if="canUpdateEmployeeCustody" variant="secondary" size="sm" as-child>
                                 <Link :href="route('employees.custody.show', employee.id)">
                                     {{ t('custody.update_custody') }}
+                                </Link>
+                            </Button>
+                            <Button
+                                v-if="canSettleEmployeeEntitlements"
+                                variant="secondary"
+                                size="sm"
+                                as-child
+                            >
+                                <Link :href="route('employees.entitlement-settlement.create', employee.id)">
+                                    {{ t('employees.settle_entitlements') }}
+                                </Link>
+                            </Button>
+                            <Button
+                                v-if="canSettleEmployeeEntitlements"
+                                variant="outline"
+                                size="sm"
+                                as-child
+                            >
+                                <Link :href="route('employees.entitlement-settlement.index', employee.id)">
+                                    {{ t('entitlement_settlement.history_title') }}
                                 </Link>
                             </Button>
                             <Button
@@ -393,6 +413,7 @@ interface Props {
     canManageEmployees?: boolean;
     canCreateLeaves?: boolean;
     canUpdateEmployeeCustody?: boolean;
+    canSettleEmployeeEntitlements?: boolean;
     canSyncEmployeeFingerprintMonth?: boolean;
 }
 
@@ -402,6 +423,7 @@ const { t } = useI18n();
 const canManageEmployees = computed(() => props.canManageEmployees ?? true);
 const canCreateLeaves = computed(() => props.canCreateLeaves ?? false);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
+const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const isSyncingFingerprintMonth = ref(false);
 

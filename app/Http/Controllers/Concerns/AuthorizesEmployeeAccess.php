@@ -38,6 +38,7 @@ trait AuthorizesEmployeeAccess
             'employees.readonly',
             'employees.manage',
             'employees.custody.update',
+            'employees.entitlements.settle',
             'attendance.fingerprint-month.sync',
         ];
     }
@@ -133,6 +134,37 @@ trait AuthorizesEmployeeAccess
         return $this->roleService()->canAccessEmployeeInCompanyDepartment(
             $user,
             'employees.custody.update',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function canSettleEmployeeEntitlements(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.entitlements.settle');
+    }
+
+    protected function canSettleEmployeeEntitlementsForEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.entitlements.settle',
             (int) $employee->company_id,
             $employee->department_id ? (string) $employee->department_id : null
         );
@@ -346,6 +378,12 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanSyncEmployeeFingerprintMonth(User $user, Employee $employee): void
     {
         abort_unless($this->canSyncEmployeeFingerprintMonth($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanSettleEmployeeEntitlementsForEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canSettleEmployeeEntitlementsForEmployee($user, $employee), 403);
+        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     /**

@@ -194,6 +194,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeDebt::class);
     }
 
+    public function entitlementSettlements(): HasMany
+    {
+        return $this->hasMany(EmployeeEntitlementSettlement::class);
+    }
+
     /**
      * Get the shift assigned to this employee
      */

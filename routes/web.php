@@ -20,6 +20,7 @@ use App\Http\Controllers\DeductionsController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
+use App\Http\Controllers\EmployeeEntitlementSettlementController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\EmployeePortalLeaveController;
@@ -217,6 +218,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Employee Leaves routes
     Route::get('employees/{employee}/leaves/create', [LeaveController::class, 'create'])->name('employees.leaves.create');
     Route::post('employees/{employee}/leaves', [LeaveController::class, 'store'])->name('employees.leaves.store');
+
+    Route::get('employees/{employee}/entitlement-settlement/create', [EmployeeEntitlementSettlementController::class, 'create'])
+        ->name('employees.entitlement-settlement.create');
+    Route::get('employees/{employee}/entitlement-settlement', [EmployeeEntitlementSettlementController::class, 'index'])
+        ->name('employees.entitlement-settlement.index');
+    Route::post('employees/{employee}/entitlement-settlement', [EmployeeEntitlementSettlementController::class, 'store'])
+        ->name('employees.entitlement-settlement.store');
+    Route::get('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'show'])
+        ->name('employees.entitlement-settlement.show');
 
     // Company Leaves routes
     Route::get('companies/{company}/leaves', [CompanyLeaveController::class, 'index'])->name('companies.leaves.index');
