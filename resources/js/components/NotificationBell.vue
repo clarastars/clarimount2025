@@ -15,12 +15,17 @@ interface NotificationData {
     salary_run_id?: number;
     leave_request_id?: number;
     salary_certificate_request_id?: number;
+    settlement_id?: number;
+    employee_id?: number;
     employee_name?: string;
     leave_type?: string;
     leave_type_label?: string;
     purpose?: string;
     start_date?: string;
     end_date?: string;
+    settlement_date?: string;
+    settlement_reason?: string;
+    net_due?: string;
     days?: number;
     company_id?: number;
     company_name?: string;
@@ -49,6 +54,7 @@ const page = usePage();
 const authProps = computed(() => (page.props.auth as {
     can_view_salary_run_notifications?: boolean;
     can_view_leave_request_notifications?: boolean;
+    can_view_entitlement_settlement_notifications?: boolean;
     is_employee?: boolean;
     unread_notifications_count?: number;
 }) ?? {});
@@ -56,6 +62,7 @@ const authProps = computed(() => (page.props.auth as {
 const showBell = computed(() =>
     authProps.value.can_view_salary_run_notifications === true
     || authProps.value.can_view_leave_request_notifications === true
+    || authProps.value.can_view_entitlement_settlement_notifications === true
     || authProps.value.is_employee === true,
 );
 const unreadCount = ref(authProps.value.unread_notifications_count ?? 0);
@@ -243,6 +250,49 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         return t(messageKey, params);
     }
 
+    const entitlementSettlementWorkflowTypes = [
+        'entitlement_settlement_your_turn',
+        'entitlement_settlement_step_approved',
+        'entitlement_settlement_step_progress',
+        'entitlement_settlement_rejected',
+        'entitlement_settlement_workflow_rejected',
+        'entitlement_settlement_finalized',
+        'entitlement_settlement_approved',
+    ];
+
+    if (entitlementSettlementWorkflowTypes.includes(data.event_type)) {
+        const settlementParams = {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            date: data.settlement_date ?? '',
+            reason: data.settlement_reason ?? '',
+            net: data.net_due ?? '',
+            step: data.step_title ?? '',
+            name: data.actor_name ?? '',
+            remaining: data.remaining_steps ?? '',
+            reject_reason: data.reason ?? '',
+        };
+
+        if (data.event_type === 'entitlement_settlement_your_turn' && data.after_rejection) {
+            return t('notifications.entitlement_settlement_workflow_your_turn_after_rejection', settlementParams);
+        }
+
+        const settlementKeyMap: Record<string, string> = {
+            entitlement_settlement_your_turn: 'notifications.entitlement_settlement_workflow_your_turn',
+            entitlement_settlement_step_approved: 'notifications.entitlement_settlement_workflow_step_approved',
+            entitlement_settlement_step_progress: 'notifications.entitlement_settlement_workflow_step_progress',
+            entitlement_settlement_rejected: 'notifications.entitlement_settlement_workflow_rejected',
+            entitlement_settlement_workflow_rejected: 'notifications.entitlement_settlement_workflow_employee_rejected',
+            entitlement_settlement_finalized: 'notifications.entitlement_settlement_workflow_finalized',
+            entitlement_settlement_approved: 'notifications.entitlement_settlement_workflow_finalized',
+        };
+
+        return t(
+            settlementKeyMap[data.event_type] ?? 'notifications.entitlement_settlement_workflow_your_turn',
+            settlementParams,
+        );
+    }
+
     const params = {
         company: data.company_name ?? '',
         period: periodLabel(notification),
@@ -344,12 +394,40 @@ const markAllAsRead = async (): Promise<void> => {
     unreadCount.value = 0;
 };
 
+const resolveNotificationUrl = (data: NotificationData): string | null => {
+    if (data.url) {
+        if (data.url.startsWith('/')) {
+            return data.url;
+        }
+
+        try {
+            const parsed = new URL(data.url, window.location.origin);
+
+            if (parsed.origin === window.location.origin) {
+                return parsed.pathname + parsed.search + parsed.hash;
+            }
+        } catch {
+            return data.url;
+        }
+
+        return data.url;
+    }
+
+    if (data.employee_id && data.settlement_id) {
+        return route('employees.entitlement-settlement.show', [data.employee_id, data.settlement_id]);
+    }
+
+    return null;
+};
+
 const openNotification = async (notification: NotificationItem): Promise<void> => {
     await markAsRead(notification);
     open.value = false;
 
-    if (notification.data.url) {
-        router.visit(notification.data.url);
+    const targetUrl = resolveNotificationUrl(notification.data);
+
+    if (targetUrl) {
+        router.visit(targetUrl);
     }
 };
 

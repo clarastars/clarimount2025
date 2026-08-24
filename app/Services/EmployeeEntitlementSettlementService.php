@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\EmployeeDebt;
 use App\Models\EmployeeEntitlementSettlement;
+use App\Models\Leave;
 use App\Models\SalaryRunItem;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeEntitlementSettlementService
 {
@@ -161,6 +164,10 @@ class EmployeeEntitlementSettlementService
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
+            'status' => $payload['status'] ?? EmployeeEntitlementSettlement::STATUS_PENDING,
+            'reviewed_by' => $payload['reviewed_by'] ?? null,
+            'reviewed_at' => $payload['reviewed_at'] ?? null,
+            'review_notes' => $payload['review_notes'] ?? null,
         ]);
     }
 
@@ -168,6 +175,7 @@ class EmployeeEntitlementSettlementService
     {
         $previous = EmployeeEntitlementSettlement::query()
             ->where('employee_id', $employee->id)
+            ->where('status', EmployeeEntitlementSettlement::STATUS_APPROVED)
             ->orderByDesc('settlement_date')
             ->orderByDesc('id')
             ->value('settlement_date');
@@ -259,6 +267,48 @@ class EmployeeEntitlementSettlementService
     public function calculateAdvancesTotal(Employee $employee): float
     {
         return round((float) $employee->debts()->sum('amount'), 2);
+    }
+
+    public function applyApprovedSettlementAdjustments(EmployeeEntitlementSettlement $settlement): void
+    {
+        if (! $settlement->isApproved()) {
+            return;
+        }
+
+        DB::transaction(function () use ($settlement): void {
+            $lockedSettlement = EmployeeEntitlementSettlement::query()
+                ->lockForUpdate()
+                ->findOrFail($settlement->id);
+
+            $employee = Employee::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedSettlement->employee_id);
+
+            $settlementDate = $this->parseDate($lockedSettlement->settlement_date)?->endOfDay();
+            $settlementCreatedAt = $lockedSettlement->created_at?->copy();
+
+            $employee->update([
+                'leave_accrued_balance' => 0,
+                'leave_days_used' => 0,
+            ]);
+
+            if ($settlementDate !== null) {
+                Leave::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('deduct_from_balance', true)
+                    ->whereDate('start_date', '<=', $settlementDate->toDateString())
+                    ->update(['deduct_from_balance' => false]);
+            }
+
+            $debtQuery = EmployeeDebt::query()
+                ->where('employee_id', $employee->id);
+
+            if ($settlementCreatedAt !== null) {
+                $debtQuery->where('created_at', '<=', $settlementCreatedAt);
+            }
+
+            $debtQuery->delete();
+        });
     }
 
     public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon

@@ -68,16 +68,6 @@
                                 </Link>
                             </Button>
                             <Button
-                                v-if="canSettleEmployeeEntitlements"
-                                variant="outline"
-                                size="sm"
-                                as-child
-                            >
-                                <Link :href="route('employees.entitlement-settlement.index', employee.id)">
-                                    {{ t('entitlement_settlement.history_title') }}
-                                </Link>
-                            </Button>
-                            <Button
                                 v-if="canSyncEmployeeFingerprintMonth"
                                 variant="secondary"
                                 size="sm"

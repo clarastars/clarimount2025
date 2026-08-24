@@ -6,9 +6,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EmployeeEntitlementSettlement extends Model
 {
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_REJECTED = 'rejected';
+
     protected $fillable = [
         'employee_id',
         'created_by',
@@ -37,6 +44,10 @@ class EmployeeEntitlementSettlement extends Model
         'total_deductions',
         'net_due',
         'notes',
+        'status',
+        'reviewed_by',
+        'reviewed_at',
+        'review_notes',
     ];
 
     protected $casts = [
@@ -63,6 +74,7 @@ class EmployeeEntitlementSettlement extends Model
         'used_annual_leave_deduction' => 'decimal:2',
         'total_deductions' => 'decimal:2',
         'net_due' => 'decimal:2',
+        'reviewed_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo
@@ -73,5 +85,35 @@ class EmployeeEntitlementSettlement extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function stepApprovals(): HasMany
+    {
+        return $this->hasMany(EntitlementSettlementStepApproval::class, 'settlement_id');
+    }
+
+    public function approvalRejections(): HasMany
+    {
+        return $this->hasMany(EntitlementSettlementApprovalRejection::class, 'settlement_id');
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === self::STATUS_REJECTED;
     }
 }

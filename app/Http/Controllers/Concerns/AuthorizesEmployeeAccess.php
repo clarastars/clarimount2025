@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\EmployeeEntitlementSettlement;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\EmployeeUserRoleService;
+use App\Services\EntitlementSettlementApprovalService;
 use Illuminate\Support\Collection;
 
 trait AuthorizesEmployeeAccess
@@ -39,6 +41,7 @@ trait AuthorizesEmployeeAccess
             'employees.manage',
             'employees.custody.update',
             'employees.entitlements.settle',
+            'employees.entitlements.approve',
             'attendance.fingerprint-month.sync',
         ];
     }
@@ -168,6 +171,85 @@ trait AuthorizesEmployeeAccess
             (int) $employee->company_id,
             $employee->department_id ? (string) $employee->department_id : null
         );
+    }
+
+    protected function canApproveEmployeeEntitlements(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.entitlements.approve');
+    }
+
+    protected function canViewEntitlementSettlementForEmployee(User $user, Employee $employee): bool
+    {
+        if ($this->canSettleEmployeeEntitlementsForEmployee($user, $employee)) {
+            return true;
+        }
+
+        if (! $this->canAccessEmployee($user, $employee)) {
+            return false;
+        }
+
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.entitlements.approve',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function abortUnlessCanViewEntitlementSettlementForEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canViewEntitlementSettlementForEmployee($user, $employee), 403);
+    }
+
+    protected function canViewEntitlementSettlement(
+        User $user,
+        Employee $employee,
+        EmployeeEntitlementSettlement $settlement,
+    ): bool {
+        if ($this->canViewEntitlementSettlementForEmployee($user, $employee)) {
+            return true;
+        }
+
+        $employee->loadMissing('company');
+        $company = $employee->company;
+
+        if ($company === null) {
+            return false;
+        }
+
+        $approvalService = app(EntitlementSettlementApprovalService::class);
+
+        foreach ($approvalService->activeStepsForCompany($company) as $step) {
+            if ($approvalService->canUserApproveStep($user, $company, $settlement, $step)) {
+                return true;
+            }
+        }
+
+        if ($settlement->stepApprovals()->where('approved_by', $user->id)->exists()) {
+            return true;
+        }
+
+        return (int) $settlement->created_by === (int) $user->id;
+    }
+
+    protected function abortUnlessCanViewEntitlementSettlement(
+        User $user,
+        Employee $employee,
+        EmployeeEntitlementSettlement $settlement,
+    ): void {
+        abort_unless($this->canViewEntitlementSettlement($user, $employee, $settlement), 403);
     }
 
     protected function canManageEmployees(User $user): bool

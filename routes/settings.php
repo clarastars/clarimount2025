@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\EntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveTypeController;
 use App\Http\Controllers\Settings\SalaryCertificateApprovalStepsController;
@@ -62,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/salary-run-approvals', [SalaryRunApprovalStepsController::class, 'index'])->name('settings.salary-run-approvals.index');
     Route::get('settings/leave-approvals', [LeaveApprovalStepsController::class, 'index'])->name('settings.leave-approvals.index');
     Route::get('settings/salary-certificate-approvals', [SalaryCertificateApprovalStepsController::class, 'index'])->name('settings.salary-certificate-approvals.index');
+    Route::get('settings/entitlement-settlement-approvals', [EntitlementSettlementApprovalStepsController::class, 'index'])->name('settings.entitlement-settlement-approvals.index');
     Route::middleware('role_or_permission:super-admin|settings.access|leave-types.manage')->group(function () {
         Route::get('settings/leave-types', [LeaveTypeController::class, 'index'])->name('settings.leave-types.index');
         Route::post('settings/leave-types', [LeaveTypeController::class, 'store'])->name('settings.leave-types.store');

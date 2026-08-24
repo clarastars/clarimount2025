@@ -241,6 +241,20 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($can('employees.entitlements.approve')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.entitlement-settlement.index',
+                'employees.entitlement-settlement.show',
+                'employees.entitlement-settlement.approve-step',
+                'employees.entitlement-settlement.reject-step',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
         if ($can('attendance.readonly')) {
             $allowed = array_merge($allowed, [
                 'attendance.index',

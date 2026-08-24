@@ -123,6 +123,12 @@ class HandleInertiaRequests extends Middleware
                     || in_array('leaves.create', $permissionNames, true)
                     || in_array('leaves.approve', $permissionNames, true)
                 ),
+                'can_view_entitlement_settlement_notifications' => $user !== null && (
+                    $isSuperAdmin
+                    || $user->ownedCompanies()->exists()
+                    || in_array('employees.entitlements.approve', $permissionNames, true)
+                    || in_array('employees.entitlements.settle', $permissionNames, true)
+                ),
                 'unread_notifications_count' => $user?->unreadNotifications()->count() ?? 0,
             ],
             'locale' => $userLanguage,

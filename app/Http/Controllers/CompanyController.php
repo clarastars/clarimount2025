@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Services\AttendancePenaltyAutoApprovalService;
+use App\Services\EntitlementSettlementApprovalService;
 use App\Services\LeaveApprovalService;
 use App\Services\SalaryCertificateApprovalService;
 use App\Services\SalaryRunApprovalService;
@@ -240,6 +241,7 @@ class CompanyController extends Controller
         app(SalaryRunApprovalService::class)->seedDefaultStepsForCompany($company);
         app(LeaveApprovalService::class)->seedDefaultStepsForCompany($company);
         app(SalaryCertificateApprovalService::class)->seedDefaultStepsForCompany($company);
+        app(EntitlementSettlementApprovalService::class)->seedDefaultStepsForCompany($company);
 
         return redirect()->route('companies.show', $company)
             ->with('success', 'Company created successfully.');

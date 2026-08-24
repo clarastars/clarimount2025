@@ -21,6 +21,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\EmployeeEntitlementSettlementController;
+use App\Http\Controllers\CompanyEntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\EmployeePortalLeaveController;
@@ -227,6 +228,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('employees.entitlement-settlement.store');
     Route::get('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'show'])
         ->name('employees.entitlement-settlement.show');
+    Route::post(
+        'employees/{employee}/entitlement-settlement/{entitlementSettlement}/approval-steps/{settlementApprovalStep}/approve',
+        [EmployeeEntitlementSettlementController::class, 'approveWorkflowStep']
+    )->name('employees.entitlement-settlement.approve-step');
+    Route::post(
+        'employees/{employee}/entitlement-settlement/{entitlementSettlement}/approval-steps/{settlementApprovalStep}/reject',
+        [EmployeeEntitlementSettlementController::class, 'rejectWorkflowStep']
+    )->name('employees.entitlement-settlement.reject-step');
 
     // Company Leaves routes
     Route::get('companies/{company}/leaves', [CompanyLeaveController::class, 'index'])->name('companies.leaves.index');
@@ -249,6 +258,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('companies/{company}/salary-certificate-approvals/{salaryCertificateApprovalStep}', [CompanySalaryCertificateApprovalStepsController::class, 'update'])->name('companies.salary-certificate-approvals.update');
     Route::delete('companies/{company}/salary-certificate-approvals/{salaryCertificateApprovalStep}', [CompanySalaryCertificateApprovalStepsController::class, 'destroy'])->name('companies.salary-certificate-approvals.destroy');
     Route::post('companies/{company}/salary-certificate-approvals/reorder', [CompanySalaryCertificateApprovalStepsController::class, 'reorder'])->name('companies.salary-certificate-approvals.reorder');
+
+    // Entitlement settlement approval steps (per company)
+    Route::get('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'index'])->name('companies.entitlement-settlement-approvals.index');
+    Route::post('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'store'])->name('companies.entitlement-settlement-approvals.store');
+    Route::put('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'update'])->name('companies.entitlement-settlement-approvals.update');
+    Route::delete('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'destroy'])->name('companies.entitlement-settlement-approvals.destroy');
+    Route::post('companies/{company}/entitlement-settlement-approvals/reorder', [CompanyEntitlementSettlementApprovalStepsController::class, 'reorder'])->name('companies.entitlement-settlement-approvals.reorder');
 
     // Employee portal — self-service leaves
     Route::get('my/leaves', [EmployeePortalLeaveController::class, 'index'])->name('employee.leaves.index');

@@ -39,6 +39,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.settlement_date') }}</th>
                                 <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.reason') }}</th>
+                                <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.status') }}</th>
                                 <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.total_dues') }}</th>
                                 <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.total_deductions') }}</th>
                                 <th class="px-4 py-3 text-start font-medium">{{ t('entitlement_settlement.net_due') }}</th>
@@ -54,6 +55,11 @@
                             >
                                 <td class="px-4 py-3 whitespace-nowrap">{{ formatDate(item.settlement_date) }}</td>
                                 <td class="px-4 py-3 max-w-[220px] truncate" :title="item.reason">{{ item.reason }}</td>
+                                <td class="px-4 py-3">
+                                    <span :class="statusBadgeClass(item.status)">
+                                        {{ t(`entitlement_settlement.status_${item.status}`) }}
+                                    </span>
+                                </td>
                                 <td class="px-4 py-3 tabular-nums whitespace-nowrap">{{ formatCurrency(item.total_dues) }}</td>
                                 <td class="px-4 py-3 tabular-nums whitespace-nowrap">{{ formatCurrency(item.total_deductions) }}</td>
                                 <td class="px-4 py-3 font-semibold tabular-nums whitespace-nowrap text-blue-700">
@@ -89,6 +95,7 @@ type SettlementSummary = {
     id: number;
     settlement_date: string | null;
     reason: string;
+    status: 'pending' | 'approved' | 'rejected';
     total_dues: number;
     total_deductions: number;
     net_due: number;
@@ -126,5 +133,19 @@ const formatDate = (value?: string | null) => {
     return new Intl.DateTimeFormat(locale.value === 'ar' ? 'ar-SA' : 'en-GB').format(
         new Date(Number(year), Number(month) - 1, Number(day)),
     );
+};
+
+const statusBadgeClass = (status: string) => {
+    const base = 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium';
+
+    if (status === 'approved') {
+        return `${base} bg-emerald-100 text-emerald-800`;
+    }
+
+    if (status === 'rejected') {
+        return `${base} bg-red-100 text-red-800`;
+    }
+
+    return `${base} bg-amber-100 text-amber-800`;
 };
 </script>

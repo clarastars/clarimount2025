@@ -255,6 +255,13 @@
                         <div>
                             <p class="text-sm text-muted-foreground">{{ t('entitlement_settlement.net_due') }}</p>
                             <p class="text-3xl font-bold text-blue-700">{{ formatCurrency(netDue) }}</p>
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                {{
+                                    hasApprovalWorkflow
+                                        ? t('entitlement_settlement.workflow_hint')
+                                        : t('entitlement_settlement.no_workflow_hint')
+                                }}
+                            </p>
                         </div>
                         <Button type="submit" size="lg" :disabled="form.processing">
                             {{ form.processing ? t('common.saving') : t('entitlement_settlement.save') }}
@@ -331,11 +338,13 @@ const props = defineProps<{
     preview: Preview;
     defaults: { settlement_date: string; reason: string };
     previous_settlements_count?: number;
+    has_approval_workflow?: boolean;
 }>();
 
 const { t, locale } = useI18n();
 const isRefreshing = ref(false);
 const previousSettlementsCount = computed(() => props.previous_settlements_count ?? 0);
+const hasApprovalWorkflow = computed(() => props.has_approval_workflow ?? false);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },
