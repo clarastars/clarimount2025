@@ -19,12 +19,14 @@ class LeaveType extends Model
         'name_en',
         'name_ar',
         'min_notice_days',
+        'allow_past_dates',
         'sort_order',
         'is_active',
     ];
 
     protected $casts = [
         'min_notice_days' => 'integer',
+        'allow_past_dates' => 'boolean',
         'sort_order' => 'integer',
         'is_active' => 'boolean',
     ];

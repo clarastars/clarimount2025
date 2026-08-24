@@ -42,7 +42,8 @@ class LeaveTypeController extends Controller
             'name_en' => trim((string) $validated['name_en']),
             'name_ar' => trim((string) $validated['name_ar']),
             'min_notice_days' => (int) $validated['min_notice_days'],
-            'sort_order' => (int) $validated['sort_order'],
+            'allow_past_dates' => $request->boolean('allow_past_dates'),
+            'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ]);
 
@@ -59,7 +60,8 @@ class LeaveTypeController extends Controller
             'name_en' => trim((string) $validated['name_en']),
             'name_ar' => trim((string) $validated['name_ar']),
             'min_notice_days' => (int) $validated['min_notice_days'],
-            'sort_order' => (int) $validated['sort_order'],
+            'allow_past_dates' => $request->boolean('allow_past_dates'),
+            'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ]);
 
@@ -84,6 +86,7 @@ class LeaveTypeController extends Controller
             'name_en' => ['required', 'string', 'max:255'],
             'name_ar' => ['required', 'string', 'max:255'],
             'min_notice_days' => ['required', 'integer', 'min:0', 'max:365'],
+            'allow_past_dates' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:10000'],
         ]);
     }

@@ -35,6 +35,12 @@
             >
                 {{ t('leaves.min_notice_days_hint_frontend', { days: formattedMinNoticeDays }) }}
             </p>
+            <p
+                v-if="selectedLeaveType?.allow_past_dates"
+                class="text-xs text-muted-foreground mt-1"
+            >
+                {{ t('leaves.allow_past_dates_hint_frontend') }}
+            </p>
             <p v-if="form.errors.leave_type" class="text-red-500 text-sm mt-1">{{ form.errors.leave_type }}</p>
         </div>
 
@@ -45,6 +51,7 @@
                     id="start_date"
                     v-model="form.start_date"
                     type="date"
+                    :min="startDateMin"
                     required
                 />
                 <p v-if="form.errors.start_date" class="text-red-500 text-sm mt-1">{{ form.errors.start_date }}</p>
@@ -55,6 +62,7 @@
                     id="end_date"
                     v-model="form.end_date"
                     type="date"
+                    :min="form.start_date || startDateMin || undefined"
                     required
                 />
                 <p v-if="form.errors.end_date" class="text-red-500 text-sm mt-1">{{ form.errors.end_date }}</p>
@@ -174,6 +182,7 @@ interface LeaveTypeOption {
     key: string;
     label: string;
     min_notice_days: number;
+    allow_past_dates?: boolean;
 }
 
 interface LeaveForm {
@@ -203,6 +212,18 @@ const props = defineProps<{
 }>();
 
 const selectedLeaveType = computed(() => props.leaveTypes.find((item) => item.key === props.form.leave_type) ?? null);
+const startDateMin = computed(() => {
+    if (!selectedLeaveType.value || selectedLeaveType.value.allow_past_dates) {
+        return undefined;
+    }
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+});
 const formattedMinNoticeDays = computed(() => {
     if (!selectedLeaveType.value) {
         return '';

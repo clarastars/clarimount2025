@@ -39,6 +39,7 @@ class LeaveTypeService
                 'name_en' => $leaveType->name_en,
                 'name_ar' => $leaveType->name_ar,
                 'min_notice_days' => $leaveType->min_notice_days,
+                'allow_past_dates' => (bool) $leaveType->allow_past_dates,
                 'sort_order' => $leaveType->sort_order,
                 'is_active' => $leaveType->is_active,
             ])
@@ -86,6 +87,22 @@ class LeaveTypeService
         return $leaveType?->displayName($locale) ?? $key;
     }
 
+    public function ensureStartDateAllowed(LeaveType $leaveType, string $startDate): void
+    {
+        if ($leaveType->allow_past_dates) {
+            return;
+        }
+
+        $today = now()->startOfDay();
+        $requestedStart = Carbon::parse($startDate)->startOfDay();
+
+        if ($requestedStart->lt($today)) {
+            throw ValidationException::withMessages([
+                'start_date' => [__('messages.leaves.start_date_must_be_today_or_later')],
+            ]);
+        }
+    }
+
     public function ensureMinimumNoticeDays(LeaveType $leaveType, string $startDate): void
     {
         $minNoticeDays = max(0, (int) $leaveType->min_notice_days);
@@ -96,6 +113,12 @@ class LeaveTypeService
 
         $today = now()->startOfDay();
         $requestedStart = Carbon::parse($startDate)->startOfDay();
+
+        // Past-dated requests are governed by allow_past_dates; skip advance-notice rules for them.
+        if ($leaveType->allow_past_dates && $requestedStart->lt($today)) {
+            return;
+        }
+
         $noticeDays = (int) $today->diffInDays($requestedStart, false);
 
         if ($noticeDays < $minNoticeDays) {
@@ -126,6 +149,7 @@ class LeaveTypeService
             'name_ar' => $leaveType->name_ar,
             'label' => $leaveType->displayName($locale),
             'min_notice_days' => $leaveType->min_notice_days,
+            'allow_past_dates' => (bool) $leaveType->allow_past_dates,
         ];
     }
 }

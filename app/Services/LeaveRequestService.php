@@ -28,7 +28,7 @@ class LeaveRequestService
     {
         $validated = $request->validate([
             'leave_type' => ['required', 'string', Rule::in($this->leaveTypeService->activeKeys())],
-            'start_date' => 'required|date|after_or_equal:today',
+            'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'deduct_from_balance' => 'required|boolean',
             'is_paid' => 'required|boolean',
@@ -43,6 +43,7 @@ class LeaveRequestService
             ]);
         }
 
+        $this->leaveTypeService->ensureStartDateAllowed($leaveType, (string) $validated['start_date']);
         $this->leaveTypeService->ensureMinimumNoticeDays($leaveType, (string) $validated['start_date']);
 
         $startDate = Carbon::parse($validated['start_date']);

@@ -20,6 +20,7 @@ interface LeaveTypeItem {
     name_en: string;
     name_ar: string;
     min_notice_days: number;
+    allow_past_dates: boolean;
     sort_order: number;
     is_active: boolean;
 }
@@ -41,6 +42,7 @@ const createForm = useForm({
     name_en: '',
     name_ar: '',
     min_notice_days: 0,
+    allow_past_dates: false,
     sort_order: 0,
 });
 
@@ -50,6 +52,7 @@ const editForm = useForm({
     name_en: '',
     name_ar: '',
     min_notice_days: 0,
+    allow_past_dates: false,
     sort_order: 0,
 });
 
@@ -58,6 +61,7 @@ function createLeaveType() {
         preserveScroll: true,
         onSuccess: () => {
             createForm.reset();
+            createForm.allow_past_dates = false;
             createDialogOpen.value = false;
         },
     });
@@ -68,6 +72,7 @@ function startEdit(item: LeaveTypeItem) {
     editForm.name_en = item.name_en;
     editForm.name_ar = item.name_ar;
     editForm.min_notice_days = item.min_notice_days;
+    editForm.allow_past_dates = item.allow_past_dates;
     editForm.sort_order = item.sort_order;
     editForm.clearErrors();
 }
@@ -116,12 +121,13 @@ function deleteLeaveType(item: LeaveTypeItem) {
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[920px] text-sm">
+                            <table class="w-full min-w-[1040px] text-sm">
                                 <thead>
                                     <tr class="border-b text-center">
                                         <th class="py-2">{{ t('settings.name_en') }}</th>
                                         <th class="py-2">{{ t('settings.name_ar') }}</th>
                                         <th class="py-2">{{ t('settings.leave_type_min_notice_days') }}</th>
+                                        <th class="py-2">{{ t('settings.leave_type_allow_past_dates') }}</th>
                                         <th class="py-2">{{ t('settings.leave_type_sort_order') }}</th>
                                         <th class="py-2">{{ t('common.actions') }}</th>
                                     </tr>
@@ -131,6 +137,9 @@ function deleteLeaveType(item: LeaveTypeItem) {
                                         <td class="py-2 text-center">{{ item.name_en }}</td>
                                         <td class="py-2 text-center">{{ item.name_ar }}</td>
                                         <td class="py-2 text-center">{{ item.min_notice_days }}</td>
+                                        <td class="py-2 text-center">
+                                            {{ item.allow_past_dates ? t('common.yes') : t('common.no') }}
+                                        </td>
                                         <td class="py-2 text-center">{{ item.sort_order }}</td>
                                         <td class="py-2">
                                             <div class="flex justify-center gap-2">
@@ -172,7 +181,22 @@ function deleteLeaveType(item: LeaveTypeItem) {
                                 <Input v-model="editForm.sort_order" type="number" min="0" />
                                 <InputError class="mt-1" :message="editForm.errors.sort_order" />
                             </div>
-                            <div class="flex gap-2 mt-6">
+                            <div class="md:col-span-2 flex items-start gap-2 pt-6">
+                                <input
+                                    id="edit-allow-past-dates"
+                                    v-model="editForm.allow_past_dates"
+                                    type="checkbox"
+                                    class="mt-1 h-4 w-4"
+                                />
+                                <div>
+                                    <Label for="edit-allow-past-dates">{{ t('settings.leave_type_allow_past_dates') }}</Label>
+                                    <p class="text-xs text-muted-foreground mt-1">
+                                        {{ t('settings.leave_type_allow_past_dates_hint') }}
+                                    </p>
+                                    <InputError class="mt-1" :message="editForm.errors.allow_past_dates" />
+                                </div>
+                            </div>
+                            <div class="flex gap-2 mt-2 md:col-span-6">
                                 <Button type="submit" :disabled="editForm.processing">{{ t('common.save') }}</Button>
                                 <Button type="button" variant="outline" @click="editingId = null">{{ t('common.cancel') }}</Button>
                             </div>
@@ -206,6 +230,21 @@ function deleteLeaveType(item: LeaveTypeItem) {
                                 <Label for="leave-type-sort-order">{{ t('settings.leave_type_sort_order') }}</Label>
                                 <Input id="leave-type-sort-order" v-model="createForm.sort_order" type="number" min="0" />
                                 <InputError class="mt-1" :message="createForm.errors.sort_order" />
+                            </div>
+                            <div class="md:col-span-2 flex items-start gap-2">
+                                <input
+                                    id="leave-type-allow-past"
+                                    v-model="createForm.allow_past_dates"
+                                    type="checkbox"
+                                    class="mt-1 h-4 w-4"
+                                />
+                                <div>
+                                    <Label for="leave-type-allow-past">{{ t('settings.leave_type_allow_past_dates') }}</Label>
+                                    <p class="text-xs text-muted-foreground mt-1">
+                                        {{ t('settings.leave_type_allow_past_dates_hint') }}
+                                    </p>
+                                    <InputError class="mt-1" :message="createForm.errors.allow_past_dates" />
+                                </div>
                             </div>
 
                             <DialogFooter class="md:col-span-2">

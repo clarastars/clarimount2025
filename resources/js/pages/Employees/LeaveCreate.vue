@@ -56,6 +56,7 @@ const props = defineProps<{
         key: string;
         label: string;
         min_notice_days: number;
+        allow_past_dates?: boolean;
     }>;
 }>();
 
@@ -98,13 +99,16 @@ const submit = () => {
         const startDate = new Date(form.start_date);
         startDate.setHours(0, 0, 0, 0);
 
-        const diffInDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
-        if (diffInDays < leaveType.min_notice_days) {
-            form.setError('start_date', t('leaves.min_notice_days_not_met_frontend', {
-                leave_type: leaveType.label,
-                days: formatLocalizedNumber(leaveType.min_notice_days),
-            }));
-            return;
+        const isPastDate = startDate.getTime() < today.getTime();
+        if (!(leaveType.allow_past_dates && isPastDate)) {
+            const diffInDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+            if (diffInDays < leaveType.min_notice_days) {
+                form.setError('start_date', t('leaves.min_notice_days_not_met_frontend', {
+                    leave_type: leaveType.label,
+                    days: formatLocalizedNumber(leaveType.min_notice_days),
+                }));
+                return;
+            }
         }
     }
 
