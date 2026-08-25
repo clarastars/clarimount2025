@@ -284,6 +284,19 @@ class SalaryRunService
                 );
             }
 
+            // Drop lines for employees no longer active in this company (e.g. transferred away).
+            $activeEmployeeIds = $employees
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+
+            $staleItemsQuery = SalaryRunItem::query()->where('salary_run_id', $salaryRun->id);
+            if ($activeEmployeeIds === []) {
+                $staleItemsQuery->delete();
+            } else {
+                $staleItemsQuery->whereNotIn('employee_id', $activeEmployeeIds)->delete();
+            }
+
             return $salaryRun->fresh(['items.employee']);
         });
     }
