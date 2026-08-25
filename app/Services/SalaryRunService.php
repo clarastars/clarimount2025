@@ -203,6 +203,8 @@ class SalaryRunService
 
                 $debtDeductions = $existingItem?->debt_deductions ?? [];
                 if ($salaryRun->isDraft()) {
+                    // Sync against current employee debts (drop deleted / clamp amounts),
+                    // then auto-include any new certificate-attestation debts.
                     $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $debtDeductions);
                 }
 
@@ -463,6 +465,63 @@ class SalaryRunService
     }
 
     /**
+     * Keep draft debt deductions aligned with the employee's current debts:
+     * drop deleted debts and clamp amounts to the remaining balance.
+     *
+     * @param  mixed  $existing
+     * @return list<array{debt_id: int, debt_type: string|null, amount: float, original_amount: float}>
+     */
+    public function syncDebtDeductionsWithCurrentDebts(Employee $employee, mixed $existing): array
+    {
+        $deductions = is_array($existing) ? array_values($existing) : [];
+        if ($deductions === []) {
+            return [];
+        }
+
+        $debts = EmployeeDebt::query()
+            ->where('employee_id', $employee->id)
+            ->where('amount', '>', 0)
+            ->get()
+            ->keyBy(static fn (EmployeeDebt $debt): int => (int) $debt->id);
+
+        $synced = [];
+
+        foreach ($deductions as $deduction) {
+            if (! is_array($deduction)) {
+                continue;
+            }
+
+            $debtId = (int) ($deduction['debt_id'] ?? 0);
+            if ($debtId <= 0 || ! $debts->has($debtId)) {
+                continue;
+            }
+
+            /** @var EmployeeDebt $debt */
+            $debt = $debts->get($debtId);
+            $remaining = round((float) $debt->amount, 2);
+            $requested = round((float) ($deduction['amount'] ?? 0), 2);
+
+            if ($requested <= 0 || $remaining <= 0) {
+                continue;
+            }
+
+            $amount = min($requested, $remaining);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $synced[] = [
+                'debt_id' => (int) $debt->id,
+                'debt_type' => $debt->debt_type,
+                'amount' => $amount,
+                'original_amount' => $remaining,
+            ];
+        }
+
+        return $synced;
+    }
+
+    /**
      * Auto-include remaining attested salary-certificate debts in a draft run.
      *
      * @param  mixed  $existing
@@ -470,7 +529,7 @@ class SalaryRunService
      */
     public function mergeCertificateAttestationDebtDeductions(Employee $employee, mixed $existing): array
     {
-        $deductions = is_array($existing) ? array_values($existing) : [];
+        $deductions = $this->syncDebtDeductionsWithCurrentDebts($employee, $existing);
         $existingIds = [];
 
         foreach ($deductions as $deduction) {
