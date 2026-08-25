@@ -132,6 +132,7 @@ const statusVariant = (status: string): 'default' | 'secondary' | 'destructive' 
 
 const cancellingRequestId = ref<number | null>(null);
 const expandedApprovalRequestIds = ref<number[]>([]);
+const expandedAssigneeStepKeys = ref<string[]>([]);
 
 const isApprovalDetailsOpen = (requestId: number): boolean =>
     expandedApprovalRequestIds.value.includes(requestId);
@@ -139,10 +140,28 @@ const isApprovalDetailsOpen = (requestId: number): boolean =>
 const toggleApprovalDetails = (requestId: number) => {
     if (isApprovalDetailsOpen(requestId)) {
         expandedApprovalRequestIds.value = expandedApprovalRequestIds.value.filter((id) => id !== requestId);
+        expandedAssigneeStepKeys.value = expandedAssigneeStepKeys.value.filter(
+            (key) => !key.startsWith(`${requestId}:`),
+        );
         return;
     }
 
     expandedApprovalRequestIds.value = [...expandedApprovalRequestIds.value, requestId];
+};
+
+const assigneeStepKey = (requestId: number, stepId: number): string => `${requestId}:${stepId}`;
+
+const isAssigneesOpen = (requestId: number, stepId: number): boolean =>
+    expandedAssigneeStepKeys.value.includes(assigneeStepKey(requestId, stepId));
+
+const toggleAssignees = (requestId: number, stepId: number) => {
+    const key = assigneeStepKey(requestId, stepId);
+    if (isAssigneesOpen(requestId, stepId)) {
+        expandedAssigneeStepKeys.value = expandedAssigneeStepKeys.value.filter((item) => item !== key);
+        return;
+    }
+
+    expandedAssigneeStepKeys.value = [...expandedAssigneeStepKeys.value, key];
 };
 
 const cancelRequest = (requestId: number) => {
@@ -426,21 +445,27 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                                                 >
                                                                     {{ index + 1 }}. {{ step.title }}
                                                                 </span>
+                                                                <button
+                                                                    v-if="step.assignees?.length"
+                                                                    type="button"
+                                                                    class="text-xs text-primary hover:underline"
+                                                                    @click="toggleAssignees(request.id, step.id)"
+                                                                >
+                                                                    {{
+                                                                        isAssigneesOpen(request.id, step.id)
+                                                                            ? t('leaves.approval_hide_assignees')
+                                                                            : t('leaves.approval_show_assignees')
+                                                                    }}
+                                                                </button>
                                                             </div>
                                                             <div
-                                                                v-if="step.assignees?.length"
-                                                                class="text-xs text-muted-foreground mt-0.5 space-y-0.5"
+                                                                v-if="isAssigneesOpen(request.id, step.id) && step.assignees?.length"
+                                                                class="text-xs text-muted-foreground mt-1 space-y-0.5 rounded-md border border-dashed px-2 py-1.5"
                                                             >
                                                                 <div v-for="person in step.assignees" :key="person.id">
                                                                     <span>{{ person.name }}</span>
                                                                     <span v-if="person.email"> — {{ person.email }}</span>
                                                                 </div>
-                                                            </div>
-                                                            <div
-                                                                v-else-if="step.team_name"
-                                                                class="text-xs text-muted-foreground mt-0.5"
-                                                            >
-                                                                {{ step.team_name }}
                                                             </div>
                                                             <p class="text-xs text-muted-foreground mt-0.5">
                                                                 {{ stepStatusLabel(step) }}

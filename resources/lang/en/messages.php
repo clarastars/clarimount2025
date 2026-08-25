@@ -1135,6 +1135,8 @@ return [
         'approval_pending' => 'Pending',
         'approval_approve' => 'Approve',
         'approval_reject' => 'Reject',
+        'approval_show_assignees' => 'Show assignees',
+        'approval_hide_assignees' => 'Hide',
         'approval_reject_confirm_title' => 'Confirm rejection',
         'approval_reject_confirm_message' => 'This leave request will be rejected and moved to the rejected requests list. Please provide a rejection reason.',
         'approval_reject_reason_label' => 'Rejection reason',

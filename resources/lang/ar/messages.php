@@ -1133,6 +1133,8 @@ return [
         'approval_pending' => 'في الانتظار',
         'approval_approve' => 'اعتماد',
         'approval_reject' => 'رفض',
+        'approval_show_assignees' => 'عرض المسؤولين',
+        'approval_hide_assignees' => 'إخفاء',
         'approval_reject_confirm_title' => 'تأكيد الرفض',
         'approval_reject_confirm_message' => 'سيتم رفض طلب الإجازة ونقله إلى قائمة الطلبات المرفوضة. يرجى توضيح سبب الرفض.',
         'approval_reject_reason_label' => 'سبب الرفض',

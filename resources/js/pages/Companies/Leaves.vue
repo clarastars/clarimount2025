@@ -278,6 +278,19 @@ const showDirectReviewActions = computed(() =>
 
 const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
+const expandedAssigneeStepIds = ref<number[]>([]);
+
+const isAssigneesOpen = (stepId: number): boolean =>
+    expandedAssigneeStepIds.value.includes(stepId);
+
+const toggleAssignees = (stepId: number) => {
+    if (isAssigneesOpen(stepId)) {
+        expandedAssigneeStepIds.value = expandedAssigneeStepIds.value.filter((id) => id !== stepId);
+        return;
+    }
+
+    expandedAssigneeStepIds.value = [...expandedAssigneeStepIds.value, stepId];
+};
 
 const approveRequest = (requestId: number) => {
     reviewForm.post(route('companies.leave-requests.approve', [props.company.id, requestId]), {
@@ -313,12 +326,14 @@ const formatDateTime = (iso: string | null | undefined): string => {
 
 function openRequestDetails(request: LeaveRequestItem) {
     selectedRequest.value = request;
+    expandedAssigneeStepIds.value = [];
     detailsDialogOpen.value = true;
 }
 
 function closeRequestDetails() {
     detailsDialogOpen.value = false;
     selectedRequest.value = null;
+    expandedAssigneeStepIds.value = [];
     rejectDialogOpen.value = false;
     rejectingStepId.value = null;
     approvingStepId.value = null;
@@ -743,15 +758,29 @@ function submitRejectStep() {
                                 class="rounded-lg border p-4 flex flex-col justify-between"
                                 :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
                             >
-                                <div class="font-medium text-sm mb-1">{{ approval.title }}</div>
-                                <div v-if="approval.assignees?.length" class="text-xs text-muted-foreground mb-2 space-y-0.5">
+                                <div class="font-medium text-sm mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span>{{ approval.title }}</span>
+                                    <button
+                                        v-if="approval.assignees?.length"
+                                        type="button"
+                                        class="text-xs font-normal text-primary hover:underline"
+                                        @click="toggleAssignees(approval.id)"
+                                    >
+                                        {{
+                                            isAssigneesOpen(approval.id)
+                                                ? t('leaves.approval_hide_assignees')
+                                                : t('leaves.approval_show_assignees')
+                                        }}
+                                    </button>
+                                </div>
+                                <div
+                                    v-if="isAssigneesOpen(approval.id) && approval.assignees?.length"
+                                    class="text-xs text-muted-foreground mb-2 space-y-0.5 rounded-md border border-dashed px-2 py-1.5"
+                                >
                                     <div v-for="person in approval.assignees" :key="person.id">
                                         <span class="font-medium text-foreground/80">{{ person.name }}</span>
                                         <span v-if="person.email"> — {{ person.email }}</span>
                                     </div>
-                                </div>
-                                <div v-else-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
-                                    {{ approval.team_name }}
                                 </div>
                                 <div v-if="approval.approved_at" class="text-sm space-y-1">
                                     <div class="text-muted-foreground">
