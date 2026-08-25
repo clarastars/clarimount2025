@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Models\Employee;
 use App\Models\SalaryRun;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\RegistersEventListeners;
@@ -72,11 +73,28 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
             }
         }
 
-        $housing = $employee && $employee->allowance_housing !== null ? (float) $employee->allowance_housing : 0;
-        $transport = $employee && $employee->allowance_transportation !== null ? (float) $employee->allowance_transportation : 0;
-        $other = $employee && $employee->allowance_other !== null ? (float) $employee->allowance_other : 0;
-        $food = $employee && $employee->allowance_food !== null ? (float) $employee->allowance_food : 0;
-        $personalCar = $employee && $employee->allowance_personal_car !== null ? (float) $employee->allowance_personal_car : 0;
+        $factor = $this->resolveExportSalaryFactor($item, $employee);
+
+        $housing = $this->prorateAllowanceForExport(
+            $employee && $employee->allowance_housing !== null ? (float) $employee->allowance_housing : 0,
+            $factor,
+        );
+        $transport = $this->prorateAllowanceForExport(
+            $employee && $employee->allowance_transportation !== null ? (float) $employee->allowance_transportation : 0,
+            $factor,
+        );
+        $other = $this->prorateAllowanceForExport(
+            $employee && $employee->allowance_other !== null ? (float) $employee->allowance_other : 0,
+            $factor,
+        );
+        $food = $this->prorateAllowanceForExport(
+            $employee && $employee->allowance_food !== null ? (float) $employee->allowance_food : 0,
+            $factor,
+        );
+        $personalCar = $this->prorateAllowanceForExport(
+            $employee && $employee->allowance_personal_car !== null ? (float) $employee->allowance_personal_car : 0,
+            $factor,
+        );
         $itemAllowances = $item->allowances !== null ? (float) $item->allowances : 0;
         $detailedSum = $housing + $transport + $other + $food + $personalCar;
         $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : 0.0;
@@ -193,6 +211,38 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
         }
 
         return round($total, 2);
+    }
+
+    private function resolveExportSalaryFactor(object $item, ?Employee $employee): float
+    {
+        if ($employee === null) {
+            return 1.0;
+        }
+
+        $fullBasic = (float) ($employee->basic_salary ?? 0);
+        $itemBasic = $item->basic_salary !== null ? (float) $item->basic_salary : null;
+
+        if ($fullBasic > 0 && $itemBasic !== null) {
+            return min(1.0, max(0.0, $itemBasic / $fullBasic));
+        }
+
+        $fullAllowances = (float) ($employee->allowances ?? 0);
+        $itemAllowances = $item->allowances !== null ? (float) $item->allowances : null;
+
+        if ($fullAllowances > 0 && $itemAllowances !== null) {
+            return min(1.0, max(0.0, $itemAllowances / $fullAllowances));
+        }
+
+        return 1.0;
+    }
+
+    private function prorateAllowanceForExport(float $fullAmount, float $factor): float
+    {
+        if ($fullAmount <= 0 || $factor <= 0) {
+            return 0.0;
+        }
+
+        return round($fullAmount * $factor, 2);
     }
 
     public function styles(Worksheet $sheet)
