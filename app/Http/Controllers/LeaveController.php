@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Employee;
-use App\Services\LeaveStoreService;
+use App\Services\LeaveRequestService;
 use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +19,7 @@ class LeaveController extends Controller
     use AuthorizesEmployeeAccess;
 
     public function __construct(
-        private LeaveStoreService $leaveStoreService,
+        private LeaveRequestService $leaveRequestService,
         private LeaveTypeService $leaveTypeService,
     ) {}
 
@@ -53,10 +53,10 @@ class LeaveController extends Controller
         $this->abortUnlessCanCreateLeaves($user);
         $this->abortUnlessCanCreateLeaveForEmployee($user, $employee);
 
-        $this->leaveStoreService->validateAndCreate($request, $employee);
+        $this->leaveRequestService->submitForEmployee($employee, $request, $user);
 
         return redirect()
             ->route('employees.show', $employee)
-            ->with('success', __('messages.leaves.created_success'));
+            ->with('success', __('messages.leaves.request_submitted_success'));
     }
 }

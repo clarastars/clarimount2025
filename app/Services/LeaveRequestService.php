@@ -24,7 +24,7 @@ class LeaveRequestService
         private LeaveBalanceService $leaveBalanceService,
     ) {}
 
-    public function submitForEmployee(Employee $employee, Request $request): LeaveRequest
+    public function submitForEmployee(Employee $employee, Request $request, ?User $submittedBy = null): LeaveRequest
     {
         $validated = $request->validate([
             'leave_type' => ['required', 'string', Rule::in($this->leaveTypeService->activeKeys())],
@@ -78,9 +78,11 @@ class LeaveRequestService
             'status' => LeaveRequest::STATUS_PENDING,
         ]);
 
-        $leaveRequest->load(['employee.company']);
+        $leaveRequest->load(['employee.company', 'employee.user']);
         $company = $leaveRequest->employee->company;
-        $actor = $leaveRequest->employee->user ?? User::make(['name' => $leaveRequest->employee->full_name]);
+        $actor = $submittedBy
+            ?? $leaveRequest->employee->user
+            ?? User::make(['name' => $leaveRequest->employee->full_name]);
 
         if ($company !== null && $this->leaveApprovalService->hasActiveStepsForCompany($company)) {
             $this->leaveApprovalNotificationService->notifyWorkflowStarted($leaveRequest, $company, $actor);

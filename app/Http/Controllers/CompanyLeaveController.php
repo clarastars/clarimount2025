@@ -15,7 +15,6 @@ use App\Services\LeaveApprovalNotificationService;
 use App\Services\LeaveApprovalService;
 use App\Services\LeaveBalanceService;
 use App\Services\LeaveRequestService;
-use App\Services\LeaveStoreService;
 use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +28,6 @@ class CompanyLeaveController extends Controller
     use AuthorizesEmployeeAccess;
 
     public function __construct(
-        private LeaveStoreService $leaveStoreService,
         private LeaveRequestService $leaveRequestService,
         private LeaveApprovalService $leaveApprovalService,
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
@@ -146,11 +144,11 @@ class CompanyLeaveController extends Controller
         abort_unless((int) $employee->company_id === (int) $company->id, 403);
         $this->abortUnlessCanCreateLeaveForEmployee($user, $employee);
 
-        $this->leaveStoreService->validateAndCreate($request, $employee);
+        $this->leaveRequestService->submitForEmployee($employee, $request, $user);
 
         return redirect()
             ->route('companies.leaves.index', $company)
-            ->with('success', __('messages.leaves.created_success'));
+            ->with('success', __('messages.leaves.request_submitted_success'));
     }
 
     public function approveRequest(Request $request, Company $company, LeaveRequest $leaveRequest): RedirectResponse
