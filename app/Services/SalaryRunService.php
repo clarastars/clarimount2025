@@ -29,6 +29,17 @@ class SalaryRunService
     public function createOrUpdateSalaryRun(int $companyId, int $year, int $month): SalaryRun
     {
         return DB::transaction(function () use ($companyId, $year, $month) {
+            // Soft-deleted runs still occupy the unique (company, year, month) key.
+            $trashed = SalaryRun::onlyTrashed()
+                ->where('company_id', $companyId)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->first();
+
+            if ($trashed !== null) {
+                $trashed->restore();
+            }
+
             // Get or create salary run
             $salaryRun = SalaryRun::firstOrCreate(
                 [

@@ -2168,7 +2168,7 @@ return [
         'breakdown' => 'Penalty Breakdown',
         'finalize' => 'Finalize',
         'finalize_confirmation' => 'Are you sure you want to finalize this salary run?',
-        'delete_confirmation' => 'Delete salary run for {month} {year}? This cannot be undone.',
+        'delete_confirmation' => 'Delete salary run for {month} {year}?',
         'deleted_successfully' => 'Salary run deleted successfully.',
         'finalized_successfully' => 'Salary run finalized successfully',
         'created_successfully' => 'Salary run created successfully',

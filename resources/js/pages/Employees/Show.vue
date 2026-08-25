@@ -159,9 +159,21 @@
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                             <Icon name="Banknote" class="h-5 w-5" />
                         </div>
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <p class="text-xs text-muted-foreground">{{ t('employees.basic_salary') }}</p>
-                            <p class="text-lg font-bold">{{ displayCurrency(employee.basic_salary) }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-lg font-bold tabular-nums">
+                                    {{ showBasicSalary ? displayCurrency(employee.basic_salary) : maskedCurrency }}
+                                </p>
+                                <button
+                                    type="button"
+                                    class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                    :aria-label="showBasicSalary ? t('employees.hide_password') : t('employees.show_password')"
+                                    @click="showBasicSalary = !showBasicSalary"
+                                >
+                                    <Icon :name="showBasicSalary ? 'EyeOff' : 'Eye'" class="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -416,6 +428,8 @@ const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const isSyncingFingerprintMonth = ref(false);
+const showBasicSalary = ref(false);
+const maskedCurrency = '•••••• SAR';
 
 const documentsCount = computed(() => props.documents?.length ?? 0);
 
