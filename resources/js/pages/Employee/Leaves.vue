@@ -29,6 +29,7 @@ interface ApprovalProgressStep {
     title: string;
     sort_order: number;
     team_name: string | null;
+    assignees?: Array<{ id: number; name: string; email: string | null }>;
     status: 'approved' | 'current' | 'waiting';
     approved_at: string | null;
     approver_name: string | null;
@@ -425,9 +426,21 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                                                 >
                                                                     {{ index + 1 }}. {{ step.title }}
                                                                 </span>
-                                                                <span v-if="step.team_name" class="text-xs text-muted-foreground">
-                                                                    ({{ step.team_name }})
-                                                                </span>
+                                                            </div>
+                                                            <div
+                                                                v-if="step.assignees?.length"
+                                                                class="text-xs text-muted-foreground mt-0.5 space-y-0.5"
+                                                            >
+                                                                <div v-for="person in step.assignees" :key="person.id">
+                                                                    <span>{{ person.name }}</span>
+                                                                    <span v-if="person.email"> — {{ person.email }}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div
+                                                                v-else-if="step.team_name"
+                                                                class="text-xs text-muted-foreground mt-0.5"
+                                                            >
+                                                                {{ step.team_name }}
                                                             </div>
                                                             <p class="text-xs text-muted-foreground mt-0.5">
                                                                 {{ stepStatusLabel(step) }}

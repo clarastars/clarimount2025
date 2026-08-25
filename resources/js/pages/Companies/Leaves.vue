@@ -43,6 +43,7 @@ interface ApprovalStepState {
     sort_order: number;
     team_id: number | null;
     team_name: string | null;
+    assignees?: Array<{ id: number; name: string; email: string | null }>;
     approved_at: string | null;
     approver_name: string | null;
     can_approve: boolean;
@@ -743,7 +744,13 @@ function submitRejectStep() {
                                 :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
                             >
                                 <div class="font-medium text-sm mb-1">{{ approval.title }}</div>
-                                <div v-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
+                                <div v-if="approval.assignees?.length" class="text-xs text-muted-foreground mb-2 space-y-0.5">
+                                    <div v-for="person in approval.assignees" :key="person.id">
+                                        <span class="font-medium text-foreground/80">{{ person.name }}</span>
+                                        <span v-if="person.email"> — {{ person.email }}</span>
+                                    </div>
+                                </div>
+                                <div v-else-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
                                     {{ approval.team_name }}
                                 </div>
                                 <div v-if="approval.approved_at" class="text-sm space-y-1">

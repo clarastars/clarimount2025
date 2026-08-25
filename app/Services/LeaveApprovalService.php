@@ -25,6 +25,13 @@ class LeaveApprovalService
     ];
 
     /**
+     * Cached step assignees keyed by "{companyId}:{teamId}".
+     *
+     * @var array<string, list<array{id: int, name: string, email: string|null}>>
+     */
+    private array $assigneesCache = [];
+
+    /**
      * @return array{deleted: int, skipped: int, skipped_titles: list<string>}
      */
     public function deleteDefaultStepsForCompany(int $companyId, bool $force = false): array
@@ -150,6 +157,7 @@ class LeaveApprovalService
                 'sort_order' => $step->sort_order,
                 'team_id' => $step->team_id,
                 'team_name' => $step->team?->name,
+                'assignees' => $this->assigneesForStep($step, $company),
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
                 'can_approve' => $canApprove,
@@ -209,6 +217,7 @@ class LeaveApprovalService
                 'title' => $step->title,
                 'sort_order' => $step->sort_order,
                 'team_name' => $step->team?->name,
+                'assignees' => $this->assigneesForStep($step, $company),
                 'status' => $status,
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
@@ -447,5 +456,75 @@ class LeaveApprovalService
                     ->update(['sort_order' => $index + 1]);
             }
         });
+    }
+
+    /**
+     * Users assigned to the step's team for this company who can approve leaves.
+     *
+     * @return list<array{id: int, name: string, email: string|null}>
+     */
+    public function assigneesForStep(LeaveApprovalStep $step, Company $company): array
+    {
+        if ($step->team_id === null) {
+            return [];
+        }
+
+        $cacheKey = (int) $company->id.':'.(int) $step->team_id;
+
+        if (isset($this->assigneesCache[$cacheKey])) {
+            return $this->assigneesCache[$cacheKey];
+        }
+
+        $userIds = app(EmployeeUserRoleService::class)
+            ->userIdsForTeamInCompany((int) $step->team_id, (int) $company->id);
+
+        if ($userIds === []) {
+            return $this->assigneesCache[$cacheKey] = [];
+        }
+
+        $users = User::query()
+            ->whereIn('id', $userIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        $teamId = (int) $step->team_id;
+        $registrar = app(PermissionRegistrar::class);
+        $previousTeamId = $registrar->getPermissionsTeamId();
+
+        $assignees = [];
+
+        try {
+            $registrar->setPermissionsTeamId($teamId);
+
+            foreach ($users as $user) {
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                if (! $user->can('leaves.approve')) {
+                    continue;
+                }
+
+                $assignees[] = [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'email' => $user->email,
+                ];
+            }
+        } finally {
+            $registrar->setPermissionsTeamId($previousTeamId);
+        }
+
+        if ($assignees === []) {
+            $assignees = $users
+                ->map(static fn (User $user): array => [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $this->assigneesCache[$cacheKey] = $assignees;
     }
 }
