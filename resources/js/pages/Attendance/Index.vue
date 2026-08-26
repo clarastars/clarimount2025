@@ -321,79 +321,97 @@
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
-                        <div class="flex flex-col justify-center items-center gap-1">
-                          <Badge v-if="record.penalty?.action_text" :variant="getPenaltyVariant(record.penalty?.action_type)" class="px-3 py-1">
-                            {{ record.penalty.action_text }}
-                          </Badge>
-                          <span v-if="record.penalty?.late_minutes_deduction_amount != null && Number(record.penalty.late_minutes_deduction_amount) > 0" class="text-xs text-amber-600 dark:text-amber-400">
-                            {{ $t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(record.penalty.late_minutes_deduction_amount)) }}
-                          </span>
-                          <template v-if="!record.penalty?.action_text && !(record.penalty?.late_minutes_deduction_amount != null && Number(record.penalty.late_minutes_deduction_amount) > 0)">
-                            <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
-                          </template>
+                        <div v-if="hasPenalties(record)" class="flex flex-col justify-center items-center gap-2">
+                          <div
+                            v-for="penalty in record.penalties"
+                            :key="penalty.id"
+                            class="flex flex-col items-center gap-1"
+                          >
+                            <Badge v-if="penalty.action_text" :variant="getPenaltyVariant(penalty.action_type)" class="px-3 py-1">
+                              {{ penalty.action_text }}
+                            </Badge>
+                            <span v-if="penalty.late_minutes_deduction_amount != null && Number(penalty.late_minutes_deduction_amount) > 0" class="text-xs text-amber-600 dark:text-amber-400">
+                              {{ $t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(penalty.late_minutes_deduction_amount)) }}
+                            </span>
+                          </div>
+                        </div>
+                        <div v-else>
+                          <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-center">
-                          <span v-if="record.penalty?.reason_text" class="text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate" :title="record.penalty.reason_text">
-                            {{ record.penalty.reason_text }}
+                        <div v-if="hasPenalties(record)" class="flex flex-col items-center gap-2">
+                          <span
+                            v-for="penalty in record.penalties"
+                            :key="`reason-${penalty.id}`"
+                            class="text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate"
+                            :title="penalty.reason_text"
+                          >
+                            {{ penalty.reason_text }}
                           </span>
-                          <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
+                        </div>
+                        <div v-else>
+                          <span class="text-xs text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
                       <td class="px-6 py-4 text-center border-r border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-center items-center gap-2">
-                          <template v-if="record.penalty">
-                            <!-- Pending: Show Approve/Reject buttons -->
-                            <template v-if="canManageAttendanceAdjustments && record.penalty.approval_status === 'pending'">
-                              <Button 
-                                @click="approvePenalty(record.penalty.id)" 
-                                size="sm" 
-                                variant="default"
-                                class="bg-green-600 hover:bg-green-700 text-white"
-                              >
-                                <Icon name="Check" class="h-4 w-4 mr-1" />
-                                {{ $t('attendance.approve') }}
-                              </Button>
-                              <Button 
-                                @click="openRejectModal(record.penalty)" 
-                                size="sm" 
-                                variant="destructive"
-                              >
-                                <Icon name="X" class="h-4 w-4 mr-1" />
-                                {{ $t('attendance.reject') }}
-                              </Button>
+                        <div v-if="hasPenalties(record)" class="flex flex-col justify-center items-center gap-3">
+                          <div
+                            v-for="penalty in record.penalties"
+                            :key="`status-${penalty.id}`"
+                            class="flex flex-col items-center gap-1"
+                          >
+                            <template v-if="canManageAttendanceAdjustments && penalty.approval_status === 'pending'">
+                              <div class="flex justify-center items-center gap-2">
+                                <Button
+                                  @click="approvePenalty(penalty.id)"
+                                  size="sm"
+                                  variant="default"
+                                  class="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  <Icon name="Check" class="h-4 w-4 mr-1" />
+                                  {{ $t('attendance.approve') }}
+                                </Button>
+                                <Button
+                                  @click="openRejectModal(penalty)"
+                                  size="sm"
+                                  variant="destructive"
+                                >
+                                  <Icon name="X" class="h-4 w-4 mr-1" />
+                                  {{ $t('attendance.reject') }}
+                                </Button>
+                              </div>
                             </template>
-                            <!-- Approved: Show approved status -->
-                            <template v-else-if="record.penalty.approval_status === 'approved'">
+                            <template v-else-if="penalty.approval_status === 'approved'">
                               <Badge variant="default" class="bg-green-600 text-white">
                                 <Icon name="CheckCircle" class="h-3 w-3 mr-1" />
                                 {{ $t('attendance.approved') }}
                               </Badge>
-                              <span v-if="record.penalty.approved_at" class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ formatDate(record.penalty.approved_at) }}
+                              <span v-if="penalty.approved_at" class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ formatDate(penalty.approved_at) }}
                               </span>
                             </template>
-                            <!-- Rejected: Show rejected status -->
-                            <template v-else-if="record.penalty.approval_status === 'rejected'">
+                            <template v-else-if="penalty.approval_status === 'rejected'">
                               <Badge variant="destructive">
                                 <Icon name="XCircle" class="h-3 w-3 mr-1" />
                                 {{ $t('attendance.rejected') }}
                               </Badge>
-                              <div v-if="record.penalty.rejection_reason" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {{ record.penalty.rejection_reason }}
+                              <div v-if="penalty.rejection_reason" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ penalty.rejection_reason }}
                               </div>
-                              <a 
-                                v-if="record.penalty.rejection_attachment_path" 
-                                :href="getAttachmentUrl(record.penalty.rejection_attachment_path)"
+                              <a
+                                v-if="penalty.rejection_attachment_path"
+                                :href="getAttachmentUrl(penalty.rejection_attachment_path)"
                                 target="_blank"
                                 class="text-xs text-blue-600 hover:underline mt-1 block"
                               >
                                 {{ $t('attendance.view_attachment') }}
                               </a>
                             </template>
-                          </template>
-                          <span v-else class="text-xs text-gray-500 dark:text-gray-400">-</span>
+                          </div>
+                        </div>
+                        <div v-else>
+                          <span class="text-xs text-gray-500 dark:text-gray-400">-</span>
                         </div>
                       </td>
                       
@@ -858,6 +876,8 @@ const getPenaltyVariant = (actionType) => {
       return 'secondary'
   }
 }
+
+const hasPenalties = (record) => Array.isArray(record?.penalties) && record.penalties.length > 0
 
 const hasFailedSyncs = (importItem) => {
   return importItem.sync_batches.some(batch => batch.status === 'failed')

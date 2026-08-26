@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AttendancePenalty;
+use App\Models\AttendanceDailyPresentation;
 use App\Models\Employee;
 use App\Models\LaborLawRule;
 use App\Models\ZkDailyAttendance;
@@ -71,10 +72,10 @@ class AttendancePenaltyService
             [
                 'employee_id' => $employeeId,
                 'attendance_date' => $attendanceDate,
+                'violation_type' => $violationType,
             ],
             [
                 'late_minutes' => $lateMinutes,
-                'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
                 'action_type' => $rule->action_type,
                 'action_value' => $rule->action_value,
@@ -145,6 +146,51 @@ class AttendancePenaltyService
     }
 
     /**
+     * Process early departure penalties for one attendance date using the last punch
+     * captured in attendance_daily_presentations.
+     *
+     * @param  string  $attendanceDate  Date in Y-m-d format
+     */
+    public function processEarlyDeparturePenaltiesForDate(string $attendanceDate): void
+    {
+        $today = Carbon::today(self::TZ)->format('Y-m-d');
+        if ($attendanceDate > $today) {
+            return;
+        }
+
+        $rows = AttendanceDailyPresentation::query()
+            ->with(['employee.shift.workdays'])
+            ->whereDate('att_date', $attendanceDate)
+            ->get();
+
+        foreach ($rows as $row) {
+            $employee = $row->employee;
+
+            if (! $employee || ! $employee->shift || ! $employee->fingerprint_device_id) {
+                continue;
+            }
+
+            $attDate = Carbon::parse((string) $row->att_date, self::TZ)->startOfDay();
+            if ($employee->hire_date !== null && $attDate->lt(Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay())) {
+                continue;
+            }
+
+            $weekday = $attDate->dayOfWeek;
+            $workdays = $employee->shift->workdays
+                ->where('is_workday', true)
+                ->pluck('weekday')
+                ->map(static fn ($value): int => (int) $value)
+                ->all();
+
+            if (! in_array($weekday, $workdays, true)) {
+                continue;
+            }
+
+            $this->reconcileEarlyDeparturePenalty($row, $employee, $attendanceDate, $weekday);
+        }
+    }
+
+    /**
      * Determine violation type based on late minutes
      */
     private function determineViolationType(int $lateMinutes): ?string
@@ -157,6 +203,17 @@ class AttendancePenaltyService
             return 'late_30_60';
         } elseif ($lateMinutes >= 60) {
             return 'late_over_60';
+        }
+
+        return null;
+    }
+
+    private function determineEarlyDepartureViolationType(int $earlyMinutes): ?string
+    {
+        if ($earlyMinutes >= 0 && $earlyMinutes <= 1) {
+            return 'early_departure_0_1';
+        } elseif ($earlyMinutes > 1) {
+            return 'early_departure_over_1';
         }
 
         return null;
@@ -382,10 +439,10 @@ class AttendancePenaltyService
             [
                 'employee_id' => $employeeId,
                 'attendance_date' => $attendanceDate,
+                'violation_type' => $violationType,
             ],
             [
                 'late_minutes' => 0, // No late minutes for absence
-                'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
                 'action_type' => $rule->action_type,
                 'action_value' => $rule->action_value,
@@ -443,6 +500,121 @@ class AttendancePenaltyService
         $amount = round($lateMinutes * $minuteRate, 2);
 
         return $amount > 0 ? $amount : null;
+    }
+
+    /**
+     * Build/update one early-departure penalty row if the employee clocked out before shift end.
+     * Single-punch days are skipped to avoid false positives on missing checkout.
+     */
+    private function reconcileEarlyDeparturePenalty(
+        AttendanceDailyPresentation $row,
+        Employee $employee,
+        string $attendanceDate,
+        int $weekday
+    ): void {
+        $existing = AttendancePenalty::query()
+            ->where('employee_id', $employee->id)
+            ->where('attendance_date', $attendanceDate)
+            ->earlyDepartureViolations()
+            ->get();
+
+        if ($row->first_punch === null || $row->is_virtual_absence || (int) ($row->punch_count ?? 0) <= 1 || $row->last_punch === null) {
+            if ($existing->isNotEmpty()) {
+                AttendancePenalty::query()->whereKey($existing->pluck('id'))->delete();
+            }
+
+            return;
+        }
+
+        $expectedStart = Carbon::parse(
+            $attendanceDate.' '.$employee->shift->effectiveStartTimeStringForWeekday($weekday),
+            self::TZ
+        );
+        $expectedEnd = Carbon::parse(
+            $attendanceDate.' '.$employee->shift->effectiveEndTimeStringForWeekday($weekday),
+            self::TZ
+        );
+        $cutoff = Carbon::parse($attendanceDate.' 20:00:00', self::TZ);
+
+        if ($expectedEnd->lte($expectedStart)) {
+            $expectedEnd->addDay();
+        }
+
+        if ($expectedEnd->gt($cutoff)) {
+            if ($existing->isNotEmpty()) {
+                AttendancePenalty::query()->whereKey($existing->pluck('id'))->delete();
+            }
+
+            return;
+        }
+
+        $lastPunch = Carbon::parse((string) $row->last_punch)->setTimezone(self::TZ);
+        $earlyMinutes = max(0, (int) round(($expectedEnd->timestamp - $lastPunch->timestamp) / 60));
+
+        if ($earlyMinutes <= 0) {
+            if ($existing->isNotEmpty()) {
+                AttendancePenalty::query()->whereKey($existing->pluck('id'))->delete();
+            }
+
+            return;
+        }
+
+        $violationType = $this->determineEarlyDepartureViolationType($earlyMinutes);
+        if ($violationType === null) {
+            return;
+        }
+
+        $repeatNumber = $this->calculateRepeatNumber($employee->id, $violationType, $attendanceDate);
+
+        $rule = LaborLawRule::byViolationType($violationType)
+            ->byRepeatNumber($repeatNumber)
+            ->first();
+
+        if (! $rule) {
+            Log::warning('No labor law rule found for early departure', [
+                'employee_id' => $employee->id,
+                'attendance_date' => $attendanceDate,
+                'violation_type' => $violationType,
+                'repeat_number' => $repeatNumber,
+                'early_minutes' => $earlyMinutes,
+            ]);
+
+            return;
+        }
+
+        $actionText = $this->generateActionText(
+            $rule->action_type,
+            $rule->action_value,
+            $rule->action_value_gross_days,
+            $rule->action_value_basic_days
+        );
+
+        AttendancePenalty::updateOrCreate(
+            [
+                'employee_id' => $employee->id,
+                'attendance_date' => $attendanceDate,
+                'violation_type' => $violationType,
+            ],
+            [
+                'late_minutes' => 0,
+                'repeat_number' => $repeatNumber,
+                'action_type' => $rule->action_type,
+                'action_value' => $rule->action_value,
+                'action_value_gross_days' => $rule->action_value_gross_days,
+                'action_value_basic_days' => $rule->action_value_basic_days,
+                'action_text' => $actionText,
+                'reason_text' => $rule->reason_text,
+                'late_minutes_deduction_amount' => null,
+            ]
+        );
+
+        $obsoleteIds = $existing
+            ->where('violation_type', '!=', $violationType)
+            ->pluck('id');
+
+        if ($obsoleteIds->isNotEmpty()) {
+            AttendancePenalty::query()->whereKey($obsoleteIds)->delete();
+        }
     }
 
     /**

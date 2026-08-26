@@ -20,6 +20,12 @@ Schedule::job(new \App\Jobs\RebuildAttendancePresentationJob(null, true))
     ->dailyAt('01:15')
     ->description('Rebuild attendance_daily_presentations for current month (all companies)');
 
+// Evaluate early departures after the workday using the latest checkout punch for today.
+Schedule::job(new \App\Jobs\ProcessEarlyDeparturePenaltiesJob())
+    ->dailyAt('20:00')
+    ->timezone('Asia/Riyadh')
+    ->description('Process early departure attendance penalties for today');
+
 // Monthly leave accrual: annual entitlement ÷ 12 per active employee (e.g. 21 → 1.75/month)
 Schedule::job(new \App\Jobs\AccrueMonthlyLeaveBalanceJob())
     ->monthlyOn(1, '02:00')

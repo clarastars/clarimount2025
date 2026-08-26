@@ -88,6 +88,12 @@ const getViolationTypeLabel = (type: string) => {
         'late_15_30': t('labor_law_rules.violation_late_15_30'),
         'late_30_60': t('labor_law_rules.violation_late_30_60'),
         'late_over_60': t('labor_law_rules.violation_late_over_60'),
+        'early_departure_0_1': t('labor_law_rules.violation_early_departure_0_1'),
+        'early_departure_over_1': t('labor_law_rules.violation_early_departure_over_1'),
+        'early_departure_0_15': t('labor_law_rules.violation_early_departure_0_15'),
+        'early_departure_15_30': t('labor_law_rules.violation_early_departure_15_30'),
+        'early_departure_30_60': t('labor_law_rules.violation_early_departure_30_60'),
+        'early_departure_over_60': t('labor_law_rules.violation_early_departure_over_60'),
         'absent_without_excuse': t('labor_law_rules.violation_absent_without_excuse'),
         'absent_without_permission': t('labor_law_rules.violation_absent_without_permission'),
     }

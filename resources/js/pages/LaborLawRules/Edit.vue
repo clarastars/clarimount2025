@@ -63,6 +63,8 @@ const violationTypes = [
     { value: 'late_15_30', label: t('labor_law_rules.violation_late_15_30') },
     { value: 'late_30_60', label: t('labor_law_rules.violation_late_30_60') },
     { value: 'late_over_60', label: t('labor_law_rules.violation_late_over_60') },
+    { value: 'early_departure_0_1', label: t('labor_law_rules.violation_early_departure_0_1') },
+    { value: 'early_departure_over_1', label: t('labor_law_rules.violation_early_departure_over_1') },
     { value: 'absent_without_excuse', label: t('labor_law_rules.violation_absent_without_excuse') },
 ]
 

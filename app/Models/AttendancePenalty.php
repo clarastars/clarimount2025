@@ -133,13 +133,39 @@ class AttendancePenalty extends Model
         return ['late_0_15', 'late_15_30', 'late_30_60', 'late_over_60'];
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public static function earlyDepartureViolationTypes(): array
+    {
+        return [
+            'early_departure_0_1',
+            'early_departure_over_1',
+            // Legacy buckets kept so old data remains queryable and cleanable.
+            'early_departure_0_15',
+            'early_departure_15_30',
+            'early_departure_30_60',
+            'early_departure_over_60',
+        ];
+    }
+
     public function isLateViolation(): bool
     {
         return str_starts_with((string) $this->violation_type, 'late_');
     }
 
+    public function isEarlyDepartureViolation(): bool
+    {
+        return str_starts_with((string) $this->violation_type, 'early_departure_');
+    }
+
     public function scopeLateViolations($query)
     {
         return $query->whereIn('violation_type', self::lateViolationTypes());
+    }
+
+    public function scopeEarlyDepartureViolations($query)
+    {
+        return $query->whereIn('violation_type', self::earlyDepartureViolationTypes());
     }
 }

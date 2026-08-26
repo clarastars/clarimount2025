@@ -167,7 +167,7 @@ class AttendanceController extends Controller
                 'status_ar' => $p->status_ar,
                 'late_minutes' => $p->late_minutes,
                 'is_virtual' => $p->is_virtual_absence,
-                'penalty' => $penaltyMap->get($key),
+                'penalties' => $penaltyMap->get($key, []),
             ];
         });
 
@@ -628,7 +628,7 @@ class AttendanceController extends Controller
 
     /**
      * @param  \Illuminate\Support\Collection<int, AttendanceDailyPresentation>  $items
-     * @return \Illuminate\Support\Collection<string, AttendancePenalty>
+     * @return \Illuminate\Support\Collection<string, array<int, array<string, mixed>>>
      */
     private function penaltyMapForPresentationPage(\Illuminate\Support\Collection $items): \Illuminate\Support\Collection
     {
@@ -646,12 +646,32 @@ class AttendanceController extends Controller
         return AttendancePenalty::query()
             ->whereIn('employee_id', $employeeIds)
             ->whereIn('attendance_date', $dates)
+            ->orderBy('attendance_date')
+            ->orderBy('id')
             ->get()
-            ->keyBy(static function (AttendancePenalty $penalty) {
+            ->groupBy(static function (AttendancePenalty $penalty) {
                 $d = $penalty->attendance_date;
                 $dateStr = $d instanceof Carbon ? $d->format('Y-m-d') : (string) $d;
 
                 return $penalty->employee_id.'_'.$dateStr;
+            })
+            ->map(static function (\Illuminate\Support\Collection $penalties): array {
+                return $penalties->map(static function (AttendancePenalty $penalty): array {
+                    return [
+                        'id' => (int) $penalty->id,
+                        'violation_type' => (string) $penalty->violation_type,
+                        'action_type' => (string) $penalty->action_type,
+                        'action_text' => (string) $penalty->action_text,
+                        'reason_text' => (string) $penalty->reason_text,
+                        'late_minutes_deduction_amount' => $penalty->late_minutes_deduction_amount !== null
+                            ? (float) $penalty->late_minutes_deduction_amount
+                            : null,
+                        'approval_status' => (string) $penalty->approval_status,
+                        'approved_at' => $penalty->approved_at?->toIso8601String(),
+                        'rejection_reason' => $penalty->rejection_reason,
+                        'rejection_attachment_path' => $penalty->rejection_attachment_path,
+                    ];
+                })->values()->all();
             });
     }
 
