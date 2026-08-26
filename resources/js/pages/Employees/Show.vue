@@ -21,6 +21,12 @@
                                     <Badge :class="getStatusBadgeClass(employee.employment_status)">
                                         {{ t(`employees.status_${employee.employment_status}`) }}
                                     </Badge>
+                                    <Badge
+                                        v-if="employee.excluded_from_salary"
+                                        class="bg-orange-100 text-orange-800"
+                                    >
+                                        {{ t('employees.excluded_from_salary_badge') }}
+                                    </Badge>
                                     <Badge v-if="employee.employee_id" variant="outline" class="font-mono">
                                         #{{ employee.employee_id }}
                                     </Badge>
@@ -43,7 +49,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth"
+                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth || canExcludeFromSalary"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -75,6 +81,21 @@
                                 @click="syncFingerprintMonth"
                             >
                                 {{ isSyncingFingerprintMonth ? t('attendance.sync_fingerprint_month_processing') : t('attendance.sync_fingerprint_month') }}
+                            </Button>
+                            <Button
+                                v-if="canExcludeFromSalary"
+                                :variant="employee.excluded_from_salary ? 'default' : 'destructive'"
+                                size="sm"
+                                :disabled="isTogglingExcludeFromSalary"
+                                @click="toggleExcludeFromSalary"
+                            >
+                                {{
+                                    isTogglingExcludeFromSalary
+                                        ? '...'
+                                        : employee.excluded_from_salary
+                                          ? t('employees.include_in_salary')
+                                          : t('employees.exclude_from_salary')
+                                }}
                             </Button>
                             <Button v-if="canCreateLeaves" size="sm" as-child>
                                 <Link :href="route('employees.leaves.create', employee.id)">
@@ -417,6 +438,7 @@ interface Props {
     canUpdateEmployeeCustody?: boolean;
     canSettleEmployeeEntitlements?: boolean;
     canSyncEmployeeFingerprintMonth?: boolean;
+    canExcludeFromSalary?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -427,7 +449,9 @@ const canCreateLeaves = computed(() => props.canCreateLeaves ?? false);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
+const canExcludeFromSalary = computed(() => props.canExcludeFromSalary ?? false);
 const isSyncingFingerprintMonth = ref(false);
+const isTogglingExcludeFromSalary = ref(false);
 const showBasicSalary = ref(false);
 const maskedCurrency = '•••••• SAR';
 
@@ -526,6 +550,20 @@ const syncFingerprintMonth = () => {
         preserveScroll: true,
         onFinish: () => {
             isSyncingFingerprintMonth.value = false;
+        },
+    });
+};
+
+const toggleExcludeFromSalary = () => {
+    if (isTogglingExcludeFromSalary.value) {
+        return;
+    }
+
+    isTogglingExcludeFromSalary.value = true;
+    router.post(route('employees.exclude-from-salary', props.employee.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            isTogglingExcludeFromSalary.value = false;
         },
     });
 };

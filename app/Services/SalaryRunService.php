@@ -14,6 +14,7 @@ use App\Models\SalaryRun;
 use App\Models\SalaryRunItem;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SalaryRunService
 {
@@ -24,11 +25,24 @@ class SalaryRunService
     ) {}
 
     /**
-     * Create or update salary run for a company, year, and month
+     * Create or refresh a salary run for a company, year, and month.
+     * Refuses when an active (non-deleted) run already exists for that period.
      */
     public function createOrUpdateSalaryRun(int $companyId, int $year, int $month): SalaryRun
     {
         return DB::transaction(function () use ($companyId, $year, $month) {
+            $existing = SalaryRun::query()
+                ->where('company_id', $companyId)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->first();
+
+            if ($existing !== null) {
+                throw ValidationException::withMessages([
+                    'month' => [__('messages.salary_runs.already_exists_for_month')],
+                ]);
+            }
+
             // Soft-deleted runs still occupy the unique (company, year, month) key.
             $trashed = SalaryRun::onlyTrashed()
                 ->where('company_id', $companyId)
@@ -53,9 +67,10 @@ class SalaryRunService
                 ]
             );
 
-            // Get all active employees for the company
+            // Get all active employees for the company (skip those suspended from payroll)
             $employees = Employee::where('company_id', $companyId)
                 ->where('employment_status', 'active')
+                ->includedInSalary()
                 ->get();
 
             // Operational month: penalties, manual deductions/additions, unpaid leave overlap (custom boundaries when set).

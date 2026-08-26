@@ -79,7 +79,7 @@
                         </Link>
                       </Button>
                       <Button
-                        v-if="canDeleteSalaryRuns"
+                        v-if="canDeleteSalaryRuns && salaryRun.status !== 'finalized'"
                         variant="ghost"
                         size="sm"
                         class="text-red-600 hover:text-red-700"
@@ -172,9 +172,22 @@
                 v-model="form.month"
                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
+                <option
+                  v-for="m in 12"
+                  :key="m"
+                  :value="m"
+                  :disabled="isMonthOccupied(Number(form.year), m)"
+                >
+                  {{ getMonthName(m) }}{{ isMonthOccupied(Number(form.year), m) ? ` — ${t('salary_runs.month_already_has_run')}` : '' }}
+                </option>
               </select>
+              <p v-if="form.errors.month" class="mt-1 text-sm text-destructive">
+                {{ form.errors.month }}
+              </p>
             </div>
+            <p v-if="form.errors.year" class="text-sm text-destructive">
+              {{ form.errors.year }}
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" @click="closeCreateModal">
@@ -202,7 +215,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import Icon from '@/components/Icon.vue';
 import Heading from '@/components/Heading.vue';
 import { useI18n } from 'vue-i18n';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Company, BreadcrumbItem } from '@/types';
 
 const { t, locale } = useI18n();
@@ -211,6 +224,11 @@ interface Props {
   company: Company;
   canCreateSalaryRuns?: boolean;
   canDeleteSalaryRuns?: boolean;
+  occupiedPeriods?: Array<{
+    year: number;
+    month: number;
+    status: string;
+  }>;
   salaryRuns: {
     data: any[];
     links: any[];
@@ -221,6 +239,60 @@ interface Props {
 const props = defineProps<Props>();
 const canCreateSalaryRuns = computed(() => props.canCreateSalaryRuns === true);
 const canDeleteSalaryRuns = computed(() => props.canDeleteSalaryRuns === true);
+const occupiedPeriods = computed(() => props.occupiedPeriods ?? []);
+
+const isMonthOccupied = (year: number, month: number): boolean =>
+  occupiedPeriods.value.some((period) => period.year === year && period.month === month);
+
+const firstAvailableMonth = (year: number): number => {
+  for (let month = 1; month <= 12; month++) {
+    if (!isMonthOccupied(year, month)) {
+      return month;
+    }
+  }
+
+  return 1;
+};
+
+const defaultCreatePeriod = (): { year: number; month: number } => {
+  if (occupiedPeriods.value.length === 0) {
+    const now = new Date();
+
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+    };
+  }
+
+  let latest = occupiedPeriods.value[0];
+  for (const period of occupiedPeriods.value) {
+    if (
+      period.year > latest.year
+      || (period.year === latest.year && period.month > latest.month)
+    ) {
+      latest = period;
+    }
+  }
+
+  let year = latest.year;
+  let month = latest.month + 1;
+
+  if (month > 12) {
+    year += 1;
+    month = 1;
+  }
+
+  // Skip any occupied gaps until the next free month.
+  while (isMonthOccupied(year, month)) {
+    month += 1;
+    if (month > 12) {
+      year += 1;
+      month = 1;
+    }
+  }
+
+  return { year, month };
+};
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
   {
@@ -249,15 +321,33 @@ const form = useForm({
   month: new Date().getMonth() + 1,
 });
 
+const onYearChanged = () => {
+  const year = Number(form.year);
+  if (!Number.isFinite(year)) {
+    return;
+  }
+
+  if (isMonthOccupied(year, Number(form.month))) {
+    form.month = firstAvailableMonth(year);
+  }
+};
+
+watch(() => form.year, () => {
+  onYearChanged();
+});
+
 const openCreateModal = () => {
-  form.year = new Date().getFullYear();
-  form.month = new Date().getMonth() + 1;
+  form.clearErrors();
+  const period = defaultCreatePeriod();
+  form.year = period.year;
+  form.month = period.month;
   createModalOpen.value = true;
 };
 
 const closeCreateModal = () => {
   createModalOpen.value = false;
   form.reset();
+  form.clearErrors();
 };
 
 const createSalaryRun = () => {
@@ -288,7 +378,11 @@ const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString();
 };
 
-const deleteSalaryRun = (salaryRun: { id: number; year: number; month: number }) => {
+const deleteSalaryRun = (salaryRun: { id: number; year: number; month: number; status?: string }) => {
+  if (salaryRun.status === 'finalized') {
+    return;
+  }
+
   if (!confirm(t('salary_runs.delete_confirmation', { month: getMonthName(salaryRun.month), year: salaryRun.year }))) {
     return;
   }

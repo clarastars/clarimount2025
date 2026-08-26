@@ -138,6 +138,7 @@ export interface Employee {
     departure_date?: string;
     departure_reason?: string;
     employment_status: 'active' | 'inactive' | 'terminated';
+    excluded_from_salary?: boolean;
     location_id?: number;
     work_address?: string;
     fingerprint_device_id?: string;

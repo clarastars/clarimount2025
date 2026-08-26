@@ -111,6 +111,24 @@ trait AuthorizesEmployeeAccess
         return $this->canAccessEmployee($user, $employee);
     }
 
+    protected function canExcludeEmployeeFromSalary(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.exclude-from-salary',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
     protected function canUpdateEmployeeCustody(User $user): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -460,6 +478,12 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanSyncEmployeeFingerprintMonth(User $user, Employee $employee): void
     {
         abort_unless($this->canSyncEmployeeFingerprintMonth($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanExcludeEmployeeFromSalary(User $user, Employee $employee): void
+    {
+        abort_unless($this->canExcludeEmployeeFromSalary($user, $employee), 403);
+        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     protected function abortUnlessCanSettleEmployeeEntitlementsForEmployee(User $user, Employee $employee): void

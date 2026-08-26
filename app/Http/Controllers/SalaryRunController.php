@@ -130,9 +130,21 @@ class SalaryRunController extends Controller
             ->orderBy('month', 'desc')
             ->paginate(12);
 
+        $occupiedPeriods = SalaryRun::query()
+            ->where('company_id', $company->id)
+            ->get(['year', 'month', 'status'])
+            ->map(static fn (SalaryRun $run): array => [
+                'year' => (int) $run->year,
+                'month' => (int) $run->month,
+                'status' => (string) $run->status,
+            ])
+            ->values()
+            ->all();
+
         return Inertia::render('SalaryRuns/Index', [
             'company' => $company,
             'salaryRuns' => $salaryRuns,
+            'occupiedPeriods' => $occupiedPeriods,
             'canCreateSalaryRuns' => $this->canCreateSalaryRun($user, $company),
             'canDeleteSalaryRuns' => $this->canDeleteSalaryRun($user, $company),
         ]);
@@ -222,7 +234,7 @@ class SalaryRunController extends Controller
 
         return redirect()
             ->route('salary-runs.show', [$company, $validated['year'], $validated['month']])
-            ->with('success', __('Salary run created successfully.'));
+            ->with('success', __('messages.salary_runs.created_successfully'));
     }
 
     /**
@@ -238,6 +250,10 @@ class SalaryRunController extends Controller
 
         if ($salaryRun->company_id !== $company->id) {
             abort(403, 'Salary run does not belong to this company.');
+        }
+
+        if ($salaryRun->isFinalized()) {
+            return back()->with('error', __('messages.salary_runs.cannot_delete_finalized'));
         }
 
         $salaryRun->delete();

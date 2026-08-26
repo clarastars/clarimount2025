@@ -36,6 +36,7 @@ class TeamPermissionController extends Controller
         ['name' => 'employees.custody.update', 'label' => 'إمكانية تحديث العهدة'],
         ['name' => 'employees.entitlements.settle', 'label' => 'تسوية مستحقات الموظف'],
         ['name' => 'employees.entitlements.approve', 'label' => 'اعتماد تسوية مستحقات الموظف (سلسلة الاعتمادات)'],
+        ['name' => 'employees.exclude-from-salary', 'label' => 'تعليق الموظف من مسير الرواتب / إعادته'],
         ['name' => 'employees.global-search', 'label' => 'البحث العلوي عن الموظفين (شركات الدور فقط)'],
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],
         ['name' => 'attendance.adjustments.manage', 'label' => 'إدارة الخصومات والإضافات واعتماد ورفض الجزاءات'],

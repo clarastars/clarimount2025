@@ -51,6 +51,7 @@ class Employee extends Model
         'departure_date',
         'departure_reason',
         'employment_status',
+        'excluded_from_salary',
         'id_number',
         'residence_expiry_date',
         'contract_end_date',
@@ -92,6 +93,7 @@ class Employee extends Model
         'annual_leave_balance' => 'integer',
         'leave_accrued_balance' => 'decimal:2',
         'leave_days_used' => 'decimal:2',
+        'excluded_from_salary' => 'boolean',
     ];
 
     protected $appends = [
@@ -272,5 +274,15 @@ class Employee extends Model
     public function isActive(): bool
     {
         return $this->employment_status === 'active';
+    }
+
+    public function isExcludedFromSalary(): bool
+    {
+        return (bool) $this->excluded_from_salary;
+    }
+
+    public function scopeIncludedInSalary($query)
+    {
+        return $query->where('excluded_from_salary', false);
     }
 }

@@ -517,7 +517,26 @@ class EmployeeController extends Controller
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
+            'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
         ]);
+    }
+
+    public function toggleExcludeFromSalary(Employee $employee): RedirectResponse
+    {
+        $user = Auth::user();
+        $this->abortUnlessCanExcludeEmployeeFromSalary($user, $employee);
+
+        $excluded = ! $employee->isExcludedFromSalary();
+
+        $employee->update([
+            'excluded_from_salary' => $excluded,
+        ]);
+
+        $message = $excluded
+            ? __('messages.employees.excluded_from_salary_success')
+            : __('messages.employees.included_in_salary_success');
+
+        return back()->with('success', $message);
     }
 
     public function syncFingerprintMonth(
