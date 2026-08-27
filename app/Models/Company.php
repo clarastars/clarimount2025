@@ -16,6 +16,10 @@ class Company extends Model
 
     public const SETTING_AUTO_APPROVE_PENALTIES = 'attendance.auto_approve_penalties';
 
+    public const SETTING_FLEXIBLE_TIME_ENABLED = 'attendance.flexible_time_enabled';
+
+    public const SETTING_FLEXIBLE_TIME_MINUTES = 'attendance.flexible_time_minutes';
+
     protected $fillable = [
         'name_en',
         'name_ar',
@@ -202,5 +206,23 @@ class Company extends Model
     public function autoApproveAttendancePenalties(): bool
     {
         return (bool) $this->getSetting(self::SETTING_AUTO_APPROVE_PENALTIES, false);
+    }
+
+    public function flexibleTimeEnabled(): bool
+    {
+        return (bool) $this->getSetting(self::SETTING_FLEXIBLE_TIME_ENABLED, false);
+    }
+
+    /**
+     * Flexible window in minutes before and after the shift schedule.
+     * Returns 0 when flexible time is disabled or not configured.
+     */
+    public function flexibleTimeMinutes(): int
+    {
+        if (! $this->flexibleTimeEnabled()) {
+            return 0;
+        }
+
+        return max(0, (int) $this->getSetting(self::SETTING_FLEXIBLE_TIME_MINUTES, 0));
     }
 }

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AttendanceDailyPresentation;
 use App\Models\AttendancePenalty;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ZkDailyAttendance;
 use Carbon\Carbon;
@@ -21,7 +22,8 @@ class AttendancePresentationRebuildService
 
     public function __construct(
         private AttendancePenaltyService $penaltyService,
-        private OperationalMonthService $operationalMonthService
+        private OperationalMonthService $operationalMonthService,
+        private FlexibleAttendanceTimingService $flexibleAttendanceTimingService,
     ) {}
 
     public function rebuildDateForAllCompanies(string $attDateYmd): void
@@ -159,8 +161,18 @@ class AttendancePresentationRebuildService
 
         $this->applyAbsencePenaltyLogic($rows, $employeesKeyed, $shiftWorkdayMaps);
 
+        $company = Company::find($companyId);
+        $flexibleEnabled = $company?->flexibleTimeEnabled() ?? false;
+        $flexibleMinutes = $company?->flexibleTimeMinutes() ?? 0;
+
         foreach ($rows as $i => $row) {
-            $rows[$i] = $this->withStatusAndLateMinutes($row, $employeesKeyed, $shiftWorkdayMaps);
+            $rows[$i] = $this->withStatusAndLateMinutes(
+                $row,
+                $employeesKeyed,
+                $shiftWorkdayMaps,
+                $flexibleEnabled,
+                $flexibleMinutes
+            );
             $this->reconcileLatePenalty($rows[$i]);
         }
 
@@ -256,8 +268,18 @@ class AttendancePresentationRebuildService
 
         $this->applyAbsencePenaltyLogic($rows, $employeesKeyed, $shiftWorkdayMaps);
 
+        $company = $employee->company_id ? Company::find($employee->company_id) : null;
+        $flexibleEnabled = $company?->flexibleTimeEnabled() ?? false;
+        $flexibleMinutes = $company?->flexibleTimeMinutes() ?? 0;
+
         foreach ($rows as $i => $row) {
-            $rows[$i] = $this->withStatusAndLateMinutes($row, $employeesKeyed, $shiftWorkdayMaps);
+            $rows[$i] = $this->withStatusAndLateMinutes(
+                $row,
+                $employeesKeyed,
+                $shiftWorkdayMaps,
+                $flexibleEnabled,
+                $flexibleMinutes
+            );
             $this->reconcileLatePenalty($rows[$i]);
         }
 
@@ -375,8 +397,13 @@ class AttendancePresentationRebuildService
      * @param  array<int, array<int>>  $shiftWorkdayMaps
      * @return array<string, mixed>
      */
-    private function withStatusAndLateMinutes(array $row, $employeesKeyed, array $shiftWorkdayMaps): array
-    {
+    private function withStatusAndLateMinutes(
+        array $row,
+        $employeesKeyed,
+        array $shiftWorkdayMaps,
+        bool $flexibleEnabled = false,
+        int $flexibleMinutes = 0,
+    ): array {
         $employee = $employeesKeyed->get($row['employee_id']);
         if (! $employee || ! $employee->shift) {
             $row['status_ar'] = 'غير محدد';
@@ -412,11 +439,21 @@ class AttendancePresentationRebuildService
 
         $dateStr = $row['att_date'];
         $expectedStartTime = $employee->shift->effectiveStartTimeStringForWeekday($weekday);
-        $expectedStart = Carbon::parse($dateStr . ' ' . $expectedStartTime, self::TZ);
+        $expectedEndTime = $employee->shift->effectiveEndTimeStringForWeekday($weekday);
+        $expectedStart = Carbon::parse($dateStr.' '.$expectedStartTime, self::TZ);
+        $expectedEnd = Carbon::parse($dateStr.' '.$expectedEndTime, self::TZ);
         $firstPunch = Carbon::parse($row['first_punch'])->setTimezone(self::TZ);
-        $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
-        $grace = (int) ($employee->shift->grace_minutes ?? 0);
-        $lateMinutes = max(0, $actualLateMinutes - $grace);
+
+        $timing = $this->flexibleAttendanceTimingService->resolveDayTiming(
+            $expectedStart,
+            $expectedEnd,
+            $firstPunch,
+            $flexibleEnabled,
+            $flexibleMinutes,
+            (int) ($employee->shift->grace_minutes ?? 0),
+        );
+
+        $lateMinutes = $timing['late_minutes'];
         $row['status_ar'] = $lateMinutes > 0 ? 'متأخر' : 'في الموعد';
         $row['late_minutes'] = $lateMinutes;
 

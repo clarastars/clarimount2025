@@ -347,7 +347,11 @@ class AttendanceController extends Controller
             }
 
             // Process each attendance record
-            $allRecords = $allRecords->map(function ($record) use ($employees, $shiftWorkdayMaps) {
+            $flexibleEnabled = $company->flexibleTimeEnabled();
+            $flexibleMinutes = $company->flexibleTimeMinutes();
+            $timingService = app(\App\Services\FlexibleAttendanceTimingService::class);
+
+            $allRecords = $allRecords->map(function ($record) use ($employees, $shiftWorkdayMaps, $flexibleEnabled, $flexibleMinutes, $timingService) {
                 $employee = $employees->get($record->employee_id);
                 $date = $record->att_date->format('Y-m-d');
 
@@ -377,14 +381,24 @@ class AttendanceController extends Controller
                     return $record;
                 }
 
-                // Calculate late minutes (respect day-specific shift_workdays override when set)
                 $expectedStart = Carbon::parse(
                     $date . ' ' . $employee->shift->effectiveStartTimeStringForWeekday($weekday),
                     'Asia/Riyadh'
                 );
+                $expectedEnd = Carbon::parse(
+                    $date . ' ' . $employee->shift->effectiveEndTimeStringForWeekday($weekday),
+                    'Asia/Riyadh'
+                );
                 $firstPunch = Carbon::parse($record->first_punch)->setTimezone('Asia/Riyadh');
-                $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
-                $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);
+                $timing = $timingService->resolveDayTiming(
+                    $expectedStart,
+                    $expectedEnd,
+                    $firstPunch,
+                    $flexibleEnabled,
+                    $flexibleMinutes,
+                    (int) ($employee->shift->grace_minutes ?? 0),
+                );
+                $lateMinutes = $timing['late_minutes'];
 
                 // Set status based on late minutes
                 $record->status_ar = $lateMinutes > 0 ? 'متأخر' : 'في الموعد';

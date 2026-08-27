@@ -195,7 +195,7 @@ class ZkAttlogIngestService
     private function calculateAttendancePenalty(ZkDailyAttendance $attendance, string $attDate): void
     {
         // Get employee from device_pin
-        $employee = Employee::with('shift.workdays')
+        $employee = Employee::with(['shift.workdays', 'company'])
             ->where('fingerprint_device_id', $attendance->device_pin)
             ->first();
 
@@ -224,18 +224,27 @@ class ZkAttlogIngestService
             return;
         }
 
-        // Calculate late minutes (same logic as AttendanceController; per-weekday start when set)
         $expectedStart = Carbon::parse(
             $attDate.' '.$employee->shift->effectiveStartTimeStringForWeekday($weekday),
             'Asia/Riyadh'
         );
+        $expectedEnd = Carbon::parse(
+            $attDate.' '.$employee->shift->effectiveEndTimeStringForWeekday($weekday),
+            'Asia/Riyadh'
+        );
         $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
 
-        // Calculate signed difference in minutes
-        $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
+        $company = $employee->company;
+        $timing = app(FlexibleAttendanceTimingService::class)->resolveDayTiming(
+            $expectedStart,
+            $expectedEnd,
+            $firstPunch,
+            $company?->flexibleTimeEnabled() ?? false,
+            $company?->flexibleTimeMinutes() ?? 0,
+            (int) ($employee->shift->grace_minutes ?? 0),
+        );
 
-        // Apply grace period
-        $lateMinutes = max(0, $actualLateMinutes - $employee->shift->grace_minutes);
+        $lateMinutes = $timing['late_minutes'];
 
         // Only calculate penalty if late
         if ($lateMinutes > 0) {

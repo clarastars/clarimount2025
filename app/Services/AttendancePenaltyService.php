@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AttendancePenalty;
 use App\Models\AttendanceDailyPresentation;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\LaborLawRule;
 use App\Models\ZkDailyAttendance;
@@ -15,9 +16,12 @@ use Illuminate\Support\Facades\Log;
 
 class AttendancePenaltyService
 {
+    private const TZ = 'Asia/Riyadh';
+
     public function __construct(
         private OperationalMonthService $operationalMonthService,
         private AttendancePenaltyAutoApprovalService $autoApprovalService,
+        private FlexibleAttendanceTimingService $flexibleAttendanceTimingService,
     ) {}
 
     /**
@@ -99,13 +103,13 @@ class AttendancePenaltyService
      */
     public function calculatePenaltyForDailyAttendance(ZkDailyAttendance $attendance, string $attDate): ?int
     {
-        $employee = Employee::with('shift.workdays')->where('fingerprint_device_id', $attendance->device_pin)->first();
+        $employee = Employee::with(['shift.workdays', 'company'])->where('fingerprint_device_id', $attendance->device_pin)->first();
 
         if (! $employee || ! $employee->shift) {
             return null;
         }
 
-        $attDateCarbon = Carbon::parse($attDate, 'Asia/Riyadh');
+        $attDateCarbon = Carbon::parse($attDate, self::TZ);
         $weekday = $attDateCarbon->dayOfWeek;
 
         $workdays = $employee->shift->workdays()->where('is_workday', true)->pluck('weekday')->toArray();
@@ -118,11 +122,22 @@ class AttendancePenaltyService
         }
 
         $expectedStartTime = $employee->shift->effectiveStartTimeStringForWeekday($weekday);
-        $expectedStart = Carbon::parse($attDate.' '.$expectedStartTime, 'Asia/Riyadh');
-        $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone('Asia/Riyadh');
-        $actualLateMinutes = (int) round(($firstPunch->timestamp - $expectedStart->timestamp) / 60);
-        $graceMinutes = (int) ($employee->shift->grace_minutes ?? 0);
-        $lateMinutes = max(0, $actualLateMinutes - $graceMinutes);
+        $expectedEndTime = $employee->shift->effectiveEndTimeStringForWeekday($weekday);
+        $expectedStart = Carbon::parse($attDate.' '.$expectedStartTime, self::TZ);
+        $expectedEnd = Carbon::parse($attDate.' '.$expectedEndTime, self::TZ);
+        $firstPunch = Carbon::parse($attendance->first_punch)->setTimezone(self::TZ);
+
+        $company = $employee->company;
+        $timing = $this->flexibleAttendanceTimingService->resolveDayTiming(
+            $expectedStart,
+            $expectedEnd,
+            $firstPunch,
+            $company?->flexibleTimeEnabled() ?? false,
+            $company?->flexibleTimeMinutes() ?? 0,
+            (int) ($employee->shift->grace_minutes ?? 0),
+        );
+
+        $lateMinutes = $timing['late_minutes'];
 
         if ($lateMinutes > 0) {
             $this->calculatePenalty($employee->id, $attDate, $lateMinutes);
@@ -159,7 +174,7 @@ class AttendancePenaltyService
         }
 
         $rows = AttendanceDailyPresentation::query()
-            ->with(['employee.shift.workdays'])
+            ->with(['employee.shift.workdays', 'employee.company'])
             ->whereDate('att_date', $attendanceDate)
             ->get();
 
@@ -536,11 +551,21 @@ class AttendancePenaltyService
         );
         $cutoff = Carbon::parse($attendanceDate.' 20:00:00', self::TZ);
 
-        if ($expectedEnd->lte($expectedStart)) {
-            $expectedEnd->addDay();
-        }
+        $company = $employee->company ?? ($employee->company_id ? Company::find($employee->company_id) : null);
+        $firstPunch = Carbon::parse((string) $row->first_punch)->setTimezone(self::TZ);
+        $timing = $this->flexibleAttendanceTimingService->resolveDayTiming(
+            $expectedStart,
+            $expectedEnd,
+            $firstPunch,
+            $company?->flexibleTimeEnabled() ?? false,
+            $company?->flexibleTimeMinutes() ?? 0,
+            (int) ($employee->shift->grace_minutes ?? 0),
+        );
 
-        if ($expectedEnd->gt($cutoff)) {
+        $requiredDeparture = $timing['required_departure'];
+
+        // Night / late-ending shifts: only evaluate when the required checkout is by 20:00.
+        if ($requiredDeparture->gt($cutoff)) {
             if ($existing->isNotEmpty()) {
                 AttendancePenalty::query()->whereKey($existing->pluck('id'))->delete();
             }
@@ -549,7 +574,7 @@ class AttendancePenaltyService
         }
 
         $lastPunch = Carbon::parse((string) $row->last_punch)->setTimezone(self::TZ);
-        $earlyMinutes = max(0, (int) round(($expectedEnd->timestamp - $lastPunch->timestamp) / 60));
+        $earlyMinutes = $this->flexibleAttendanceTimingService->calculateEarlyMinutes($requiredDeparture, $lastPunch);
 
         if ($earlyMinutes <= 0) {
             if ($existing->isNotEmpty()) {
@@ -577,6 +602,8 @@ class AttendancePenaltyService
                 'violation_type' => $violationType,
                 'repeat_number' => $repeatNumber,
                 'early_minutes' => $earlyMinutes,
+                'required_departure' => $requiredDeparture->toDateTimeString(),
+                'uses_flexible_time' => $timing['uses_flexible_time'],
             ]);
 
             return;

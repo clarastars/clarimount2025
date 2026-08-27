@@ -64,11 +64,19 @@ const sidebarNavItems = computed((): NavItem[] => {
             title: t('settings.operational_month'),
             href: '/settings/operational-month',
         },
-        {
-            title: t('settings.employee_global_search'),
-            href: '/settings/employee-global-search',
-        },
     ];
+
+    if (canAccessSettings.value) {
+        items.push({
+            title: t('settings.flexible_attendance'),
+            href: '/settings/flexible-attendance',
+        });
+    }
+
+    items.push({
+        title: t('settings.employee_global_search'),
+        href: '/settings/employee-global-search',
+    });
 
     if (canAccessSettings.value) {
         items.push(

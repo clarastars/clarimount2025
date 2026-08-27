@@ -8,6 +8,7 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\EmployeeReferenceDataController;
 use App\Http\Controllers\Settings\EmailTestController;
 use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
+use App\Http\Controllers\Settings\FlexibleAttendanceSettingsController;
 use App\Http\Controllers\Settings\SalaryCertificateFeeSettingsController;
 use App\Http\Controllers\Settings\MissingHireDateExportController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
@@ -83,6 +84,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('settings/operational-month', [OperationalMonthSettingsController::class, 'edit'])->name('settings.operational-month.edit');
         Route::put('settings/operational-month', [OperationalMonthSettingsController::class, 'update'])->name('settings.operational-month.update');
+        Route::get('settings/flexible-attendance', [FlexibleAttendanceSettingsController::class, 'edit'])->name('settings.flexible-attendance.edit');
+        Route::put('settings/flexible-attendance', [FlexibleAttendanceSettingsController::class, 'update'])->name('settings.flexible-attendance.update');
         Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
         Route::get('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'edit'])->name('settings.salary-certificate-fee.edit');
