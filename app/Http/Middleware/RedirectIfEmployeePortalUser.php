@@ -127,6 +127,7 @@ class RedirectIfEmployeePortalUser
                 'employees.destroy',
                 'employees.fingerprint-link',
                 'employees.fingerprint-device',
+                'employees.exclude-from-salary',
                 'employees.expiring-documents.index',
                 'employees.documents.store',
                 'employees.documents.destroy',
@@ -141,6 +142,15 @@ class RedirectIfEmployeePortalUser
                 'employee-debts.store',
                 'employee-debts.update',
                 'employee-debts.destroy',
+            ]);
+        }
+
+        if ($can('employees.exclude-from-salary')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.exclude-from-salary',
+                'api.employees.search',
             ]);
         }
 
