@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
-use App\Models\Employee;
 use App\Models\SalaryRun;
+use App\Models\SalaryRunItem;
+use App\Services\SalaryRunExportRowBuilder;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\RegistersEventListeners;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -23,7 +24,8 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
     use RegistersEventListeners;
 
     public function __construct(
-        private SalaryRun $salaryRun
+        private SalaryRun $salaryRun,
+        private SalaryRunExportRowBuilder $rowBuilder = new SalaryRunExportRowBuilder,
     ) {}
 
     public function collection()
@@ -56,193 +58,29 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
 
     public function map($item): array
     {
-        $employee = $item->employee;
-        $employeeName = '';
-        if ($employee) {
-            $parts = [
-                trim((string) ($employee->first_name ?? '')),
-                trim((string) ($employee->father_name ?? '')),
-                trim((string) ($employee->last_name ?? '')),
-            ];
-            $employeeName = implode(' ', array_filter($parts, static fn (string $p): bool => $p !== ''));
-        }
-        $debtTotal = 0;
-        if (is_array($item->debt_deductions)) {
-            foreach ($item->debt_deductions as $d) {
-                $debtTotal += (float) ($d['amount'] ?? 0);
-            }
+        /** @var SalaryRunItem $item */
+        if ($this->salaryRun->isFinalized()) {
+            return $this->mapFinalizedItem($item);
         }
 
-        $factor = $this->resolveExportSalaryFactor($item, $employee);
-
-        $housing = $this->prorateAllowanceForExport(
-            $employee && $employee->allowance_housing !== null ? (float) $employee->allowance_housing : 0,
-            $factor,
+        return $this->rowBuilder->snapshotToExcelRow(
+            $this->rowBuilder->buildLiveSnapshot($item, $item->employee)
         );
-        $transport = $this->prorateAllowanceForExport(
-            $employee && $employee->allowance_transportation !== null ? (float) $employee->allowance_transportation : 0,
-            $factor,
-        );
-        $other = $this->prorateAllowanceForExport(
-            $employee && $employee->allowance_other !== null ? (float) $employee->allowance_other : 0,
-            $factor,
-        );
-        $food = $this->prorateAllowanceForExport(
-            $employee && $employee->allowance_food !== null ? (float) $employee->allowance_food : 0,
-            $factor,
-        );
-        $personalCar = $this->prorateAllowanceForExport(
-            $employee && $employee->allowance_personal_car !== null ? (float) $employee->allowance_personal_car : 0,
-            $factor,
-        );
-        $itemAllowances = $item->allowances !== null ? (float) $item->allowances : 0;
-        $detailedSum = $housing + $transport + $other + $food + $personalCar;
-        $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : 0.0;
-        $manualAdditions = $this->sumManualAdditionsForExport($item);
-        $additionalAllowances = round($additionalAllowances + $manualAdditions, 2);
-        [
-            $penaltiesColumnTotal,
-            $trafficViolationTotal,
-            $absenceTotal,
-            $attestationsTotal,
-        ] = $this->splitTotalsForExportColumns($item);
-
-        return [
-            $employeeName,
-            $item->basic_salary !== null ? (float) $item->basic_salary : '',
-            $housing ?: '',
-            $transport ?: '',
-            '', // بدل انتقالات - لا يوجد في النظام
-            $other ?: '',
-            $food ?: '',
-            $personalCar ?: '',
-            $additionalAllowances > 0 ? $additionalAllowances : '',
-            $item->unpaid_leave_total !== null ? (float) $item->unpaid_leave_total : '',
-            $debtTotal > 0 ? $debtTotal : '',
-            $trafficViolationTotal > 0 ? $trafficViolationTotal : '',
-            $penaltiesColumnTotal > 0 ? $penaltiesColumnTotal : '',
-            $item->social_insurance_deduction_total !== null ? (float) $item->social_insurance_deduction_total : '',
-            $absenceTotal > 0 ? $absenceTotal : '',
-            $attestationsTotal > 0 ? $attestationsTotal : '',
-            $item->net_salary !== null ? (float) $item->net_salary : '',
-        ];
     }
 
     /**
-     * @return array{0: float, 1: float, 2: float, 3: float}
+     * @return array<int, float|string>
      */
-    private function splitTotalsForExportColumns(object $item): array
+    private function mapFinalizedItem(SalaryRunItem $item): array
     {
-        $penaltiesTotal = 0.0;
-        $trafficViolationTotal = 0.0;
-        $absenceTotal = 0.0;
-        $attestationsTotal = 0.0;
-        $breakdown = is_array($item->breakdown ?? null) ? $item->breakdown : [];
+        $snapshot = is_array($item->export_snapshot) ? $item->export_snapshot : null;
 
-        foreach ($breakdown as $line) {
-            if (! is_array($line)) {
-                continue;
-            }
-
-            if (($line['source'] ?? null) === 'manual_addition') {
-                continue;
-            }
-
-            if (($line['source'] ?? null) !== 'penalty') {
-                if (($line['source'] ?? null) !== 'manual_deduction') {
-                    continue;
-                }
-
-                $amount = (float) ($line['amount'] ?? 0);
-                if ($amount <= 0) {
-                    continue;
-                }
-
-                $deductionType = (string) ($line['deduction_type'] ?? '');
-                if ($deductionType === 'absence') {
-                    $absenceTotal += $amount;
-                } elseif ($deductionType === 'traffic_violation') {
-                    $trafficViolationTotal += $amount;
-                } elseif ($deductionType === 'attestations') {
-                    $attestationsTotal += $amount;
-                } else {
-                    $penaltiesTotal += $amount;
-                }
-
-                continue;
-            }
-
-            $amount = (float) ($line['amount'] ?? 0);
-            if ($amount <= 0) {
-                continue;
-            }
-
-            $category = (string) ($line['penalty_category'] ?? '');
-            $violationType = (string) ($line['violation_type'] ?? '');
-
-            if ($category === 'absence' || $violationType === 'absent_without_excuse') {
-                $absenceTotal += $amount;
-            } else {
-                $penaltiesTotal += $amount;
-            }
+        if ($snapshot === null) {
+            $snapshot = $this->rowBuilder->buildFrozenSnapshotFromItem($item, $item->employee);
+            $item->forceFill(['export_snapshot' => $snapshot])->save();
         }
 
-        return [
-            round($penaltiesTotal, 2),
-            round($trafficViolationTotal, 2),
-            round($absenceTotal, 2),
-            round($attestationsTotal, 2),
-        ];
-    }
-
-    private function sumManualAdditionsForExport(object $item): float
-    {
-        $total = 0.0;
-        $breakdown = is_array($item->breakdown ?? null) ? $item->breakdown : [];
-        foreach ($breakdown as $line) {
-            if (! is_array($line) || ($line['source'] ?? null) !== 'manual_addition') {
-                continue;
-            }
-
-            $amount = (float) ($line['amount'] ?? 0);
-            if ($amount > 0) {
-                $total += $amount;
-            }
-        }
-
-        return round($total, 2);
-    }
-
-    private function resolveExportSalaryFactor(object $item, ?Employee $employee): float
-    {
-        if ($employee === null) {
-            return 1.0;
-        }
-
-        $fullBasic = (float) ($employee->basic_salary ?? 0);
-        $itemBasic = $item->basic_salary !== null ? (float) $item->basic_salary : null;
-
-        if ($fullBasic > 0 && $itemBasic !== null) {
-            return min(1.0, max(0.0, $itemBasic / $fullBasic));
-        }
-
-        $fullAllowances = (float) ($employee->allowances ?? 0);
-        $itemAllowances = $item->allowances !== null ? (float) $item->allowances : null;
-
-        if ($fullAllowances > 0 && $itemAllowances !== null) {
-            return min(1.0, max(0.0, $itemAllowances / $fullAllowances));
-        }
-
-        return 1.0;
-    }
-
-    private function prorateAllowanceForExport(float $fullAmount, float $factor): float
-    {
-        if ($fullAmount <= 0 || $factor <= 0) {
-            return 0.0;
-        }
-
-        return round($fullAmount * $factor, 2);
+        return $this->rowBuilder->snapshotToExcelRow($snapshot);
     }
 
     public function styles(Worksheet $sheet)
@@ -271,7 +109,6 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
                 ->setVertical(Alignment::VERTICAL_CENTER);
         }
 
-        // Add totals row for all amount columns.
         if ($highestRow >= 2) {
             $totalRow = $highestRow + 1;
             $sheet->setCellValue('A'.$totalRow, 'الإجمالي');

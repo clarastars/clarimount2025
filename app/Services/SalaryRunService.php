@@ -21,7 +21,8 @@ class SalaryRunService
     private const TZ = 'Asia/Riyadh';
 
     public function __construct(
-        private OperationalMonthService $operationalMonthService
+        private OperationalMonthService $operationalMonthService,
+        private SalaryRunExportRowBuilder $exportRowBuilder,
     ) {}
 
     /**
@@ -675,6 +676,17 @@ class SalaryRunService
 
         DB::transaction(function () use ($salaryRun) {
             $this->applyDebtDeductions($salaryRun);
+
+            $salaryRun->loadMissing(['items.employee']);
+
+            foreach ($salaryRun->items as $item) {
+                $item->update([
+                    'export_snapshot' => $this->exportRowBuilder->buildLiveSnapshot(
+                        $item,
+                        $item->employee
+                    ),
+                ]);
+            }
 
             $salaryRun->update([
                 'status' => 'finalized',

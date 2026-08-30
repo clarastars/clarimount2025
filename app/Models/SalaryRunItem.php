@@ -26,6 +26,7 @@ class SalaryRunItem extends Model
         'breakdown',
         'breakdown_exclusions',
         'debt_deductions',
+        'export_snapshot',
     ];
 
     protected $casts = [
@@ -40,6 +41,7 @@ class SalaryRunItem extends Model
         'breakdown' => 'array',
         'breakdown_exclusions' => 'array',
         'debt_deductions' => 'array',
+        'export_snapshot' => 'array',
     ];
 
     /**
