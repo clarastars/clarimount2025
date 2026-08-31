@@ -48,6 +48,7 @@ interface Props {
     defaultResidenceCountryId?: number
     shifts?: any[]
     canManagePortalAccount?: boolean
+    canManageTeamRoleAssignments?: boolean
     canAssignAnyDepartment?: boolean
     availableTeams?: Array<{ id: number; name: string }>
     assignableTeamRoles?: Array<{ name: string; label: string }>
@@ -986,7 +987,7 @@ const formatCurrency = (amount: number) => {
                     </Collapsible>
                 </Card>
 
-                <Card v-if="props.canManagePortalAccount">
+                <Card v-if="props.canManageTeamRoleAssignments">
                     <Collapsible v-model:open="sectionPermissionsTeams">
                         <CollapsibleTrigger asChild>
                             <CardHeader class="cursor-pointer hover:bg-gray-50">

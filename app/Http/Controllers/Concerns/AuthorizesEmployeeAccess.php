@@ -292,6 +292,45 @@ trait AuthorizesEmployeeAccess
         return $this->roleService()->canInAnyAssignedTeam($user, 'employees.assign-any-department');
     }
 
+    protected function canManageTeamRoleAssignments(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.team-roles.assign')
+            || $this->roleService()->canInAnyAssignedTeam($user, 'employees.team-roles.assign-any-company');
+    }
+
+    protected function canAssignAnyCompanyForTeamRoles(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.team-roles.assign-any-company');
+    }
+
+    /**
+     * Companies the acting user may scope when assigning team roles (owned + role-access companies).
+     *
+     * @return array<int, int>
+     */
+    protected function roleAssignableCompanyIds(User $user): array
+    {
+        if ($user->hasRole('super-admin')) {
+            return Company::query()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        }
+
+        return $user->ownedCompanies()
+            ->pluck('id')
+            ->merge($user->accessibleCompanies()->pluck('companies.id'))
+            ->unique()
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
     protected function canManageEmployee(User $user, Employee $employee): bool
     {
         if ($user->hasRole('super-admin')) {

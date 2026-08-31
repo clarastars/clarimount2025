@@ -462,7 +462,7 @@ class EmployeeController extends Controller
             );
 
             $employee->refresh()->load('user');
-            if ($employee->user) {
+            if ($employee->user && $this->canManageTeamRoleAssignments($user)) {
                 $this->syncPortalUserRoles($employee->user, $user, $validated);
             }
 
@@ -755,7 +755,7 @@ class EmployeeController extends Controller
 
         $employee->refresh()->load('user');
 
-        if ($employee->user) {
+        if ($employee->user && $this->canManageTeamRoleAssignments($user)) {
             $this->syncPortalUserRoles($employee->user, $user, $validated);
         }
 
@@ -993,32 +993,50 @@ class EmployeeController extends Controller
     private function portalRoleFormProps($actingUser, ?\App\Models\User $portalUser = null): array
     {
         $roleService = app(EmployeeUserRoleService::class);
+        $canManageTeamRoleAssignments = $this->canManageTeamRoleAssignments($actingUser);
+        $canAssignAnyCompanyForTeamRoles = $this->canAssignAnyCompanyForTeamRoles($actingUser);
+
+        $companiesQuery = Company::query()->orderBy('name_en')->orderBy('name_ar');
+        $departmentsQuery = Department::query()->orderBy('name');
+
+        if (! $canAssignAnyCompanyForTeamRoles) {
+            $assignableCompanyIds = $this->roleAssignableCompanyIds($actingUser);
+            $companiesQuery->whereIn('id', $assignableCompanyIds === [] ? [-1] : $assignableCompanyIds);
+            $departmentsQuery->whereIn('company_id', $assignableCompanyIds === [] ? [-1] : $assignableCompanyIds);
+        }
 
         return [
-            'availableTeams' => $roleService->manageableTeamsFor($actingUser)->values()->all(),
-            'assignableTeamRoles' => $roleService->assignableTeamRolesForUi(),
+            'canManageTeamRoleAssignments' => $canManageTeamRoleAssignments,
+            'canAssignAnyCompanyForTeamRoles' => $canAssignAnyCompanyForTeamRoles,
+            'availableTeams' => $canManageTeamRoleAssignments
+                ? $roleService->manageableTeamsFor($actingUser)->values()->all()
+                : [],
+            'assignableTeamRoles' => $canManageTeamRoleAssignments
+                ? $roleService->assignableTeamRolesForUi()
+                : [],
             'teamRoleAssignments' => $portalUser ? $this->resolveTeamRoleAssignments($roleService, $portalUser) : [],
             'primaryTeamId' => $portalUser?->team_id,
-            'roleCompanies' => Company::query()
-                ->orderBy('name_en')
-                ->orderBy('name_ar')
-                ->get(['id', 'name_en', 'name_ar'])
-                ->map(fn (Company $company) => [
-                    'id' => $company->id,
-                    'name' => trim(($company->name_en ?? '').' '.($company->name_ar ?? '')) ?: (string) $company->id,
-                ])
-                ->values()
-                ->all(),
-            'roleDepartments' => Department::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'company_id'])
-                ->map(fn (Department $department) => [
-                    'id' => (string) $department->id,
-                    'name' => $department->name,
-                    'company_id' => (int) $department->company_id,
-                ])
-                ->values()
-                ->all(),
+            'roleCompanies' => $canManageTeamRoleAssignments
+                ? $companiesQuery
+                    ->get(['id', 'name_en', 'name_ar'])
+                    ->map(fn (Company $company) => [
+                        'id' => $company->id,
+                        'name' => trim(($company->name_en ?? '').' '.($company->name_ar ?? '')) ?: (string) $company->id,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+            'roleDepartments' => $canManageTeamRoleAssignments
+                ? $departmentsQuery
+                    ->get(['id', 'name', 'company_id'])
+                    ->map(fn (Department $department) => [
+                        'id' => (string) $department->id,
+                        'name' => $department->name,
+                        'company_id' => (int) $department->company_id,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
         ];
     }
 
@@ -1044,12 +1062,48 @@ class EmployeeController extends Controller
      */
     private function syncPortalUserRoles(\App\Models\User $portalUser, $actingUser, array $validated): void
     {
+        if (! $this->canManageTeamRoleAssignments($actingUser)) {
+            return;
+        }
+
         $roleService = app(EmployeeUserRoleService::class);
+        $teamRoleAssignments = $validated['team_role_assignments'] ?? [];
+
+        if (! $this->canAssignAnyCompanyForTeamRoles($actingUser)) {
+            $allowedCompanyIds = $this->roleAssignableCompanyIds($actingUser);
+            $teamRoleAssignments = collect($teamRoleAssignments)
+                ->map(function (array $row) use ($allowedCompanyIds): array {
+                    $companyIds = collect($row['company_ids'] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn (int $id): bool => in_array($id, $allowedCompanyIds, true))
+                        ->values()
+                        ->all();
+
+                    $companyDepartments = collect($row['company_departments'] ?? [])
+                        ->mapWithKeys(function ($departmentIds, $companyId) use ($companyIds) {
+                            $companyId = (int) $companyId;
+                            if (! in_array($companyId, $companyIds, true) || ! is_array($departmentIds)) {
+                                return [];
+                            }
+
+                            return [$companyId => $departmentIds];
+                        })
+                        ->all();
+
+                    return [
+                        ...$row,
+                        'company_ids' => $companyIds,
+                        'company_departments' => $companyDepartments,
+                    ];
+                })
+                ->values()
+                ->all();
+        }
 
         $roleService->sync(
             $portalUser,
             $actingUser,
-            $validated['team_role_assignments'] ?? [],
+            $teamRoleAssignments,
             null,
             $roleService->assignedGlobalRoleNames($portalUser),
         );

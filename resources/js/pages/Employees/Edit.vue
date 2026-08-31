@@ -272,7 +272,7 @@
                     </Collapsible>
                 </Card>
 
-                <Card v-if="props.canManagePortalAccount">
+                <Card v-if="props.canManageTeamRoleAssignments">
                     <Collapsible v-model:open="sectionPermissionsTeams">
                         <CollapsibleTrigger asChild>
                             <CardHeader class="cursor-pointer hover:bg-gray-50">
@@ -1103,6 +1103,7 @@ interface Props {
     canAssignAnyDepartment?: boolean;
     shifts?: any[];
     canManagePortalAccount?: boolean;
+    canManageTeamRoleAssignments?: boolean;
     portalAccount?: {
         exists: boolean;
         email?: string | null;
