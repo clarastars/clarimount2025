@@ -26,6 +26,7 @@ class RestrictEmployeeReferenceDataSeeder extends Seeder
             ['code' => 'SO', 'code_alpha3' => 'SOM', 'name_en' => 'Somalia', 'name_ar' => 'الصومال'],
             ['code' => 'SD', 'code_alpha3' => 'SDN', 'name_en' => 'Sudan', 'name_ar' => 'السودان'],
             ['code' => 'PH', 'code_alpha3' => 'PHL', 'name_en' => 'Philippines', 'name_ar' => 'الفلبين'],
+            ['code' => 'ET', 'code_alpha3' => 'ETH', 'name_en' => 'Ethiopia', 'name_ar' => 'إثيوبيا'],
         ];
 
         foreach ($countries as $country) {
@@ -37,7 +38,7 @@ class RestrictEmployeeReferenceDataSeeder extends Seeder
 
         /** @var list<array{code: string, name_en: string, name_ar: string}> $allLabels */
         $allLabels = require database_path('data/nationality_labels.php');
-        $allowedCodes = ['SAU', 'EGY', 'SYR', 'PSE', 'JOR', 'YEM', 'IND', 'BGD', 'PAK', 'SOM', 'SDN', 'PHL', 'AFG'];
+        $allowedCodes = ['SAU', 'EGY', 'SYR', 'PSE', 'JOR', 'YEM', 'IND', 'BGD', 'PAK', 'SOM', 'SDN', 'PHL', 'AFG', 'ETH'];
 
         foreach ($allLabels as $nationality) {
             if (! in_array($nationality['code'], $allowedCodes, true)) {
