@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
+@import './app-shell.css';
 
 /* Tajawal — place files under public/fonts (served as /fonts/...) */
 @font-face {
@@ -176,40 +177,40 @@
 }
 
 :root {
-    --background: #F8FAFC;
-    --foreground: hsl(0 0% 3.9%);
-    --card: #FFFFFF;
-    --card-foreground: hsl(0 0% 3.9%);
-    --popover: #FFFFFF;
-    --popover-foreground: hsl(0 0% 3.9%);
-    --primary: #3B82F6;
-    --primary-foreground: hsl(0 0% 100%);
-    --secondary: hsl(0 0% 92.1%);
-    --secondary-foreground: hsl(0 0% 9%);
-    --muted: hsl(0 0% 96.1%);
-    --muted-foreground: hsl(0 0% 45.1%);
-    --accent: hsl(0 0% 96.1%);
-    --accent-foreground: hsl(0 0% 9%);
-    --destructive: hsl(0 84.2% 60.2%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 92.8%);
-    --input: hsl(0 0% 89.8%);
-    --ring: #3B82F6;
-    --chart-1: hsl(12 76% 61%);
-    --chart-2: hsl(173 58% 39%);
-    --chart-3: hsl(197 37% 24%);
-    --chart-4: hsl(43 74% 66%);
-    --chart-5: hsl(27 87% 67%);
-    --radius: 0.5rem;
-    --sidebar-background: #1E40AF;
-    --sidebar-foreground: hsl(0 0% 100%);
-    --sidebar-primary: #3B82F6;
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: #2563EB;
-    --sidebar-accent-foreground: hsl(0 0% 100%);
-    --sidebar-border: #2563EB;
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: #1E40AF;
+    --background: #f1f5f9;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #e2e8f0;
+    --secondary-foreground: #1e293b;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #2563eb;
+    --chart-1: #2563eb;
+    --chart-2: #10b981;
+    --chart-3: #8b5cf6;
+    --chart-4: #f59e0b;
+    --chart-5: #ec4899;
+    --radius: 0.625rem;
+    --sidebar-background: #0f172a;
+    --sidebar-foreground: #e2e8f0;
+    --sidebar-primary: #3b82f6;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #1e293b;
+    --sidebar-ring: #3b82f6;
+    --sidebar: #0f172a;
 }
 
 /* RTL: same stack as LTR (Tajawal first) */
@@ -221,39 +222,39 @@
 }
 
 .dark {
-    --background: hsl(0 0% 3.9%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(0 0% 3.9%);
-    --card-foreground: hsl(0 0% 98%);
-    --popover: hsl(0 0% 3.9%);
-    --popover-foreground: 0 0% 98%;
-    --primary: hsl(217 91% 60%);
-    --primary-foreground: hsl(0 0% 100%);
-    --secondary: hsl(0 0% 14.9%);
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: hsl(0 0% 16.08%);
-    --muted-foreground: hsl(0 0% 63.9%);
-    --accent: hsl(0 0% 14.9%);
-    --accent-foreground: hsl(0 0% 98%);
-    --destructive: hsl(0 84% 60%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 14.9%);
-    --input: hsl(0 0% 14.9%);
-    --ring: hsl(217 91% 55%);
-    --chart-1: hsl(220 70% 50%);
-    --chart-2: hsl(160 60% 45%);
-    --chart-3: hsl(30 80% 55%);
-    --chart-4: hsl(280 65% 60%);
-    --chart-5: hsl(340 75% 55%);
-    --sidebar-background: #1E40AF;
-    --sidebar-foreground: hsl(0 0% 100%);
-    --sidebar-primary: #3B82F6;
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: #2563EB;
-    --sidebar-accent-foreground: hsl(0 0% 100%);
-    --sidebar-border: #2563EB;
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: #1E40AF;
+    --background: #0b1120;
+    --foreground: #f1f5f9;
+    --card: #111827;
+    --card-foreground: #f1f5f9;
+    --popover: #111827;
+    --popover-foreground: #f1f5f9;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #1e293b;
+    --secondary-foreground: #f1f5f9;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent: #1e293b;
+    --accent-foreground: #f1f5f9;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #3b82f6;
+    --chart-1: #3b82f6;
+    --chart-2: #34d399;
+    --chart-3: #a78bfa;
+    --chart-4: #fbbf24;
+    --chart-5: #f472b6;
+    --sidebar-background: #020617;
+    --sidebar-foreground: #e2e8f0;
+    --sidebar-primary: #3b82f6;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #0f172a;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #1e293b;
+    --sidebar-ring: #3b82f6;
+    --sidebar: #020617;
 }
 
 @layer base {
@@ -261,6 +262,7 @@
         @apply border-border outline-ring/50;
     }
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: 'kern' 1;
     }
 }

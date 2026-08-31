@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
@@ -104,39 +105,28 @@ const formatRemainingText = (daysRemaining: number) => {
     <Head :title="t('nav.dashboard')" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-6 p-6 pt-0">
-            <!-- Header Section -->
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold tracking-tight text-foreground">
-                        {{ t('nav.dashboard') }}
-                    </h1>
-                    <p class="text-muted-foreground mt-1">
-                        {{ t('employees.expiry.upcoming_expirations') }}
-                    </p>
-                </div>
-                <Button
-                    v-if="expiringEmployeesCount > 0 || expiredEmployeesCount > 0"
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    class="bg-white hover:bg-gray-50 border-gray-200"
-                >
+        <PageHeader
+            :title="t('nav.dashboard')"
+            :description="t('employees.expiry.upcoming_expirations')"
+        >
+            <template v-if="expiringEmployeesCount > 0 || expiredEmployeesCount > 0" #actions>
+                <Button asChild variant="outline" size="sm">
                     <Link :href="route('employees.expiring-documents.index')">
                         {{ t('employees.expiry.view_all') }} ({{ expiringEmployeesCount + expiredEmployeesCount }})
-                        <ArrowUpRight class="ml-2 h-4 w-4" />
+                        <ArrowUpRight class="ms-2 size-4" />
                     </Link>
                 </Button>
-            </div>
+            </template>
+        </PageHeader>
 
-            <!-- Expired Documents Section -->
-            <Card v-if="expiredEmployeesPreview && expiredEmployeesPreview.length > 0" class="border border-gray-200 dark:border-gray-700 rounded-lg">
-                <CardHeader class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 px-5 py-4">
-                    <CardTitle class="flex items-center gap-2 text-gray-700 dark:text-gray-300 text-base font-medium">
-                        <AlertTriangle class="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        {{ t('employees.expiry.expired_documents') }}
-                    </CardTitle>
-                </CardHeader>
+        <!-- Expired Documents Section -->
+        <Card v-if="expiredEmployeesPreview && expiredEmployeesPreview.length > 0">
+            <CardHeader class="border-b border-border/60 bg-muted/40 px-5 py-4">
+                <CardTitle class="flex items-center gap-2 text-base font-semibold text-foreground">
+                    <AlertTriangle class="size-4 text-destructive" />
+                    {{ t('employees.expiry.expired_documents') }}
+                </CardTitle>
+            </CardHeader>
                 <CardContent class="p-5">
                     <div class="grid gap-3 md:grid-cols-1 lg:grid-cols-2">
                         <Card
@@ -201,9 +191,9 @@ const formatRemainingText = (daysRemaining: number) => {
             </Card>
 
             <!-- Upcoming Expirations Section -->
-            <Card class="border border-gray-200 dark:border-gray-700 rounded-lg">
-                <CardHeader class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 px-5 py-4">
-                    <CardTitle class="text-base font-medium text-gray-700 dark:text-gray-300">
+            <Card>
+                <CardHeader class="border-b border-border/60 bg-muted/40 px-5 py-4">
+                    <CardTitle class="text-base font-semibold text-foreground">
                         {{ t('employees.expiry.upcoming_expirations') }}
                     </CardTitle>
                 </CardHeader>
@@ -286,6 +276,5 @@ const formatRemainingText = (daysRemaining: number) => {
                     </div>
                 </CardContent>
             </Card>
-        </div>
     </AppLayout>
 </template>

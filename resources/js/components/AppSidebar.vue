@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Building, MapPin, Users, Package, HardDrive, FileText, Building2, Scale, Clock, Mail, CalendarDays, FileBadge } from 'lucide-vue-next';
+import { Building, Building2, CalendarDays, Clock, FileBadge, FileText, HardDrive, LayoutGrid, Mail, MapPin, Package, Scale, Users } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -156,19 +155,6 @@ const settingsNavItems = computed((): NavItem[] => {
 
     return items;
 });
-
-const footerNavItems = computed((): NavItem[] => [
-    {
-        title: t('nav.githubRepo'),
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: t('nav.documentation'),
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-]);
 </script>
 
 <template>
@@ -205,7 +191,6 @@ const footerNavItems = computed((): NavItem[] => [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter v-if="!isEmployee" :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

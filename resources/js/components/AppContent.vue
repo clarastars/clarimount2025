@@ -10,12 +10,16 @@ interface Props {
 
 const props = defineProps<Props>();
 const className = computed(() => cn(props.class));
-const sidebarClassName = computed(() => cn('px-4 pb-6 pt-4 md:px-6 md:pb-6 md:pt-4', props.class));
+const sidebarClassName = computed(() =>
+    cn('flex flex-1 flex-col px-4 pb-8 pt-2 md:px-6 md:pb-8 md:pt-3', props.class),
+);
 </script>
 
 <template>
     <SidebarInset v-if="props.variant === 'sidebar'" :class="sidebarClassName">
-        <slot />
+        <div class="app-page">
+            <slot />
+        </div>
     </SidebarInset>
     <main v-else class="mx-auto flex h-full w-full max-w-7xl flex-1 flex-col gap-4 rounded-xl" :class="className">
         <slot />

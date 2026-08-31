@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const step = ref<'email' | 'otp' | 'password'>(props.loginStep);
 const email = ref(props.loginEmail);
+const currentYear = new Date().getFullYear();
 
 watch(
     () => [props.loginStep, props.loginEmail] as const,
@@ -106,31 +107,24 @@ const stepMessage = computed(() => {
 <template>
     <Head :title="t('auth.welcome')" />
 
-    <div class="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-10 sm:px-6 lg:px-8">
-        <div class="mx-auto flex min-h-[85vh] w-full max-w-xl items-center justify-center">
-            <div class="w-full rounded-2xl border border-slate-200 bg-white/95 p-8 shadow-xl backdrop-blur sm:p-10">
+    <div class="login-page">
+        <div class="w-full max-w-xl">
+            <div class="login-card p-10 sm:p-12">
                 <div class="mb-8 text-center">
-                    <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200">
-                        <span class="text-lg font-bold">HR</span>
-                    </div>
-                    <h2 class="text-3xl font-bold tracking-tight text-slate-900">
-                        {{ stepTitle }}
-                    </h2>
-                    <p class="mt-2 text-sm text-slate-600">
-                        {{ stepMessage }}
-                    </p>
+                    <h2 class="text-2xl font-bold text-foreground sm:text-3xl">{{ stepTitle }}</h2>
+                    <p class="mt-3 text-base leading-relaxed text-muted-foreground">{{ stepMessage }}</p>
                 </div>
 
                 <div
                     v-if="status"
-                    class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                    class="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
                 >
                     {{ status }}
                 </div>
 
                 <form v-if="step === 'email'" class="space-y-5" @submit.prevent="submitIdentify">
                     <div>
-                        <label for="email" class="mb-2 block text-sm font-medium text-slate-700">
+                        <label for="email" class="mb-2 block text-sm font-medium text-foreground">
                             {{ t('auth.work_email') }}
                         </label>
                         <input
@@ -141,9 +135,9 @@ const stepMessage = computed(() => {
                             required
                             autocomplete="username"
                             :placeholder="t('auth.work_email_placeholder')"
-                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                        <div v-if="identifyForm.errors.email" class="mt-2 text-sm text-red-600">
+                            class="w-full rounded-lg border border-input bg-background px-4 py-3.5 text-base text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        >
+                        <div v-if="identifyForm.errors.email" class="mt-2 text-sm text-destructive">
                             {{ identifyForm.errors.email }}
                         </div>
                     </div>
@@ -151,7 +145,7 @@ const stepMessage = computed(() => {
                     <button
                         type="submit"
                         :disabled="identifyForm.processing"
-                        class="mt-2 flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <span v-if="identifyForm.processing">{{ t('auth.continuing') }}</span>
                         <span v-else>{{ t('auth.continue') }}</span>
@@ -159,12 +153,12 @@ const stepMessage = computed(() => {
                 </form>
 
                 <form v-else-if="step === 'otp'" class="space-y-5" @submit.prevent="submitOtp">
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" dir="ltr">
+                    <div class="rounded-lg border border-border bg-muted/50 px-4 py-3 text-center text-sm text-muted-foreground" dir="ltr">
                         {{ email }}
                     </div>
 
                     <div>
-                        <label for="otp" class="mb-2 block text-sm font-medium text-slate-700">
+                        <label for="otp" class="mb-2 block text-sm font-medium text-foreground">
                             {{ t('auth.otp_code') }}
                         </label>
                         <input
@@ -178,12 +172,12 @@ const stepMessage = computed(() => {
                             required
                             autocomplete="one-time-code"
                             :placeholder="t('auth.otp_placeholder')"
-                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl tracking-[0.5em] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                        <div v-if="otpForm.errors.otp" class="mt-2 text-sm text-red-600">
+                            class="w-full rounded-lg border border-input bg-background px-4 py-3 text-center text-2xl tracking-[0.5em] text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        >
+                        <div v-if="otpForm.errors.otp" class="mt-2 text-sm text-destructive">
                             {{ otpForm.errors.otp }}
                         </div>
-                        <div v-if="otpForm.errors.email" class="mt-2 text-sm text-red-600">
+                        <div v-if="otpForm.errors.email" class="mt-2 text-sm text-destructive">
                             {{ otpForm.errors.email }}
                         </div>
                     </div>
@@ -191,7 +185,7 @@ const stepMessage = computed(() => {
                     <button
                         type="submit"
                         :disabled="otpForm.processing"
-                        class="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <span v-if="otpForm.processing">{{ t('auth.verifying') }}</span>
                         <span v-else>{{ t('auth.verify_otp') }}</span>
@@ -200,14 +194,14 @@ const stepMessage = computed(() => {
                     <div class="flex items-center justify-between gap-3 text-sm">
                         <button
                             type="button"
-                            class="text-slate-600 transition hover:text-slate-900"
+                            class="text-muted-foreground transition hover:text-foreground"
                             @click="goBackToEmail"
                         >
                             {{ t('auth.change_email') }}
                         </button>
                         <button
                             type="button"
-                            class="font-medium text-blue-600 transition hover:text-blue-700"
+                            class="font-medium text-primary transition hover:text-primary/80"
                             @click="resendOtp"
                         >
                             {{ t('auth.resend_otp') }}
@@ -216,12 +210,12 @@ const stepMessage = computed(() => {
                 </form>
 
                 <form v-else class="space-y-5" @submit.prevent="submitPassword">
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" dir="ltr">
+                    <div class="rounded-lg border border-border bg-muted/50 px-4 py-3 text-center text-sm text-muted-foreground" dir="ltr">
                         {{ email }}
                     </div>
 
                     <div>
-                        <label for="password" class="mb-2 block text-sm font-medium text-slate-700">
+                        <label for="password" class="mb-2 block text-sm font-medium text-foreground">
                             {{ t('auth.password') }}
                         </label>
                         <input
@@ -231,12 +225,12 @@ const stepMessage = computed(() => {
                             dir="ltr"
                             required
                             autocomplete="current-password"
-                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                        <div v-if="passwordForm.errors.password" class="mt-2 text-sm text-red-600">
+                            class="w-full rounded-lg border border-input bg-background px-4 py-3.5 text-base text-foreground shadow-xs outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        >
+                        <div v-if="passwordForm.errors.password" class="mt-2 text-sm text-destructive">
                             {{ passwordForm.errors.password }}
                         </div>
-                        <div v-if="passwordForm.errors.email" class="mt-2 text-sm text-red-600">
+                        <div v-if="passwordForm.errors.email" class="mt-2 text-sm text-destructive">
                             {{ passwordForm.errors.email }}
                         </div>
                     </div>
@@ -244,7 +238,7 @@ const stepMessage = computed(() => {
                     <button
                         type="submit"
                         :disabled="passwordForm.processing"
-                        class="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <span v-if="passwordForm.processing">{{ t('auth.signing_in') }}</span>
                         <span v-else>{{ t('auth.sign_in') }}</span>
@@ -252,23 +246,17 @@ const stepMessage = computed(() => {
 
                     <button
                         type="button"
-                        class="text-sm text-slate-600 transition hover:text-slate-900"
+                        class="w-full text-center text-sm text-muted-foreground transition hover:text-foreground"
                         @click="goBackToEmail"
                     >
                         {{ t('auth.change_email') }}
                     </button>
                 </form>
             </div>
+
+            <p class="mt-8 text-center text-xs text-muted-foreground">
+                © {{ currentYear }} إعتمال — منصة إدارة الموارد البشرية
+            </p>
         </div>
     </div>
 </template>
-
-<style scoped>
-[dir='rtl'] .text-left {
-    text-align: right;
-}
-
-[dir='rtl'] .text-right {
-    text-align: left;
-}
-</style>

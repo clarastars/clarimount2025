@@ -135,17 +135,18 @@ const contentWidthClass = computed(() =>
 </script>
 
 <template>
-    <div class="px-4 py-6">
+    <div>
         <Heading :title="t('settings.title')" :description="t('settings.description')" />
 
-        <div class="flex flex-col space-y-8 md:space-y-0 lg:flex-row lg:space-y-0 lg:space-x-12">
-            <aside class="w-full max-w-xl lg:w-48">
-                <nav class="flex flex-col space-y-1 space-x-0">
+        <div class="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
+            <aside class="w-full shrink-0 lg:w-56">
+                <nav class="flex flex-col gap-1">
                     <Button
                         v-for="item in sidebarNavItems"
                         :key="item.href"
                         variant="ghost"
-                        :class="['w-full justify-start', { 'bg-muted': currentPath === item.href }]"
+                        :data-active="currentPath === item.href"
+                        class="app-settings-nav-item w-full justify-start"
                         as-child
                     >
                         <Link :href="item.href">
@@ -155,10 +156,10 @@ const contentWidthClass = computed(() =>
                 </nav>
             </aside>
 
-            <Separator class="my-6 md:hidden" />
+            <Separator class="lg:hidden" />
 
-            <div :class="['flex-1', props.contentWidth === 'wide' ? 'md:max-w-6xl' : 'md:max-w-2xl']">
-                <section :class="[contentWidthClass, 'space-y-12']">
+            <div :class="['min-w-0 flex-1', props.contentWidth === 'wide' ? 'md:max-w-6xl' : 'md:max-w-2xl']">
+                <section :class="[contentWidthClass, 'space-y-8']">
                     <slot />
                 </section>
             </div>

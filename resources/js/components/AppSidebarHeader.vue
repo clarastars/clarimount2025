@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
 
 <template>
     <header
-        class="flex min-h-12 shrink-0 flex-col gap-2 border-b bg-background px-3 py-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:md:h-12 md:grid md:h-16 md:grid-cols-[1fr_minmax(0,36rem)_1fr] md:items-center md:gap-3 md:px-4 md:py-0 lg:px-6"
+        class="sticky top-0 z-20 flex min-h-12 shrink-0 flex-col gap-2 border-b border-border/60 bg-background/80 px-3 py-2 backdrop-blur-md transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:md:h-14 md:grid md:h-16 md:grid-cols-[1fr_minmax(0,36rem)_1fr] md:items-center md:gap-3 md:px-4 md:py-0 lg:px-6"
     >
         <div class="flex min-h-9 min-w-0 items-center gap-2 md:min-h-0">
             <SidebarTrigger class="-ms-1 shrink-0" />
@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
         >
             <div class="relative w-full">
                 <Search
-                    class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                 />
                 <input
@@ -176,7 +176,7 @@ onBeforeUnmount(() => {
                     type="search"
                     enterkeyhint="search"
                     autocomplete="off"
-                    class="h-10 w-full min-w-0 rounded-md border border-input bg-background py-2 ps-10 pe-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="h-10 w-full min-w-0 rounded-lg border border-input bg-card py-2 ps-10 pe-10 text-sm shadow-xs transition-shadow placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
                     :placeholder="$t('settings.employee_global_search_placeholder')"
                     @focus="searchQuery.trim().length >= 2 && suggestions.length > 0 ? openSuggestions = true : null"
                     @keydown="onSearchKeydown"
@@ -191,23 +191,23 @@ onBeforeUnmount(() => {
 
             <div
                 v-if="openSuggestions"
-                class="absolute z-50 mt-1 max-h-[min(20rem,70vh)] w-full overflow-auto rounded-md border bg-popover shadow-lg"
+                class="absolute z-50 mt-1.5 max-h-[min(20rem,70vh)] w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg"
             >
                 <button
                     v-for="(employee, index) in suggestions"
                     :key="employee.id"
                     type="button"
-                    class="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-start hover:bg-accent"
+                    class="flex w-full cursor-pointer items-start gap-2 px-3 py-2.5 text-start transition-colors hover:bg-accent"
                     :class="index === activeIndex ? 'bg-accent' : ''"
                     @mouseenter="activeIndex = index"
                     @click="selectEmployee(employee)"
                 >
-                    <User class="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <User class="mt-0.5 size-4 text-muted-foreground" />
                     <div class="min-w-0">
                         <div class="truncate text-sm font-medium">{{ employee.full_name }}</div>
                         <div class="truncate text-xs text-muted-foreground">
                             <span v-if="employee.employee_id">#{{ employee.employee_id }}</span>
-                            <span v-if="employee.company_name"> - {{ employee.company_name }}</span>
+                            <span v-if="employee.company_name"> — {{ employee.company_name }}</span>
                         </div>
                     </div>
                 </button>
@@ -217,6 +217,5 @@ onBeforeUnmount(() => {
         <div class="flex shrink-0 items-center justify-end gap-2 md:justify-self-end">
             <NotificationBell />
         </div>
-
     </header>
 </template>

@@ -1,0 +1,173 @@
+/* Enterprise app shell — layout, navigation & page utilities */
+
+/* ── Sidebar navigation ── */
+[data-sidebar="menu-button"][data-active="true"] {
+    background: var(--sidebar-accent);
+    color: var(--sidebar-accent-foreground);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 0 var(--sidebar-primary);
+}
+
+[dir="rtl"] [data-sidebar="menu-button"][data-active="true"] {
+    box-shadow: inset -3px 0 0 0 var(--sidebar-primary);
+}
+
+[data-sidebar="group-label"] {
+    color: color-mix(in srgb, var(--sidebar-foreground) 55%, transparent);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ── Page layout ── */
+.app-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+}
+
+.app-page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-bottom: 0.25rem;
+}
+
+@media (min-width: 640px) {
+    .app-page-header {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+}
+
+.app-page-title {
+    font-size: 1.625rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
+    color: var(--foreground);
+}
+
+.app-page-description {
+    margin-top: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+
+/* ── Stat / KPI cards ── */
+.app-stat-card {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--primary) 30%);
+}
+
+/* ── Data tables ── */
+.app-data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+}
+
+.app-data-table thead th {
+    background: color-mix(in srgb, var(--muted) 50%, transparent);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    padding: 0.75rem 1rem;
+    text-align: start;
+    white-space: nowrap;
+}
+
+.app-data-table tbody td {
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+}
+
+.app-data-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.app-data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--muted) 35%, transparent);
+}
+
+.app-data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── Settings nav pills ── */
+.app-settings-nav-item {
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.app-settings-nav-item[data-active="true"] {
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* ── Login page ── */
+.login-page {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background-color: #f1f5f9;
+    background-image:
+        radial-gradient(at 20% 20%, rgba(37, 99, 235, 0.08) 0px, transparent 50%),
+        radial-gradient(at 80% 80%, rgba(99, 102, 241, 0.06) 0px, transparent 50%);
+}
+
+.login-card {
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 1rem;
+    box-shadow:
+        0 1px 3px rgba(15, 23, 42, 0.04),
+        0 8px 32px rgba(15, 23, 42, 0.08);
+}
+
+.dark .login-page {
+    background-color: #0b1120;
+    background-image:
+        radial-gradient(at 20% 20%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+        radial-gradient(at 80% 80%, rgba(99, 102, 241, 0.08) 0px, transparent 50%);
+}
+
+.dark .login-card {
+    background: #111827;
+    border-color: #1e293b;
+}
+
+.app-page ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.app-page ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+    border-radius: 9999px;
+}
+
+.app-page ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+}

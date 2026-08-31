@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import PageHeader from '@/components/PageHeader.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,6 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import Icon from '@/components/Icon.vue';
-import Heading from '@/components/Heading.vue';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, watch } from 'vue';
 import type { Employee, Company, BreadcrumbItem } from '@/types';
@@ -373,40 +373,35 @@ async function unlinkFingerprint() {
     <Head :title="t('employees.title')" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-6">
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <Heading :title="t('employees.my_employees')" />
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {{ t('employees.manage_workforce') }}
-                    </p>
-                </div>
-                <div v-if="!isReadOnly" class="flex flex-col sm:flex-row gap-2">
-                    <Button variant="outline" asChild>
-                        <Link :href="route('employees.fingerprint-device')">
-                            <Icon name="Fingerprint" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
-                            {{ t('employees.fingerprint_device_employees') }}
-                        </Link>
-                    </Button>
-                    <Button variant="outline" asChild class="bg-blue-600 hover:bg-blue-700 text-white font-semibold border-blue-600">
-                        <Link :href="route('employees.import')">
-                            <Icon name="Upload" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
-                            {{ t('employees.import_csv') }}
-                        </Link>
-                    </Button>
-                    <Button asChild class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                        <Link :href="route('employees.create')">
-                            <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
-                            {{ t('employees.create_employee') }}
-                        </Link>
-                    </Button>
-                </div>
-            </div>
+        <PageHeader
+            :title="t('employees.my_employees')"
+            :description="t('employees.manage_workforce')"
+        >
+            <template v-if="!isReadOnly" #actions>
+                <Button variant="outline" asChild>
+                    <Link :href="route('employees.fingerprint-device')">
+                        <Icon name="Fingerprint" class="me-2 size-4" />
+                        {{ t('employees.fingerprint_device_employees') }}
+                    </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                    <Link :href="route('employees.import')">
+                        <Icon name="Upload" class="me-2 size-4" />
+                        {{ t('employees.import_csv') }}
+                    </Link>
+                </Button>
+                <Button asChild>
+                    <Link :href="route('employees.create')">
+                        <Icon name="Plus" class="me-2 size-4" />
+                        {{ t('employees.create_employee') }}
+                    </Link>
+                </Button>
+            </template>
+        </PageHeader>
 
             <!-- Summary Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card class="app-stat-card">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">{{ t('employees.total_employees') }}</CardTitle>
                         <Icon name="Users" class="h-4 w-4 text-muted-foreground" />
@@ -419,7 +414,7 @@ async function unlinkFingerprint() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card class="app-stat-card">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">{{ t('employees.active_employees') }}</CardTitle>
                         <Icon name="CheckCircle" class="h-4 w-4 text-green-600" />
@@ -432,7 +427,7 @@ async function unlinkFingerprint() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card class="app-stat-card">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">{{ t('employees.needing_attention') }}</CardTitle>
                         <Icon name="AlertTriangle" class="h-4 w-4 text-orange-600" />
@@ -445,7 +440,7 @@ async function unlinkFingerprint() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card class="app-stat-card">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">{{ t('employees.open_tickets') }}</CardTitle>
                         <Icon name="Ticket" class="h-4 w-4 text-orange-600" />
@@ -868,6 +863,5 @@ async function unlinkFingerprint() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
     </AppLayout>
 </template> 
