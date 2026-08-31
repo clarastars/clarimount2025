@@ -293,7 +293,6 @@ return [
         'team_role_member' => 'Member',
         'team_role_admin' => 'Admin',
         'team_role_viewer' => 'Viewer',
-        'team_role_label' => 'Role',
         'no_team' => 'No team',
         'role_companies_hint' => 'Select companies this employee can access through their role.',
         'role_companies_per_team_hint' => 'Select companies allowed for this role only.',

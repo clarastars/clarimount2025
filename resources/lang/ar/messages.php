@@ -293,7 +293,6 @@ return [
         'team_role_member' => 'عضو',
         'team_role_admin' => 'مدير',
         'team_role_viewer' => 'مشاهد',
-        'team_role_label' => 'الدور',
         'no_team' => 'بدون فريق',
         'role_companies_hint' => 'حدد الشركات المسموح للموظف الوصول لها عبر دوره.',
         'role_companies_per_team_hint' => 'حدد الشركات المسموح بها لهذا الدور فقط.',
