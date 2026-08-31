@@ -40,6 +40,18 @@ class EmployeeUserRoleService
     }
 
     /**
+     * All teams available when assigning team roles to an employee (permission-gated at controller).
+     *
+     * @return Collection<int, Team>
+     */
+    public function assignableTeamsForRoleAssignment(): Collection
+    {
+        return Team::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
      * @return array<int, array{
      *     team_id: int,
      *     role_name: string,
@@ -175,14 +187,14 @@ class EmployeeUserRoleService
         array $globalRoleNames,
         ?array $legacyRoleCompanyIds = null
     ): void {
-        $manageableTeamIds = $this->manageableTeamsFor($actingUser)->pluck('id')->map(fn ($id) => (int) $id);
+        $assignableTeamIds = $this->assignableTeamsForRoleAssignment()->pluck('id')->map(fn ($id) => (int) $id);
 
         $normalizedAssignments = collect($teamRoleAssignments)
-            ->map(function (array $row) use ($manageableTeamIds, $legacyRoleCompanyIds) {
+            ->map(function (array $row) use ($assignableTeamIds, $legacyRoleCompanyIds) {
                 $teamId = isset($row['team_id']) ? (int) $row['team_id'] : 0;
                 $roleName = isset($row['role_name']) ? (string) $row['role_name'] : '';
 
-                if ($teamId === 0 || ! $manageableTeamIds->contains($teamId)) {
+                if ($teamId === 0 || ! $assignableTeamIds->contains($teamId)) {
                     return null;
                 }
 

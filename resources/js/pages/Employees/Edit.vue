@@ -302,6 +302,7 @@
                                 <EmployeeTeamAssignmentsFields
                                     v-model:team-role-assignments="form.team_role_assignments"
                                     :available-teams="props.availableTeams || []"
+                                    :assignable-team-roles="props.assignableTeamRoles || []"
                                     :role-companies="props.roleCompanies || []"
                                     :role-departments="props.roleDepartments || []"
                                     :errors="form.errors"

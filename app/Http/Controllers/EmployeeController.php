@@ -1009,7 +1009,7 @@ class EmployeeController extends Controller
             'canManageTeamRoleAssignments' => $canManageTeamRoleAssignments,
             'canAssignAnyCompanyForTeamRoles' => $canAssignAnyCompanyForTeamRoles,
             'availableTeams' => $canManageTeamRoleAssignments
-                ? $roleService->manageableTeamsFor($actingUser)->values()->all()
+                ? $roleService->assignableTeamsForRoleAssignment()->values()->all()
                 : [],
             'assignableTeamRoles' => $canManageTeamRoleAssignments
                 ? $roleService->assignableTeamRolesForUi()

@@ -12,6 +12,7 @@ export interface TeamRoleAssignment {
 
 const props = defineProps<{
     availableTeams: Array<{ id: number; name: string }>
+    assignableTeamRoles?: Array<{ name: string; label: string }>
     roleCompanies?: Array<{ id: number; name: string }>
     roleDepartments?: Array<{ id: string; name: string; company_id: number }>
     errors?: Record<string, string>
@@ -39,13 +40,28 @@ function toggleTeam(teamId: number, checked: boolean): void {
         if (!isTeamSelected(teamId)) {
             teamRoleAssignments.value = [
                 ...teamRoleAssignments.value,
-                { team_id: teamId, role_name: 'team-member', company_ids: [], company_departments: {} },
+                {
+                    team_id: teamId,
+                    role_name: props.assignableTeamRoles?.[0]?.name ?? 'team-member',
+                    company_ids: [],
+                    company_departments: {},
+                },
             ]
         }
         return
     }
 
     teamRoleAssignments.value = teamRoleAssignments.value.filter((row: TeamRoleAssignment) => row.team_id !== teamId)
+}
+
+function setTeamRole(teamId: number, roleName: string): void {
+    teamRoleAssignments.value = teamRoleAssignments.value.map((row: TeamRoleAssignment) => {
+        if (row.team_id !== teamId) {
+            return row
+        }
+
+        return { ...row, role_name: roleName }
+    })
 }
 
 function isCompanySelected(teamId: number, companyId: number): boolean {
@@ -164,6 +180,29 @@ function companyErrorFor(teamId: number): string | undefined {
                         v-if="isTeamSelected(team.id)"
                         class="ms-6 mb-2 me-2 rounded-md border bg-muted/20 p-2 space-y-2"
                     >
+                        <div v-if="(assignableTeamRoles || []).length">
+                            <p class="text-xs font-medium text-foreground">
+                                {{ t('settings.team_role_label') }}
+                            </p>
+                            <div class="mt-1 flex flex-wrap gap-3">
+                                <label
+                                    v-for="role in (assignableTeamRoles || [])"
+                                    :key="`${team.id}-${role.name}`"
+                                    class="flex items-center gap-2 text-xs rounded px-1 py-1 hover:bg-muted/50 cursor-pointer"
+                                >
+                                    <input
+                                        type="radio"
+                                        class="h-3.5 w-3.5 border-gray-300"
+                                        :name="`team-role-${team.id}`"
+                                        :value="role.name"
+                                        :checked="assignmentFor(team.id)?.role_name === role.name"
+                                        @change="setTeamRole(team.id, role.name)"
+                                    >
+                                    <span>{{ role.label }}</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div>
                             <p class="text-xs font-medium text-foreground">
                                 {{ t('companies.title') }}
