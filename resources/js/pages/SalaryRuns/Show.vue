@@ -971,20 +971,8 @@ const getRemainingDebtAmount = (debtId: number) => {
   if (!debt) {
     return 0;
   }
-  // Get the original debt amount
-  const originalAmount = parseFloat(debt.amount);
-  
-  // Check if there's an existing deduction for this debt
-  const existingDeduction = selectedItemForDebts.value.debt_deductions?.find(
-    (d: any) => d.debt_id === debtId
-  );
-  
-  if (existingDeduction) {
-    // Return the remaining amount after existing deduction
-    return Math.max(0, originalAmount - parseFloat(existingDeduction.amount || 0));
-  }
-  
-  return originalAmount;
+  // The input is the total deduction for this salary run (replacement), not an additional amount.
+  return parseFloat(debt.amount || 0);
 };
 
 const submitDebtDeductions = () => {
