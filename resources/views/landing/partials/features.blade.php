@@ -42,25 +42,28 @@ $icons = [
 ];
 @endphp
 
-<section id="features" class="py-24 bg-white">
-    <div class="container mx-auto px-6">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl mb-4 text-gray-900">مميزات المنصة</h2>
-            <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+<section id="features" class="bg-white py-20 lg:py-24">
+    <div class="container mx-auto px-4 sm:px-6">
+        <div class="mb-14 text-center landing-fade-in">
+            <div class="landing-section-badge mb-4">المميزات</div>
+            <h2 class="mb-4 text-3xl font-bold text-slate-900 sm:text-4xl">
+                حلول متكاملة <span class="landing-gradient-text">للمؤسسات</span>
+            </h2>
+            <p class="mx-auto max-w-2xl text-lg text-slate-600">
                 كل ما تحتاجه لإدارة مواردك البشرية بكفاءة واحترافية
             </p>
         </div>
 
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            @foreach($features as $feature)
-                <div class="p-8 hover:shadow-xl transition-shadow border border-gray-200 rounded-lg bg-white">
-                    <div class="bg-blue-100 w-14 h-14 rounded-xl flex items-center justify-center mb-6">
-                        <svg class="size-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            @foreach($features as $index => $feature)
+                <div class="landing-feature-card landing-fade-in" style="transition-delay: {{ ($index % 3) * 0.08 }}s">
+                    <div class="mb-5 flex size-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                        <svg class="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             {!! $icons[$feature['icon']] !!}
                         </svg>
                     </div>
-                    <h3 class="text-xl mb-3 text-gray-900">{{ $feature['title'] }}</h3>
-                    <p class="text-gray-600">{{ $feature['description'] }}</p>
+                    <h3 class="mb-2 text-lg font-bold text-slate-900">{{ $feature['title'] }}</h3>
+                    <p class="text-sm leading-relaxed text-slate-600">{{ $feature['description'] }}</p>
                 </div>
             @endforeach
         </div>

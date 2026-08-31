@@ -4,27 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    
-    <title>{{ config('app.name', 'إعتمال - منصة الموارد البشرية') }}</title>
-    
-    <link rel="preload" href="/fonts/Tajawal-Regular.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="/fonts/Tajawal-Bold.ttf" as="font" type="font/ttf" crossorigin>
+    <meta name="description" content="إعتمال - منصة موارد بشرية متكاملة للشركات. إدارة الموظفين، الحضور، الرواتب، والتقارير.">
 
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
-    
-    @vite(['resources/css/app.css'])
+    <title>{{ config('app.name', 'إعتمال - منصة الموارد البشرية') }}</title>
+
+    @vite(['resources/css/app.css', 'resources/css/landing.css'])
 </head>
-<body class="font-sans antialiased bg-white">
+<body class="landing-page font-sans antialiased bg-white text-slate-900">
     @include('landing.partials.header')
-    
+
     <main>
         @yield('content')
     </main>
-    
+
     @include('landing.partials.footer')
-    
+
     @stack('scripts')
 </body>
 </html>
-
