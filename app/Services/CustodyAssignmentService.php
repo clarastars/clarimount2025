@@ -142,7 +142,7 @@ class CustodyAssignmentService
      */
     private function serializeAssetState(Asset $asset): array
     {
-        return [
+        return $this->sanitizeUtf8([
             'id' => $asset->id,
             'asset_tag' => $asset->asset_tag,
             'model_name' => $asset->model_name,
@@ -152,7 +152,22 @@ class CustodyAssignmentService
             'location_name' => $asset->location->name ?? null,
             'status' => $asset->status,
             'condition' => $asset->condition,
-        ];
+        ]);
+    }
+
+    private function sanitizeUtf8(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return mb_check_encoding($value, 'UTF-8')
+                ? $value
+                : mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        }
+
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => $this->sanitizeUtf8($item), $value);
+        }
+
+        return $value;
     }
 
     private function returnAssetFromEmployee(

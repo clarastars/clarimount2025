@@ -132,7 +132,10 @@ class CustodyController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => __('messages.custody.custody_updated_successfully'),
-                'custody_change' => $custodyChange,
+                'custody_change' => [
+                    'id' => $custodyChange->id,
+                    'status' => $custodyChange->status,
+                ],
             ]);
         } catch (\RuntimeException $exception) {
             return response()->json([
@@ -233,9 +236,13 @@ class CustodyController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'assets' => $createdAssets['assets'],
-                'asset' => $createdAssets['assets'][0] ?? null,
-                'custody_change' => $createdAssets['custody_change'],
+                'assets' => array_map(
+                    fn (Asset $asset): array => $this->formatAssetForApiResponse($asset),
+                    $createdAssets['assets']
+                ),
+                'asset' => isset($createdAssets['assets'][0])
+                    ? $this->formatAssetForApiResponse($createdAssets['assets'][0])
+                    : null,
             ]);
         } catch (\RuntimeException $exception) {
             return response()->json([
@@ -312,6 +319,17 @@ class CustodyController extends Controller
             'Content-Type' => $mimeType,
             'Content-Disposition' => 'inline; filename="'.basename($custodyChange->document_path).'"',
         ]);
+    }
+
+    /**
+     * @return array{id: string, asset_tag: string|null}
+     */
+    private function formatAssetForApiResponse(Asset $asset): array
+    {
+        return [
+            'id' => (string) $asset->id,
+            'asset_tag' => $asset->asset_tag,
+        ];
     }
 
     /**
