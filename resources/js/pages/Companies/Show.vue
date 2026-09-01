@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Heading from '@/components/Heading.vue';
+import CompanyTeamRolesSection from '@/components/companies/CompanyTeamRolesSection.vue';
 import { type BreadcrumbItem, type Company } from '@/types';
 
 interface BayzatConfig {
@@ -21,6 +22,25 @@ interface BayzatConfig {
     settings: any;
 }
 
+interface TeamRoleOverviewUser {
+    user_id: number;
+    user_name: string;
+    user_email: string;
+    employee_id: number | null;
+    employee_name: string | null;
+    employee_profile_url: string | null;
+    global_roles: Array<{ name: string; label: string }>;
+    team_assignments: Array<{
+        team_id: number;
+        team_name: string;
+        role_name: string;
+        role_label: string;
+        scope_type: 'full_company' | 'departments';
+        department_names: string[];
+        is_primary_team: boolean;
+    }>;
+}
+
 interface Props {
     company: Company & {
         bayzat_config?: BayzatConfig;
@@ -28,6 +48,7 @@ interface Props {
     };
     totalAssetsCount: number;
     isReadOnly?: boolean;
+    teamRoleOverview?: TeamRoleOverviewUser[] | null;
     capabilities?: {
         can_view_employees_readonly?: boolean;
         can_manage_employees?: boolean;
@@ -36,6 +57,7 @@ interface Props {
         can_manage_attendance_adjustments?: boolean;
         can_view_salary_runs_readonly?: boolean;
         can_approve_salary_runs?: boolean;
+        can_view_company_team_roles?: boolean;
     };
 }
 
@@ -49,6 +71,7 @@ const auth = usePage().props.auth as {
     can_manage_attendance_adjustments?: boolean;
     can_view_salary_runs_readonly?: boolean;
     can_approve_salary_runs?: boolean;
+    can_view_company_team_roles?: boolean;
 };
 
 const caps = computed(() => ({
@@ -59,6 +82,7 @@ const caps = computed(() => ({
     can_manage_attendance_adjustments: props.capabilities?.can_manage_attendance_adjustments ?? auth?.can_manage_attendance_adjustments,
     can_view_salary_runs_readonly: props.capabilities?.can_view_salary_runs_readonly ?? auth?.can_view_salary_runs_readonly,
     can_approve_salary_runs: props.capabilities?.can_approve_salary_runs ?? auth?.can_approve_salary_runs,
+    can_view_company_team_roles: props.capabilities?.can_view_company_team_roles ?? false,
 }));
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
@@ -266,6 +290,11 @@ const formatLastSync = (lastSync: string | null) => {
                     </CardContent>
                 </Card>
             </div>
+
+            <CompanyTeamRolesSection
+                v-if="caps.can_view_company_team_roles && teamRoleOverview"
+                :assignments="teamRoleOverview"
+            />
         </div>
     </AppLayout>
 </template> 

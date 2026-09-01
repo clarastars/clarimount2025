@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\CompanyTeamRoleOverviewService;
 use App\Services\EntitlementSettlementApprovalService;
 use App\Services\LeaveApprovalService;
 use App\Services\SalaryCertificateApprovalService;
@@ -66,7 +67,8 @@ class CompanyController extends Controller
      *     can_view_attendance_readonly: bool,
      *     can_manage_attendance_adjustments: bool,
      *     can_view_salary_runs_readonly: bool,
-     *     can_approve_salary_runs: bool
+     *     can_approve_salary_runs: bool,
+     *     can_view_company_team_roles: bool
      * }
      */
     private function companyCapabilityFlags(Company $company): array
@@ -81,6 +83,7 @@ class CompanyController extends Controller
                 'can_manage_attendance_adjustments' => false,
                 'can_view_salary_runs_readonly' => false,
                 'can_approve_salary_runs' => false,
+                'can_view_company_team_roles' => false,
             ];
         }
 
@@ -93,6 +96,7 @@ class CompanyController extends Controller
                 'can_manage_attendance_adjustments' => true,
                 'can_view_salary_runs_readonly' => true,
                 'can_approve_salary_runs' => true,
+                'can_view_company_team_roles' => true,
             ];
         }
 
@@ -121,7 +125,23 @@ class CompanyController extends Controller
                 $companyId
             ),
             'can_approve_salary_runs' => $roleService->canForCompany($user, 'salary-runs.approve', $companyId),
+            'can_view_company_team_roles' => $this->canViewCompanyTeamRoles($company),
         ];
+    }
+
+    private function canViewCompanyTeamRoles(Company $company): bool
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasRole('super-admin') || $this->canManageCompany($company)) {
+            return true;
+        }
+
+        return app(\App\Services\EmployeeUserRoleService::class)
+            ->canForCompany($user, 'company.team-roles.view', (int) $company->id);
     }
 
     private function canManageCompany(Company $company): bool
@@ -264,11 +284,16 @@ class CompanyController extends Controller
             ->get()
             ->sum('assets_count');
 
+        $canViewTeamRoles = $this->canViewCompanyTeamRoles($company);
+
         return Inertia::render('Companies/Show', [
             'company' => $company,
             'totalAssetsCount' => $totalAssetsCount,
             'isReadOnly' => ! $canManage,
             'capabilities' => $this->companyCapabilityFlags($company),
+            'teamRoleOverview' => $canViewTeamRoles
+                ? app(CompanyTeamRoleOverviewService::class)->buildForCompany($company)
+                : null,
         ]);
     }
 

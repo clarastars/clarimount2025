@@ -24,6 +24,7 @@ class TeamPermissionController extends Controller
         ['name' => 'asset-inventory.access', 'label' => 'جرد الأصول'],
         ['name' => 'settings.access', 'label' => 'الإعدادات'],
         ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
+        ['name' => 'company.team-roles.view', 'label' => 'الاطلاع على أدوار وتعيينات الشركة'],
         ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
         ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
         ['name' => 'employees.audit-log.view', 'label' => 'الاطلاع على سجل تعديلات ملف الموظف'],
