@@ -269,7 +269,7 @@ class EmployeeUserRoleService
             'joined_team_at' => $primaryTeamId ? now() : null,
         ]);
 
-        $this->detachManageableTeamRoles($portalUser, $manageableTeamIds);
+        $this->detachManageableTeamRoles($portalUser, $assignableTeamIds);
 
         foreach ($normalizedAssignments as $assignment) {
             app(PermissionRegistrar::class)->setPermissionsTeamId($assignment['team_id']);
@@ -286,7 +286,7 @@ class EmployeeUserRoleService
         }
 
         $this->syncGlobalRoles($portalUser, $globalRoleNames);
-        $this->syncTeamCompanyAccess($portalUser, $manageableTeamIds, $normalizedAssignments);
+        $this->syncTeamCompanyAccess($portalUser, $assignableTeamIds, $normalizedAssignments);
 
         app(PermissionRegistrar::class)->setPermissionsTeamId($portalUser->team_id);
         $portalUser->unsetRelation('roles');
