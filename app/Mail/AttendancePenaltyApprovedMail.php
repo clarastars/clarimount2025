@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\AttendancePenalty;
+use App\Services\AttendancePenaltyEmailContextBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -57,6 +58,7 @@ class AttendancePenaltyApprovedMail extends Mailable
                 'employee' => $employee,
                 'company' => $company,
                 'companyLogoPath' => $companyLogoPath,
+                'emailContext' => app(AttendancePenaltyEmailContextBuilder::class)->build($this->penalty),
             ],
         );
     }
