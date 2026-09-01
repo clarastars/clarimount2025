@@ -7,10 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
+use OwenIt\Auditing\Auditable as AuditableTrait;
 
-class Employee extends Model
+class Employee extends Model implements AuditableContract
 {
+    use AuditableTrait;
     use HasFactory, SoftDeletes;
+
+    /**
+     * @var array<int, string>
+     */
+    protected $auditExclude = [
+        'updated_at',
+    ];
 
     protected $fillable = [
         'employee_id',

@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
 use App\Models\SystemSetting;
+use App\Services\EmployeeAuditLogPresenter;
 use App\Services\EmployeeDocumentService;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeeFingerprintMonthSyncService;
@@ -518,6 +519,10 @@ class EmployeeController extends Controller
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
             'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
+            'canViewEmployeeAuditLog' => $this->canViewEmployeeAuditLog($user, $employee),
+            'auditLogs' => $this->canViewEmployeeAuditLog($user, $employee)
+                ? app(EmployeeAuditLogPresenter::class)->forEmployee($employee)
+                : [],
         ]);
     }
 

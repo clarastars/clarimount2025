@@ -793,6 +793,18 @@ return [
         'delete_failed' => 'Failed to delete employee. Check logs.',
         'created_successfully' => 'Employee created successfully.',
         'updated_successfully' => 'Employee updated successfully.',
+        'audit_log_title' => 'Change history',
+        'audit_log_empty' => 'No changes have been recorded for this employee file yet.',
+        'audit_event_created' => 'Created',
+        'audit_event_updated' => 'Updated',
+        'audit_event_deleted' => 'Deleted',
+        'audit_event_restored' => 'Restored',
+        'audit_performed_by' => 'By',
+        'audit_by_system' => 'System',
+        'audit_field' => 'Field',
+        'audit_old_value' => 'Previous value',
+        'audit_new_value' => 'New value',
+        'audit_no_field_changes' => 'No field details are available for this event.',
 
         // New sectional translations for comprehensive employee form
         'general_information' => 'General Information',

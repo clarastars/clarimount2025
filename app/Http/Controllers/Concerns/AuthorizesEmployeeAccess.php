@@ -111,6 +111,24 @@ trait AuthorizesEmployeeAccess
         return $this->canAccessEmployee($user, $employee);
     }
 
+    protected function canViewEmployeeAuditLog(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.audit-log.view',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
     protected function canExcludeEmployeeFromSalary(User $user, Employee $employee): bool
     {
         if ($user->hasRole('super-admin')) {

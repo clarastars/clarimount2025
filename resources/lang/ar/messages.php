@@ -791,6 +791,18 @@ return [
         'delete_failed' => 'فشل حذف الموظف. راجع السجلات.',
         'created_successfully' => 'تم إضافة الموظف بنجاح.',
         'updated_successfully' => 'تم تحديث الموظف بنجاح.',
+        'audit_log_title' => 'سجل التعديلات',
+        'audit_log_empty' => 'لا توجد تعديلات مسجلة على هذا الملف بعد.',
+        'audit_event_created' => 'إنشاء',
+        'audit_event_updated' => 'تعديل',
+        'audit_event_deleted' => 'حذف',
+        'audit_event_restored' => 'استعادة',
+        'audit_performed_by' => 'بواسطة',
+        'audit_by_system' => 'النظام',
+        'audit_field' => 'الحقل',
+        'audit_old_value' => 'القيمة السابقة',
+        'audit_new_value' => 'القيمة الجديدة',
+        'audit_no_field_changes' => 'لا توجد تفاصيل حقول لهذا الحدث.',
 
         // New sectional translations for comprehensive employee form
         'general_information' => 'المعلومات العامة',

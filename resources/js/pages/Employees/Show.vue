@@ -392,6 +392,11 @@
                 </EmployeeShowSection>
             </div>
 
+            <EmployeeAuditLogSection
+                v-if="canViewEmployeeAuditLog"
+                :audit-logs="auditLogs || []"
+            />
+
             <p class="text-center text-xs text-muted-foreground">
                 {{ t('common.created_at') }}: {{ displayDate(employee.created_at) }}
             </p>
@@ -411,6 +416,8 @@ import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/Icon.vue';
 import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
 import EmployeeShowSection from '@/components/employees/EmployeeShowSection.vue';
+import EmployeeAuditLogSection from '@/components/employees/EmployeeAuditLogSection.vue';
+import type { EmployeeAuditLogEntry } from '@/components/employees/EmployeeAuditLogSection.vue';
 import EmployeeInfoField from '@/components/employees/EmployeeInfoField.vue';
 import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import type { Employee, BreadcrumbItem } from '@/types';
@@ -439,6 +446,8 @@ interface Props {
     canSettleEmployeeEntitlements?: boolean;
     canSyncEmployeeFingerprintMonth?: boolean;
     canExcludeFromSalary?: boolean;
+    canViewEmployeeAuditLog?: boolean;
+    auditLogs?: EmployeeAuditLogEntry[];
 }
 
 const props = defineProps<Props>();
@@ -450,6 +459,7 @@ const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const canExcludeFromSalary = computed(() => props.canExcludeFromSalary ?? false);
+const canViewEmployeeAuditLog = computed(() => props.canViewEmployeeAuditLog ?? false);
 const isSyncingFingerprintMonth = ref(false);
 const isTogglingExcludeFromSalary = ref(false);
 const showBasicSalary = ref(false);

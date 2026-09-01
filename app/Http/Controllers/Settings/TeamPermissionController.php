@@ -26,6 +26,7 @@ class TeamPermissionController extends Controller
         ['name' => 'company.readonly', 'label' => 'الاطلاع على بيانات الشركة (قراءة فقط)'],
         ['name' => 'employees.readonly', 'label' => 'الاطلاع على الموظفين (قراءة فقط)'],
         ['name' => 'employees.manage', 'label' => 'إدارة الموظفين (إضافة وتعديل وحذف وعرض)'],
+        ['name' => 'employees.audit-log.view', 'label' => 'الاطلاع على سجل تعديلات ملف الموظف'],
         ['name' => 'employees.team-roles.assign', 'label' => 'تعيين أدوار الفرق للموظف (شركات الدور فقط)'],
         ['name' => 'employees.team-roles.assign-any-company', 'label' => 'تعيين أدوار الفرق للموظف (كل الشركات والأقسام)'],
         ['name' => 'employees.assign-any-department', 'label' => 'تعيين أي قسم للموظف (كل الأقسام وليس فقط أقسام شركته)'],
