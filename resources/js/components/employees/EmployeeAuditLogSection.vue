@@ -90,7 +90,7 @@ function displayValue(value: string | null): string {
                 <div v-if="entry.changes.length" class="mt-3 overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
-                            <tr class="border-b border-border/60 text-start text-xs text-muted-foreground">
+                            <tr class="border-b border-border/60 text-center text-xs text-muted-foreground">
                                 <th class="px-2 py-2 font-medium">{{ t('employees.audit_field') }}</th>
                                 <th class="px-2 py-2 font-medium">{{ t('employees.audit_old_value') }}</th>
                                 <th class="px-2 py-2 font-medium">{{ t('employees.audit_new_value') }}</th>
@@ -100,11 +100,11 @@ function displayValue(value: string | null): string {
                             <tr
                                 v-for="change in entry.changes"
                                 :key="`${entry.id}-${change.field}`"
-                                class="border-b border-border/40 last:border-0"
+                                class="border-b border-border/40 last:border-0 text-center"
                             >
-                                <td class="px-2 py-2 align-top font-medium">{{ change.label }}</td>
-                                <td class="px-2 py-2 align-top text-muted-foreground">{{ displayValue(change.old) }}</td>
-                                <td class="px-2 py-2 align-top text-foreground">{{ displayValue(change.new) }}</td>
+                                <td class="px-2 py-2 align-middle font-medium">{{ change.label }}</td>
+                                <td class="px-2 py-2 align-middle text-muted-foreground">{{ displayValue(change.old) }}</td>
+                                <td class="px-2 py-2 align-middle text-foreground">{{ displayValue(change.new) }}</td>
                             </tr>
                         </tbody>
                     </table>
