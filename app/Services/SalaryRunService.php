@@ -86,219 +86,13 @@ class SalaryRunService
 
             /** @var \Illuminate\Database\Eloquent\Collection<int, Employee> $employees */
             foreach ($employees as $employee) {
-                $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
-                    ->where('employee_id', $employee->id)
-                    ->first();
-
-                $breakdownExclusions = $existingItem?->breakdown_exclusions ?? [];
-
-                $fullBasicSalary = (float) ($employee->basic_salary ?? 0);
-                $fullAllowances = (float) ($employee->allowances ?? 0);
-                $fullGrossSalary = $fullBasicSalary + $fullAllowances;
-
-                $proration = $this->resolveEmploymentProration(
+                $this->upsertEmployeeSalaryRunItem(
+                    $salaryRun,
                     $employee,
+                    $startDate,
+                    $endDate,
                     $calendarMonthStart,
-                    $calendarMonthEndDay
-                );
-                $salaryFactor = $proration['factor'];
-
-                $hireDateTz = $employee->hire_date !== null
-                    ? Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay()
-                    : null;
-                $opStart = $startDate->copy()->timezone(self::TZ)->startOfDay();
-                $attendanceRangeStart = ($hireDateTz !== null && $hireDateTz->gt($opStart))
-                    ? $hireDateTz
-                    : $opStart;
-
-                $basicSalary = round($fullBasicSalary * $salaryFactor, 2);
-                $allowances = round($fullAllowances * $salaryFactor, 2);
-                $grossSalary = round($basicSalary + $allowances, 2);
-                $insuranceBase = round((($employee->basic_salary ?? 0) + ($employee->allowance_housing ?? 0)) * $salaryFactor, 2);
-                $insuranceRate = (float) ($employee->social_insurance_deduction_rate ?? 0);
-                $socialInsuranceDeductionTotal = $insuranceRate > 0
-                    ? round(($insuranceBase * $insuranceRate) / 100, 2)
-                    : 0.0;
-                $dailyWage = $fullGrossSalary / 30; // Keep a full daily wage; monthly proration is applied separately.
-
-                // Get approved penalties for this employee in the operational payroll window (not calendar month).
-                $approvedPenalties = AttendancePenalty::where('employee_id', $employee->id)
-                    ->where('approval_status', 'approved')
-                    ->whereBetween('attendance_date', [
-                        $attendanceRangeStart->format('Y-m-d'),
-                        $endDate->format('Y-m-d'),
-                    ])
-                    ->get();
-
-                // Calculate total penalties
-                $penaltiesTotal = 0;
-                $breakdown = [];
-
-                foreach ($approvedPenalties as $penalty) {
-                    if ($this->isBreakdownExcluded($breakdownExclusions, 'attendance_penalty', $penalty->id)) {
-                        continue;
-                    }
-
-                    $penaltyAmount = $this->calculatePenaltyAmount($penalty, $fullGrossSalary, $dailyWage, $fullBasicSalary);
-                    $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
-                    $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
-                    $penaltiesTotal += $totalForPenalty;
-                    $penaltyCategory = $this->resolvePenaltyCategory((string) $penalty->violation_type);
-
-                    $breakdown[] = [
-                        'date' => \Carbon\Carbon::parse((string) $penalty->attendance_date)->format('Y-m-d'),
-                        'violation_type' => $penalty->violation_type,
-                        'penalty_category' => $penaltyCategory,
-                        'action_type' => $penalty->action_type,
-                        'action_value' => $penalty->action_value,
-                        'action_text' => $penalty->action_text,
-                        'amount' => $totalForPenalty,
-                        'penalty_amount' => $penaltyAmount,
-                        'late_minutes_deduction_amount' => $lateMinutesDeduction,
-                        'attendance_penalty_id' => $penalty->id,
-                        'source' => 'penalty',
-                    ];
-                }
-
-                // Manual deductions (employee_deductions) in the operational payroll window.
-                $manualDeductions = EmployeeDeduction::where('employee_id', $employee->id)
-                    ->whereBetween('deduction_date', [
-                        $attendanceRangeStart->format('Y-m-d'),
-                        $endDate->format('Y-m-d'),
-                    ])
-                    ->orderBy('deduction_date')
-                    ->get();
-
-                foreach ($manualDeductions as $deduction) {
-                    if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_deduction', $deduction->id)) {
-                        continue;
-                    }
-
-                    $amount = (float) $deduction->amount;
-                    $penaltiesTotal += $amount;
-                    $breakdown[] = [
-                        'date' => \Carbon\Carbon::parse((string) $deduction->deduction_date)->format('Y-m-d'),
-                        'action_type' => 'manual_deduction',
-                        'deduction_type' => (string) $deduction->deduction_type,
-                        'action_value' => null,
-                        'action_text' => $deduction->reason,
-                        'amount' => $amount,
-                        'employee_deduction_id' => $deduction->id,
-                        'source' => 'manual_deduction',
-                    ];
-                }
-
-                // Manual additions (employee_additions) in the operational payroll window.
-                $manualAdditions = EmployeeAddition::where('employee_id', $employee->id)
-                    ->whereBetween('addition_date', [
-                        $attendanceRangeStart->format('Y-m-d'),
-                        $endDate->format('Y-m-d'),
-                    ])
-                    ->orderBy('addition_date')
-                    ->get();
-
-                $additionsTotal = 0.0;
-                foreach ($manualAdditions as $addition) {
-                    if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_addition', $addition->id)) {
-                        continue;
-                    }
-
-                    $amount = (float) $addition->amount;
-                    $additionsTotal += $amount;
-                    $breakdown[] = [
-                        'date' => \Carbon\Carbon::parse((string) $addition->addition_date)->format('Y-m-d'),
-                        'action_type' => 'manual_addition',
-                        'addition_type' => (string) $addition->addition_type,
-                        'action_value' => null,
-                        'action_text' => $addition->reason,
-                        'amount' => $amount,
-                        'employee_addition_id' => $addition->id,
-                        'source' => 'manual_addition',
-                    ];
-                }
-
-                $debtDeductions = $existingItem?->debt_deductions ?? [];
-                if ($salaryRun->isDraft()) {
-                    // Sync against current employee debts (drop deleted / clamp amounts),
-                    // then auto-include any new certificate-attestation debts.
-                    $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $debtDeductions);
-                }
-
-                $debtDeductionsTotal = 0;
-
-                // Calculate total debt deductions
-                if (is_array($debtDeductions)) {
-                    foreach ($debtDeductions as $deduction) {
-                        $debtDeductionsTotal += $deduction['amount'] ?? 0;
-                    }
-                }
-
-                // Unpaid leave: overlap with operational payroll window only.
-                $unpaidLeaves = Leave::where('employee_id', $employee->id)
-                    ->where('is_paid', false)
-                    ->get()
-                    ->filter(fn (Leave $leave) => $leave->overlapsDateRange($attendanceRangeStart, $endDate));
-
-                $unpaidLeaveTotal = 0;
-                foreach ($unpaidLeaves as $leave) {
-                    /** @var Leave $leave */
-                    if ($this->isBreakdownExcluded($breakdownExclusions, 'unpaid_leave', $leave->id)) {
-                        continue;
-                    }
-
-                    $daysInAttendanceRange = $leave->daysInDateRange($attendanceRangeStart, $endDate);
-                    $amount = round($daysInAttendanceRange * $dailyWage, 2);
-                    $unpaidLeaveTotal += $amount;
-                    $breakdown[] = [
-                        'date' => \Carbon\Carbon::parse((string) $leave->start_date)->format('Y-m-d')
-                            .' / '
-                            .\Carbon\Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
-                        'action_type' => 'unpaid_leave',
-                        'action_value' => $daysInAttendanceRange,
-                        'action_text' => 'Unpaid leave',
-                        'amount' => $amount,
-                        'leave_id' => $leave->id,
-                        'source' => 'unpaid_leave',
-                    ];
-                }
-
-                if ($salaryFactor < 1.0) {
-                    $breakdown[] = [
-                        'date' => $calendarMonthStart->format('Y-m-d').' / '.$calendarMonthEndDay->format('Y-m-d'),
-                        'action_type' => 'employment_proration',
-                        'action_value' => round($salaryFactor * 100, 2),
-                        'action_text' => 'Salary prorated from hire date (calendar month)',
-                        'amount' => $grossSalary,
-                        'source' => 'employment_proration',
-                    ];
-                }
-
-                $netSalary = $grossSalary
-                    + $additionsTotal
-                    - $penaltiesTotal
-                    - (float) $unpaidLeaveTotal
-                    - $debtDeductionsTotal
-                    - $socialInsuranceDeductionTotal;
-
-                // Upsert salary run item
-                SalaryRunItem::updateOrCreate(
-                    [
-                        'salary_run_id' => $salaryRun->id,
-                        'employee_id' => $employee->id,
-                    ],
-                    [
-                        'basic_salary' => $basicSalary,
-                        'allowances' => $allowances,
-                        'gross_salary' => $grossSalary,
-                        'penalties_total' => $penaltiesTotal,
-                        'additions_total' => $additionsTotal,
-                        'social_insurance_deduction_total' => $socialInsuranceDeductionTotal,
-                        'unpaid_leave_total' => $unpaidLeaveTotal,
-                        'net_salary' => $netSalary,
-                        'breakdown' => $breakdown,
-                        'breakdown_exclusions' => $breakdownExclusions,
-                        'debt_deductions' => $debtDeductions, // Preserve existing debt deductions
-                    ]
+                    $calendarMonthEndDay,
                 );
             }
 
@@ -317,6 +111,310 @@ class SalaryRunService
 
             return $salaryRun->fresh(['items.employee']);
         });
+    }
+
+    /**
+     * Add a single employee to an existing salary run without touching other lines or approvals.
+     *
+     * @throws ValidationException
+     */
+    public function addEmployeeToSalaryRun(
+        int $companyId,
+        int $salaryRunId,
+        int $employeeId,
+        bool $forceFinalized = false,
+    ): SalaryRunItem {
+        return DB::transaction(function () use ($companyId, $salaryRunId, $employeeId, $forceFinalized): SalaryRunItem {
+            $salaryRun = SalaryRun::query()
+                ->where('company_id', $companyId)
+                ->whereKey($salaryRunId)
+                ->first();
+
+            if ($salaryRun === null) {
+                throw ValidationException::withMessages([
+                    'salary_run' => [__('messages.salary_runs.add_employee_run_not_found')],
+                ]);
+            }
+
+            if ($salaryRun->isFinalized() && ! $forceFinalized) {
+                throw ValidationException::withMessages([
+                    'salary_run' => [__('messages.salary_runs.cannot_update_finalized')],
+                ]);
+            }
+
+            $employee = Employee::query()->find($employeeId);
+
+            if ($employee === null) {
+                throw ValidationException::withMessages([
+                    'employee' => [__('messages.salary_runs.add_employee_not_found')],
+                ]);
+            }
+
+            if ((int) $employee->company_id !== $companyId) {
+                throw ValidationException::withMessages([
+                    'employee' => [__('messages.salary_runs.add_employee_company_mismatch')],
+                ]);
+            }
+
+            if ($employee->employment_status !== 'active') {
+                throw ValidationException::withMessages([
+                    'employee' => [__('messages.salary_runs.add_employee_not_active')],
+                ]);
+            }
+
+            if ($employee->isExcludedFromSalary()) {
+                throw ValidationException::withMessages([
+                    'employee' => [__('messages.salary_runs.add_employee_excluded_from_salary')],
+                ]);
+            }
+
+            $alreadyIncluded = SalaryRunItem::query()
+                ->where('salary_run_id', $salaryRun->id)
+                ->where('employee_id', $employee->id)
+                ->exists();
+
+            if ($alreadyIncluded) {
+                throw ValidationException::withMessages([
+                    'employee' => [__('messages.salary_runs.add_employee_already_in_run')],
+                ]);
+            }
+
+            $operationalRange = $this->operationalMonthService->resolveRangeForPayrollMonth(
+                (int) $salaryRun->year,
+                (int) $salaryRun->month,
+            );
+            $calendarRange = $this->resolveCalendarMonthRange((int) $salaryRun->year, (int) $salaryRun->month);
+
+            $item = $this->upsertEmployeeSalaryRunItem(
+                $salaryRun,
+                $employee,
+                $operationalRange['start'],
+                $operationalRange['end'],
+                $calendarRange['start'],
+                $calendarRange['end'],
+            );
+
+            if ($salaryRun->isFinalized()) {
+                $item->update([
+                    'export_snapshot' => $this->exportRowBuilder->buildLiveSnapshot($item, $employee),
+                ]);
+            }
+
+            return $item->fresh(['employee']);
+        });
+    }
+
+    private function upsertEmployeeSalaryRunItem(
+        SalaryRun $salaryRun,
+        Employee $employee,
+        Carbon $startDate,
+        Carbon $endDate,
+        Carbon $calendarMonthStart,
+        Carbon $calendarMonthEndDay,
+    ): SalaryRunItem {
+        $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
+            ->where('employee_id', $employee->id)
+            ->first();
+
+        $breakdownExclusions = $existingItem?->breakdown_exclusions ?? [];
+
+        $fullBasicSalary = (float) ($employee->basic_salary ?? 0);
+        $fullAllowances = (float) ($employee->allowances ?? 0);
+        $fullGrossSalary = $fullBasicSalary + $fullAllowances;
+
+        $proration = $this->resolveEmploymentProration(
+            $employee,
+            $calendarMonthStart,
+            $calendarMonthEndDay
+        );
+        $salaryFactor = $proration['factor'];
+
+        $hireDateTz = $employee->hire_date !== null
+            ? Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay()
+            : null;
+        $opStart = $startDate->copy()->timezone(self::TZ)->startOfDay();
+        $attendanceRangeStart = ($hireDateTz !== null && $hireDateTz->gt($opStart))
+            ? $hireDateTz
+            : $opStart;
+
+        $basicSalary = round($fullBasicSalary * $salaryFactor, 2);
+        $allowances = round($fullAllowances * $salaryFactor, 2);
+        $grossSalary = round($basicSalary + $allowances, 2);
+        $insuranceBase = round((($employee->basic_salary ?? 0) + ($employee->allowance_housing ?? 0)) * $salaryFactor, 2);
+        $insuranceRate = (float) ($employee->social_insurance_deduction_rate ?? 0);
+        $socialInsuranceDeductionTotal = $insuranceRate > 0
+            ? round(($insuranceBase * $insuranceRate) / 100, 2)
+            : 0.0;
+        $dailyWage = $fullGrossSalary / 30;
+
+        $approvedPenalties = AttendancePenalty::where('employee_id', $employee->id)
+            ->where('approval_status', 'approved')
+            ->whereBetween('attendance_date', [
+                $attendanceRangeStart->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->get();
+
+        $penaltiesTotal = 0;
+        $breakdown = [];
+
+        foreach ($approvedPenalties as $penalty) {
+            if ($this->isBreakdownExcluded($breakdownExclusions, 'attendance_penalty', $penalty->id)) {
+                continue;
+            }
+
+            $penaltyAmount = $this->calculatePenaltyAmount($penalty, $fullGrossSalary, $dailyWage, $fullBasicSalary);
+            $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
+            $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
+            $penaltiesTotal += $totalForPenalty;
+            $penaltyCategory = $this->resolvePenaltyCategory((string) $penalty->violation_type);
+
+            $breakdown[] = [
+                'date' => Carbon::parse((string) $penalty->attendance_date)->format('Y-m-d'),
+                'violation_type' => $penalty->violation_type,
+                'penalty_category' => $penaltyCategory,
+                'action_type' => $penalty->action_type,
+                'action_value' => $penalty->action_value,
+                'action_text' => $penalty->action_text,
+                'amount' => $totalForPenalty,
+                'penalty_amount' => $penaltyAmount,
+                'late_minutes_deduction_amount' => $lateMinutesDeduction,
+                'attendance_penalty_id' => $penalty->id,
+                'source' => 'penalty',
+            ];
+        }
+
+        $manualDeductions = EmployeeDeduction::where('employee_id', $employee->id)
+            ->whereBetween('deduction_date', [
+                $attendanceRangeStart->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->orderBy('deduction_date')
+            ->get();
+
+        foreach ($manualDeductions as $deduction) {
+            if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_deduction', $deduction->id)) {
+                continue;
+            }
+
+            $amount = (float) $deduction->amount;
+            $penaltiesTotal += $amount;
+            $breakdown[] = [
+                'date' => Carbon::parse((string) $deduction->deduction_date)->format('Y-m-d'),
+                'action_type' => 'manual_deduction',
+                'deduction_type' => (string) $deduction->deduction_type,
+                'action_value' => null,
+                'action_text' => $deduction->reason,
+                'amount' => $amount,
+                'employee_deduction_id' => $deduction->id,
+                'source' => 'manual_deduction',
+            ];
+        }
+
+        $manualAdditions = EmployeeAddition::where('employee_id', $employee->id)
+            ->whereBetween('addition_date', [
+                $attendanceRangeStart->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            ])
+            ->orderBy('addition_date')
+            ->get();
+
+        $additionsTotal = 0.0;
+        foreach ($manualAdditions as $addition) {
+            if ($this->isBreakdownExcluded($breakdownExclusions, 'employee_addition', $addition->id)) {
+                continue;
+            }
+
+            $amount = (float) $addition->amount;
+            $additionsTotal += $amount;
+            $breakdown[] = [
+                'date' => Carbon::parse((string) $addition->addition_date)->format('Y-m-d'),
+                'action_type' => 'manual_addition',
+                'addition_type' => (string) $addition->addition_type,
+                'action_value' => null,
+                'action_text' => $addition->reason,
+                'amount' => $amount,
+                'employee_addition_id' => $addition->id,
+                'source' => 'manual_addition',
+            ];
+        }
+
+        $debtDeductions = $existingItem?->debt_deductions ?? [];
+        if ($salaryRun->isDraft()) {
+            $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $debtDeductions);
+        }
+
+        $debtDeductionsTotal = 0.0;
+        if (is_array($debtDeductions)) {
+            foreach ($debtDeductions as $deduction) {
+                $debtDeductionsTotal += (float) ($deduction['amount'] ?? 0);
+            }
+        }
+
+        $unpaidLeaves = Leave::where('employee_id', $employee->id)
+            ->where('is_paid', false)
+            ->get()
+            ->filter(fn (Leave $leave) => $leave->overlapsDateRange($attendanceRangeStart, $endDate));
+
+        $unpaidLeaveTotal = 0.0;
+        foreach ($unpaidLeaves as $leave) {
+            if ($this->isBreakdownExcluded($breakdownExclusions, 'unpaid_leave', $leave->id)) {
+                continue;
+            }
+
+            $daysInAttendanceRange = $leave->daysInDateRange($attendanceRangeStart, $endDate);
+            $amount = round($daysInAttendanceRange * $dailyWage, 2);
+            $unpaidLeaveTotal += $amount;
+            $breakdown[] = [
+                'date' => Carbon::parse((string) $leave->start_date)->format('Y-m-d')
+                    .' / '
+                    .Carbon::parse((string) $leave->end_date)->format('Y-m-d'),
+                'action_type' => 'unpaid_leave',
+                'action_value' => $daysInAttendanceRange,
+                'action_text' => 'Unpaid leave',
+                'amount' => $amount,
+                'leave_id' => $leave->id,
+                'source' => 'unpaid_leave',
+            ];
+        }
+
+        if ($salaryFactor < 1.0) {
+            $breakdown[] = [
+                'date' => $calendarMonthStart->format('Y-m-d').' / '.$calendarMonthEndDay->format('Y-m-d'),
+                'action_type' => 'employment_proration',
+                'action_value' => round($salaryFactor * 100, 2),
+                'action_text' => 'Salary prorated from hire date (calendar month)',
+                'amount' => $grossSalary,
+                'source' => 'employment_proration',
+            ];
+        }
+
+        $netSalary = $grossSalary
+            + $additionsTotal
+            - $penaltiesTotal
+            - $unpaidLeaveTotal
+            - $debtDeductionsTotal
+            - $socialInsuranceDeductionTotal;
+
+        return SalaryRunItem::updateOrCreate(
+            [
+                'salary_run_id' => $salaryRun->id,
+                'employee_id' => $employee->id,
+            ],
+            [
+                'basic_salary' => $basicSalary,
+                'allowances' => $allowances,
+                'gross_salary' => $grossSalary,
+                'penalties_total' => $penaltiesTotal,
+                'additions_total' => $additionsTotal,
+                'social_insurance_deduction_total' => $socialInsuranceDeductionTotal,
+                'unpaid_leave_total' => $unpaidLeaveTotal,
+                'net_salary' => $netSalary,
+                'breakdown' => $breakdown,
+                'breakdown_exclusions' => $breakdownExclusions,
+                'debt_deductions' => $debtDeductions,
+            ]
+        );
     }
 
     /**
