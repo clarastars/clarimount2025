@@ -42,6 +42,12 @@
                     @endif
                     <p style="margin: 0 0 8px 0;"><strong>{{ __('messages.attendance.attendance_late_minutes') }}:</strong> {{ $emailContext['late_minutes'] ?? 0 }}</p>
                 @elseif(($emailContext['scenario'] ?? 'generic') === 'early_departure')
+                    @if(!empty($emailContext['scheduled_check_in']))
+                        <p style="margin: 0 0 8px 0;"><strong>{{ __('messages.attendance.penalty_email_scheduled_check_in') }}:</strong> {{ $emailContext['scheduled_check_in'] }}</p>
+                    @endif
+                    @if(!empty($emailContext['actual_check_in']))
+                        <p style="margin: 0 0 8px 0;"><strong>{{ __('messages.attendance.penalty_email_actual_check_in') }}:</strong> {{ $emailContext['actual_check_in'] }}</p>
+                    @endif
                     @if(!empty($emailContext['scheduled_check_out']))
                         <p style="margin: 0 0 8px 0;"><strong>{{ __('messages.attendance.penalty_email_scheduled_check_out') }}:</strong> {{ $emailContext['scheduled_check_out'] }}</p>
                     @endif
