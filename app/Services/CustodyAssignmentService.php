@@ -11,6 +11,7 @@ use App\Models\CustodyChange;
 use App\Models\Employee;
 use App\Models\Location;
 use App\Models\User;
+use App\Support\Utf8;
 use Illuminate\Support\Facades\DB;
 
 class CustodyAssignmentService
@@ -48,7 +49,7 @@ class CustodyAssignmentService
             foreach ($assetsToAdd as $asset) {
                 if ($asset->status !== 'available') {
                     throw new \RuntimeException(
-                        __('messages.custody.asset_not_available', ['tag' => $asset->asset_tag])
+                        __('messages.custody.asset_not_available', ['tag' => Utf8::sanitize($asset->asset_tag)])
                     );
                 }
             }
@@ -71,7 +72,7 @@ class CustodyAssignmentService
                 'updated_by' => $user->id,
                 'previous_state' => $previousState,
                 'new_state' => $newState,
-                'changes_summary' => $changesSummary,
+                'changes_summary' => Utf8::sanitize($changesSummary),
                 'document_path' => null,
                 'status' => 'pending',
             ]);
@@ -123,12 +124,12 @@ class CustodyAssignmentService
             'asset_category_id' => $template->asset_category_id,
             'location_id' => $location->id,
             'asset_template_id' => $template->id,
-            'serial_number' => $data['serial_number'] ?? null,
+            'serial_number' => Utf8::sanitize($data['serial_number'] ?? null),
             'condition' => $data['condition'] ?? 'good',
-            'model_name' => $template->model_name,
-            'model_number' => $template->model_number,
-            'manufacturer' => $template->manufacturer,
-            'notes' => $template->default_notes,
+            'model_name' => Utf8::sanitize($template->model_name),
+            'model_number' => Utf8::sanitize($template->model_number),
+            'manufacturer' => Utf8::sanitize($template->manufacturer),
+            'notes' => Utf8::sanitize($template->default_notes),
             'status' => 'available',
         ]);
 
@@ -142,7 +143,7 @@ class CustodyAssignmentService
      */
     private function serializeAssetState(Asset $asset): array
     {
-        return $this->sanitizeUtf8([
+        return Utf8::sanitizeMixed([
             'id' => $asset->id,
             'asset_tag' => $asset->asset_tag,
             'model_name' => $asset->model_name,
@@ -153,21 +154,6 @@ class CustodyAssignmentService
             'status' => $asset->status,
             'condition' => $asset->condition,
         ]);
-    }
-
-    private function sanitizeUtf8(mixed $value): mixed
-    {
-        if (is_string($value)) {
-            return mb_check_encoding($value, 'UTF-8')
-                ? $value
-                : mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-        }
-
-        if (is_array($value)) {
-            return array_map(fn (mixed $item): mixed => $this->sanitizeUtf8($item), $value);
-        }
-
-        return $value;
     }
 
     private function returnAssetFromEmployee(

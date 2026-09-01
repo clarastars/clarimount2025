@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Services\CustodyAssignmentService;
 use App\Services\CustodyDocumentService;
+use App\Support\Utf8;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -129,7 +130,7 @@ class CustodyController extends Controller
                 $accessibleCompanyIds
             );
 
-            return response()->json([
+            return $this->safeJsonResponse([
                 'success' => true,
                 'message' => __('messages.custody.custody_updated_successfully'),
                 'custody_change' => [
@@ -138,12 +139,14 @@ class CustodyController extends Controller
                 ],
             ]);
         } catch (\RuntimeException $exception) {
-            return response()->json([
-                'error' => $exception->getMessage(),
+            return $this->safeJsonResponse([
+                'error' => Utf8::sanitize($exception->getMessage()),
             ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => __('messages.custody.failed_to_update_custody').': '.$e->getMessage(),
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->safeJsonResponse([
+                'error' => __('messages.custody.failed_to_update_custody'),
             ], 500);
         }
     }
@@ -211,7 +214,7 @@ class CustodyController extends Controller
 
                 $count = count($assets);
                 $summary = $count === 1
-                    ? __('messages.custody.quick_create_summary', ['tag' => $assets[0]->asset_tag])
+                    ? __('messages.custody.quick_create_summary', ['tag' => Utf8::sanitize($assets[0]->asset_tag) ?? ''])
                     : __('messages.custody.quick_create_multiple_summary', ['count' => $count]);
 
                 $custodyChange = $this->custodyAssignmentService->updateEmployeeCustody(
@@ -230,10 +233,10 @@ class CustodyController extends Controller
 
             $count = count($createdAssets['assets']);
             $message = $count === 1
-                ? __('messages.custody.quick_create_success', ['tag' => $createdAssets['assets'][0]->asset_tag])
+                ? __('messages.custody.quick_create_success', ['tag' => Utf8::sanitize($createdAssets['assets'][0]->asset_tag) ?? ''])
                 : __('messages.custody.quick_create_multiple_success', ['count' => $count]);
 
-            return response()->json([
+            return $this->safeJsonResponse([
                 'success' => true,
                 'message' => $message,
                 'assets' => array_map(
@@ -245,12 +248,14 @@ class CustodyController extends Controller
                     : null,
             ]);
         } catch (\RuntimeException $exception) {
-            return response()->json([
-                'error' => $exception->getMessage(),
+            return $this->safeJsonResponse([
+                'error' => Utf8::sanitize($exception->getMessage()),
             ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => __('messages.custody.quick_create_failed').': '.$e->getMessage(),
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->safeJsonResponse([
+                'error' => __('messages.custody.quick_create_failed'),
             ], 500);
         }
     }
@@ -328,8 +333,21 @@ class CustodyController extends Controller
     {
         return [
             'id' => (string) $asset->id,
-            'asset_tag' => $asset->asset_tag,
+            'asset_tag' => Utf8::sanitize($asset->asset_tag),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function safeJsonResponse(array $data, int $status = 200): JsonResponse
+    {
+        return response()->json(
+            Utf8::sanitizeMixed($data),
+            $status,
+            [],
+            JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE
+        );
     }
 
     /**

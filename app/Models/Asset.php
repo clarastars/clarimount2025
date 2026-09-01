@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Support\Utf8;
 use Spatie\Searchable\Searchable;
 use Spatie\Searchable\SearchResult;
 
@@ -67,8 +68,11 @@ class Asset extends Model implements Searchable
             $companyPrefix = str_pad($companyId % 100, 2, '0', STR_PAD_LEFT);
         } else {
             // Generate company abbreviation from name
-            $companyPrefix = static::generateCompanyAbbreviation($company->name_en);
+            $companyPrefix = static::generateCompanyAbbreviation($company->name_en ?? '');
         }
+
+        $companyPrefix = strtoupper(preg_replace('/[^A-Z0-9]/', '', $companyPrefix) ?: 'ASST');
+        $companyPrefix = substr($companyPrefix, 0, 4) ?: 'ASST';
         
         // Pattern for this company's asset tags (e.g., "ADTY-" for Advanced Line for Technology)
         $pattern = $companyPrefix . '-';
@@ -102,6 +106,13 @@ class Asset extends Model implements Searchable
         return $assetTag;
     }
 
+    protected static function normalizeAssetTagPrefix(string $prefix): string
+    {
+        $normalized = strtoupper(preg_replace('/[^A-Z0-9]/', '', Utf8::sanitize($prefix) ?? '') ?: '');
+
+        return substr($normalized, 0, 4) ?: 'ASST';
+    }
+
     /**
      * Generate a 4-letter abbreviation from company name with collision detection.
      * Examples:
@@ -113,6 +124,8 @@ class Asset extends Model implements Searchable
      */
     protected static function generateCompanyAbbreviation(string $companyName): string
     {
+        $companyName = Utf8::sanitize($companyName) ?? '';
+
         // Remove common business words and clean the name
         $commonWords = ['corporation', 'corp', 'company', 'co', 'inc', 'incorporated', 'ltd', 'limited', 'llc', 'for', 'and', 'the', 'of', 'in', 'to'];
         $cleanName = str_replace($commonWords, '', strtolower($companyName));
@@ -163,23 +176,22 @@ class Asset extends Model implements Searchable
         
         // Find the first abbreviation that doesn't collide
         foreach ($abbreviations as $abbreviation) {
-            $abbreviation = str_pad($abbreviation, 4, 'X');
-            $abbreviation = strtoupper(substr($abbreviation, 0, 4));
-            
+            $abbreviation = static::normalizeAssetTagPrefix($abbreviation);
+
             if (!in_array($abbreviation, $existingAbbreviations)) {
                 return $abbreviation;
             }
         }
-        
+
         // If all strategies fail, add a numeric suffix to make it unique
-        $baseAbbr = strtoupper(substr($abbreviations[0], 0, 3));
+        $baseAbbr = substr(static::normalizeAssetTagPrefix($abbreviations[0] ?? 'ASST'), 0, 3);
         $counter = 1;
         do {
-            $abbreviation = $baseAbbr . $counter;
+            $abbreviation = $baseAbbr.$counter;
             $counter++;
         } while (in_array($abbreviation, $existingAbbreviations) && $counter < 10);
-        
-        return $abbreviation;
+
+        return static::normalizeAssetTagPrefix($abbreviation);
     }
 
     /**
