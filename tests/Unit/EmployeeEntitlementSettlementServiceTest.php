@@ -58,14 +58,15 @@ it('uses gross salary for salary dues amount', function (): void {
     expect($amountService->fromGrossDays($employee, 23))->toBe(round((5400 / 30) * 23, 2));
 });
 
-it('calculates annual leave dues from projected remaining days and gross salary', function (): void {
+it('calculates annual leave dues from projected accrued days and gross salary', function (): void {
     $employee = makeSettlementEmployee();
 
     $leaveBalanceService = Mockery::mock(LeaveBalanceService::class);
     $leaveBalanceService->shouldReceive('forecastForDate')
         ->once()
         ->andReturn([
-            'projected_remaining' => 16.975,
+            'projected_accrued' => 18.73,
+            'projected_remaining' => 0.73,
         ]);
 
     $service = new EmployeeEntitlementSettlementService(
@@ -75,11 +76,69 @@ it('calculates annual leave dues from projected remaining days and gross salary'
 
     $result = $service->calculateAnnualLeaveDues(
         $employee,
-        Carbon::parse('2026-08-23', 'Asia/Riyadh'),
+        Carbon::parse('2026-09-13', 'Asia/Riyadh'),
     );
 
-    expect($result['days'])->toBe(16.98);
-    expect($result['amount'])->toBe(app(ManualDeductionAmountService::class)->fromGrossDays($employee, 16.98));
+    expect($result['days'])->toBe(18.73);
+    expect($result['amount'])->toBe(app(ManualDeductionAmountService::class)->fromGrossDays($employee, 18.73));
+});
+
+it('does not deduct approved future leave from annual leave settlement', function (): void {
+    $futureLeave = new \App\Models\Leave([
+        'leave_type' => \App\Models\Leave::TYPE_ANNUAL,
+        'start_date' => '2026-09-20',
+        'end_date' => '2026-10-07',
+        'days' => 18,
+        'deduct_from_balance' => true,
+        'is_paid' => true,
+    ]);
+
+    $leavesQuery = Mockery::mock(\Illuminate\Database\Eloquent\Relations\HasMany::class);
+    $leavesQuery->shouldReceive('where')->with('deduct_from_balance', true)->andReturnSelf();
+    $leavesQuery->shouldReceive('get')->andReturn(collect([$futureLeave]));
+
+    $employee = Mockery::mock(Employee::class)->makePartial();
+    $employee->id = 1;
+    $employee->leave_days_used = 0;
+    $employee->shouldReceive('leaves')->andReturn($leavesQuery);
+
+    $service = app(EmployeeEntitlementSettlementService::class);
+
+    $used = $service->calculateUsedAnnualLeaveDeduction(
+        $employee,
+        Carbon::parse('2026-09-13', 'Asia/Riyadh'),
+    );
+
+    expect($used['days'])->toBe(0.0);
+    expect($used['amount'])->toBe(0.0);
+});
+
+it('counts only elapsed days for leave spanning the settlement date', function (): void {
+    $leave = new \App\Models\Leave([
+        'leave_type' => \App\Models\Leave::TYPE_ANNUAL,
+        'start_date' => '2026-09-10',
+        'end_date' => '2026-09-20',
+        'days' => 11,
+        'deduct_from_balance' => true,
+        'is_paid' => true,
+    ]);
+
+    $leavesQuery = Mockery::mock(\Illuminate\Database\Eloquent\Relations\HasMany::class);
+    $leavesQuery->shouldReceive('where')->with('deduct_from_balance', true)->andReturnSelf();
+    $leavesQuery->shouldReceive('get')->andReturn(collect([$leave]));
+
+    $employee = Mockery::mock(Employee::class)->makePartial();
+    $employee->id = 1;
+    $employee->shouldReceive('leaves')->andReturn($leavesQuery);
+
+    $service = app(EmployeeEntitlementSettlementService::class);
+
+    $elapsed = $service->calculateElapsedDeductibleLeaveDays(
+        $employee,
+        Carbon::parse('2026-09-13', 'Asia/Riyadh'),
+    );
+
+    expect($elapsed)->toBe(4.0);
 });
 
 it('calculates salary dues from an explicit unpaid start date', function (): void {

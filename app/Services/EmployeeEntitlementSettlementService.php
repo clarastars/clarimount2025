@@ -45,7 +45,7 @@ class EmployeeEntitlementSettlementService
         $serviceDays = $this->calculateServiceDays($hireDate, $settlementDate);
         $salaryDues = $this->calculateSalaryDues($employee, $settlementDate);
         $annualLeave = $this->calculateAnnualLeaveDues($employee, $settlementDate);
-        $usedLeave = $this->calculateUsedAnnualLeaveDeduction($employee);
+        $usedLeave = $this->calculateUsedAnnualLeaveDeduction($employee, $settlementDate);
         $advances = $this->calculateAdvancesTotal($employee);
 
         $manual = $this->normalizeManualInput($manualInput);
@@ -232,12 +232,15 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
+     * Pay out the employee's accrued annual leave entitlement at settlement.
+     * Uses projected accrued balance (not remaining after scheduled future leave).
+     *
      * @return array{days: float, amount: float}
      */
     public function calculateAnnualLeaveDues(Employee $employee, Carbon $settlementDate): array
     {
         $forecast = $this->leaveBalanceService->forecastForDate($employee, $settlementDate);
-        $days = max(0, round((float) $forecast['projected_remaining'], 2));
+        $days = max(0, round((float) $forecast['projected_accrued'], 2));
         $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;
 
         return [
@@ -247,21 +250,41 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
+     * Deduct leave days that were actually consumed on or before the settlement date.
+     * Approved future leave is excluded — it is paid via annual leave dues, not deducted.
+     *
      * @return array{days: float, amount: float}
      */
-    public function calculateUsedAnnualLeaveDeduction(Employee $employee): array
+    public function calculateUsedAnnualLeaveDeduction(Employee $employee, Carbon $settlementDate): array
     {
         $legacyUsed = (float) ($employee->leave_days_used ?? 0);
-        $deducted = (float) $employee->leaves()
-            ->where('deduct_from_balance', true)
-            ->sum('days');
-        $days = round($legacyUsed + $deducted, 2);
+        $elapsedFromRecords = $this->calculateElapsedDeductibleLeaveDays($employee, $settlementDate);
+        $days = round($legacyUsed + $elapsedFromRecords, 2);
         $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;
 
         return [
             'days' => $days,
             'amount' => $amount,
         ];
+    }
+
+    public function calculateElapsedDeductibleLeaveDays(Employee $employee, Carbon $settlementDate): float
+    {
+        $total = 0.0;
+
+        foreach ($employee->leaves()->where('deduct_from_balance', true)->get() as $leave) {
+            $leaveStart = $this->parseDate($leave->start_date);
+            $leaveEnd = $this->parseDate($leave->end_date);
+
+            if ($leaveStart === null || $leaveEnd === null || $leaveStart->gt($settlementDate)) {
+                continue;
+            }
+
+            $elapsedEnd = $leaveEnd->gt($settlementDate) ? $settlementDate : $leaveEnd;
+            $total += (float) $leave->daysInDateRange($leaveStart, $elapsedEnd);
+        }
+
+        return round($total, 2);
     }
 
     public function calculateAdvancesTotal(Employee $employee): float
