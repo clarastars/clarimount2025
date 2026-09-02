@@ -366,7 +366,10 @@ class SalaryRunService
         $socialInsuranceDeductionTotal = $insuranceRate > 0
             ? round(($insuranceBase * $insuranceRate) / 100, 2)
             : 0.0;
-        $dailyWage = $fullGrossSalary / 30;
+        $monthDayDivisor = $useCustomSalaryPeriod
+            ? $this->resolvePayrollMonthDayCount($calendarMonthStart)
+            : 30;
+        $dailyWage = $fullGrossSalary / $monthDayDivisor;
 
         $approvedPenalties = AttendancePenalty::where('employee_id', $employee->id)
             ->where('approval_status', 'approved')
@@ -384,7 +387,13 @@ class SalaryRunService
                 continue;
             }
 
-            $penaltyAmount = $this->calculatePenaltyAmount($penalty, $fullGrossSalary, $dailyWage, $fullBasicSalary);
+            $penaltyAmount = $this->calculatePenaltyAmount(
+                $penalty,
+                $fullGrossSalary,
+                $dailyWage,
+                $fullBasicSalary,
+                $monthDayDivisor,
+            );
             $lateMinutesDeduction = (float) ($penalty->late_minutes_deduction_amount ?? 0);
             $totalForPenalty = $penaltyAmount + $lateMinutesDeduction;
             $penaltiesTotal += $totalForPenalty;
@@ -608,6 +617,7 @@ class SalaryRunService
 
     /**
      * Prorate salary for a custom inclusive date range (supplementary runs).
+     * Uses the actual number of days in the payroll month (e.g. 31 for May), not a fixed 30.
      *
      * @return array{factor: float, effective_start: Carbon}
      */
@@ -635,16 +645,29 @@ class SalaryRunService
         }
 
         $workedDays = $effectiveStart->diffInDays($periodEnd) + 1;
-        $factor = min(1.0, max(0.0, $workedDays / 30));
+        $monthDays = $this->resolvePayrollMonthDayCount($periodStart);
+        $factor = min(1.0, max(0.0, $workedDays / $monthDays));
 
         return ['factor' => $factor, 'effective_start' => $effectiveStart];
+    }
+
+    private function resolvePayrollMonthDayCount(Carbon $dateInMonth): int
+    {
+        return max(1, (int) $dateInMonth->copy()->timezone(self::TZ)->daysInMonth);
     }
 
     /**
      * Calculate penalty amount based on action type
      */
-    public function calculatePenaltyAmount(AttendancePenalty $penalty, float $grossSalary, float $dailyWage, ?float $basicSalary = null): float
-    {
+    public function calculatePenaltyAmount(
+        AttendancePenalty $penalty,
+        float $grossSalary,
+        float $dailyWage,
+        ?float $basicSalary = null,
+        int $monthDayDivisor = 30,
+    ): float {
+        $monthDayDivisor = max(1, $monthDayDivisor);
+
         switch ($penalty->action_type) {
             case 'warning':
                 return 0;
@@ -655,7 +678,7 @@ class SalaryRunService
                 if ($basicSalary === null || $basicSalary <= 0) {
                     return 0;
                 }
-                $basicDailyWage = $basicSalary / 30;
+                $basicDailyWage = $basicSalary / $monthDayDivisor;
 
                 return ($percentage / 100) * $basicDailyWage;
 
@@ -672,7 +695,7 @@ class SalaryRunService
 
                     // Deduct from basic salary
                     if ($penalty->action_value_basic_days !== null && $penalty->action_value_basic_days > 0 && $basicSalary !== null) {
-                        $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
+                        $basicDailyWage = $basicSalary / $monthDayDivisor;
                         $deduction += $penalty->action_value_basic_days * $basicDailyWage;
                     }
 
@@ -691,7 +714,7 @@ class SalaryRunService
 
                 // For the next day: deduct one day from basic salary
                 if ($basicSalary !== null) {
-                    $basicDailyWage = $basicSalary / 30; // Assuming 30 days per month
+                    $basicDailyWage = $basicSalary / $monthDayDivisor;
                     $deduction += $basicDailyWage;
                 }
 
