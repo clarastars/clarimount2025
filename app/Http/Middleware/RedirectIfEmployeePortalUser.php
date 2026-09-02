@@ -317,6 +317,7 @@ class RedirectIfEmployeePortalUser
                 'salary-runs.index',
                 'salary-runs.show',
                 'salary-runs.store',
+                'salary-runs.store-supplementary',
                 'salary-runs.export-excel',
                 'api.notifications.index',
                 'api.notifications.read',

@@ -15,6 +15,8 @@ class SalaryRunItem extends Model
     protected $fillable = [
         'salary_run_id',
         'employee_id',
+        'period_start',
+        'period_end',
         'basic_salary',
         'allowances',
         'gross_salary',
@@ -30,6 +32,8 @@ class SalaryRunItem extends Model
     ];
 
     protected $casts = [
+        'period_start' => 'date',
+        'period_end' => 'date',
         'basic_salary' => 'decimal:2',
         'allowances' => 'decimal:2',
         'gross_salary' => 'decimal:2',

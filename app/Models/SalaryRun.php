@@ -15,10 +15,17 @@ class SalaryRun extends Model
     use HasFactory;
     use SoftDeletes;
 
+    public const RUN_TYPE_REGULAR = 'regular';
+
+    public const RUN_TYPE_SUPPLEMENTARY = 'supplementary';
+
     protected $fillable = [
         'company_id',
         'year',
         'month',
+        'run_type',
+        'sequence',
+        'label',
         'status',
         'created_by',
         'hr_approved_at',
@@ -36,6 +43,7 @@ class SalaryRun extends Model
     protected $casts = [
         'year' => 'integer',
         'month' => 'integer',
+        'sequence' => 'integer',
         'hr_approved_at' => 'datetime',
         'director_approved_at' => 'datetime',
         'financial_manager_approved_at' => 'datetime',
@@ -116,5 +124,24 @@ class SalaryRun extends Model
     public function isDraft(): bool
     {
         return $this->status === 'draft';
+    }
+
+    public function isRegular(): bool
+    {
+        return ($this->run_type ?? self::RUN_TYPE_REGULAR) === self::RUN_TYPE_REGULAR;
+    }
+
+    public function isSupplementary(): bool
+    {
+        return $this->run_type === self::RUN_TYPE_SUPPLEMENTARY;
+    }
+
+    public function displayTitle(): string
+    {
+        if ($this->isSupplementary() && filled($this->label)) {
+            return (string) $this->label;
+        }
+
+        return __('messages.salary_runs.run_type_regular');
     }
 }

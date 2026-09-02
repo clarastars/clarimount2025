@@ -128,10 +128,12 @@ class SalaryRunController extends Controller
             ->withCount('items')
             ->orderBy('year', 'desc')
             ->orderBy('month', 'desc')
+            ->orderBy('sequence', 'desc')
             ->paginate(12);
 
         $occupiedPeriods = SalaryRun::query()
             ->where('company_id', $company->id)
+            ->where('run_type', SalaryRun::RUN_TYPE_REGULAR)
             ->get(['year', 'month', 'status'])
             ->map(static fn (SalaryRun $run): array => [
                 'year' => (int) $run->year,
@@ -153,7 +155,7 @@ class SalaryRunController extends Controller
     /**
      * Display a specific salary run
      */
-    public function show(Company $company, int $year, int $month): Response
+    public function show(Company $company, SalaryRun $salaryRun): Response
     {
         $user = Auth::user();
 
@@ -161,17 +163,15 @@ class SalaryRunController extends Controller
             abort(403, 'You do not have access to this company.');
         }
 
-        $salaryRun = SalaryRun::where('company_id', $company->id)
-            ->where('year', $year)
-            ->where('month', $month)
-            ->with(['items.employee.debts', 'creator'])
-            ->firstOrFail();
+        if ($salaryRun->company_id !== $company->id) {
+            abort(404);
+        }
+
+        $salaryRun->load(['items.employee.debts', 'creator']);
 
         $approvalSteps = $this->salaryRunApprovalService->buildApprovalPayload($salaryRun, $user, $company);
         $latestRejection = $this->salaryRunApprovalService->buildLatestRejectionPayload($salaryRun);
         $this->salaryRunNotificationService->ensureYourTurnNotifications($salaryRun, $company);
-
-        $salaryRun->loadMissing(['items.employee.debts', 'creator']);
 
         return Inertia::render('SalaryRuns/Show', [
             'company' => $company,
@@ -181,6 +181,21 @@ class SalaryRunController extends Controller
             'canManageSalaryRun' => $this->canManageCompanySalaryRuns($user, $company),
             'canManageDebtDeductions' => $this->canManageSalaryRunDebtDeductions($user, $company),
         ]);
+    }
+
+    /**
+     * Backward-compatible redirect for old year/month URLs (regular run only).
+     */
+    public function showByPayrollPeriod(Company $company, int $year, int $month): RedirectResponse
+    {
+        $salaryRun = SalaryRun::query()
+            ->where('company_id', $company->id)
+            ->where('year', $year)
+            ->where('month', $month)
+            ->where('run_type', SalaryRun::RUN_TYPE_REGULAR)
+            ->firstOrFail();
+
+        return redirect()->route('salary-runs.show', [$company, $salaryRun]);
     }
 
     /**
@@ -233,8 +248,44 @@ class SalaryRunController extends Controller
         }
 
         return redirect()
-            ->route('salary-runs.show', [$company, $validated['year'], $validated['month']])
+            ->route('salary-runs.show', [$company, $salaryRun])
             ->with('success', __('messages.salary_runs.created_successfully'));
+    }
+
+    /**
+     * Create a supplementary salary run for selected employees.
+     */
+    public function storeSupplementary(Request $request, Company $company): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if (! $this->canCreateSalaryRun($user, $company)) {
+            abort(403, 'You do not have permission to create salary runs for this company.');
+        }
+
+        $validated = $request->validate([
+            'year' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
+            'label' => ['nullable', 'string', 'max:255'],
+            'entries' => ['required', 'array', 'min:1', 'max:200'],
+            'entries.*.employee_id' => ['required', 'integer', 'exists:employees,id'],
+            'entries.*.period_start' => ['required', 'date'],
+            'entries.*.period_end' => ['required', 'date', 'after_or_equal:entries.*.period_start'],
+        ]);
+
+        $salaryRun = $this->salaryRunService->createSupplementarySalaryRun(
+            $company->id,
+            (int) $validated['year'],
+            (int) $validated['month'],
+            $validated['label'] ?? null,
+            $validated['entries'],
+        );
+
+        $this->salaryRunNotificationService->notifyWorkflowStarted($salaryRun, $company, $user);
+
+        return redirect()
+            ->route('salary-runs.show', [$company, $salaryRun])
+            ->with('success', __('messages.salary_runs.supplementary_created_successfully'));
     }
 
     /**

@@ -270,7 +270,7 @@ class SalaryRunNotificationService
             'year' => $salaryRun->year,
             'month' => $salaryRun->month,
             'actor_name' => $actor->name,
-            'url' => route('salary-runs.show', [$company, $salaryRun->year, $salaryRun->month]),
+            'url' => route('salary-runs.show', [$company, $salaryRun]),
         ];
     }
 

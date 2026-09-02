@@ -36,6 +36,7 @@ class SalaryRunService
                 ->where('company_id', $companyId)
                 ->where('year', $year)
                 ->where('month', $month)
+                ->where('run_type', SalaryRun::RUN_TYPE_REGULAR)
                 ->first();
 
             if ($existing !== null) {
@@ -49,6 +50,7 @@ class SalaryRunService
                 ->where('company_id', $companyId)
                 ->where('year', $year)
                 ->where('month', $month)
+                ->where('run_type', SalaryRun::RUN_TYPE_REGULAR)
                 ->first();
 
             if ($trashed !== null) {
@@ -61,6 +63,8 @@ class SalaryRunService
                     'company_id' => $companyId,
                     'year' => $year,
                     'month' => $month,
+                    'run_type' => SalaryRun::RUN_TYPE_REGULAR,
+                    'sequence' => 1,
                 ],
                 [
                     'status' => 'draft',
@@ -107,6 +111,124 @@ class SalaryRunService
                 $staleItemsQuery->delete();
             } else {
                 $staleItemsQuery->whereNotIn('employee_id', $activeEmployeeIds)->delete();
+            }
+
+            return $salaryRun->fresh(['items.employee']);
+        });
+    }
+
+    /**
+     * Create a supplementary salary run for selected employees with custom payroll periods.
+     *
+     * @param  array<int, array{employee_id: int, period_start: string, period_end: string}>  $entries
+     */
+    public function createSupplementarySalaryRun(
+        int $companyId,
+        int $year,
+        int $month,
+        ?string $label,
+        array $entries,
+    ): SalaryRun {
+        return DB::transaction(function () use ($companyId, $year, $month, $label, $entries): SalaryRun {
+            if ($entries === []) {
+                throw ValidationException::withMessages([
+                    'entries' => [__('messages.salary_runs.supplementary_entries_required')],
+                ]);
+            }
+
+            $calendarRange = $this->resolveCalendarMonthRange($year, $month);
+            $calendarStart = $calendarRange['start'];
+            $calendarEnd = $calendarRange['end'];
+
+            $nextSequence = ((int) SalaryRun::query()
+                ->where('company_id', $companyId)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->max('sequence')) + 1;
+
+            if ($nextSequence < 2) {
+                $nextSequence = 2;
+            }
+
+            $salaryRun = SalaryRun::query()->create([
+                'company_id' => $companyId,
+                'year' => $year,
+                'month' => $month,
+                'run_type' => SalaryRun::RUN_TYPE_SUPPLEMENTARY,
+                'sequence' => $nextSequence,
+                'label' => $label,
+                'status' => 'draft',
+                'created_by' => auth()->id(),
+            ]);
+
+            $seenEmployeeIds = [];
+
+            foreach ($entries as $index => $entry) {
+                $employeeId = (int) ($entry['employee_id'] ?? 0);
+                $periodStart = Carbon::parse((string) ($entry['period_start'] ?? ''), self::TZ)->startOfDay();
+                $periodEnd = Carbon::parse((string) ($entry['period_end'] ?? ''), self::TZ)->startOfDay();
+
+                if ($employeeId === 0) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.supplementary_employee_required')],
+                    ]);
+                }
+
+                if (in_array($employeeId, $seenEmployeeIds, true)) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.supplementary_duplicate_employee')],
+                    ]);
+                }
+
+                $seenEmployeeIds[] = $employeeId;
+
+                if ($periodEnd->lt($periodStart)) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.period_end" => [__('messages.salary_runs.supplementary_invalid_period')],
+                    ]);
+                }
+
+                if ($periodStart->lt($calendarStart) || $periodEnd->gt($calendarEnd)) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.period_start" => [__('messages.salary_runs.supplementary_period_outside_month')],
+                    ]);
+                }
+
+                $employee = Employee::query()->find($employeeId);
+
+                if ($employee === null) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.add_employee_not_found')],
+                    ]);
+                }
+
+                if ((int) $employee->company_id !== $companyId) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.add_employee_company_mismatch')],
+                    ]);
+                }
+
+                if ($employee->employment_status !== 'active') {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.add_employee_not_active')],
+                    ]);
+                }
+
+                if ($employee->isExcludedFromSalary()) {
+                    throw ValidationException::withMessages([
+                        "entries.{$index}.employee_id" => [__('messages.salary_runs.add_employee_excluded_from_salary')],
+                    ]);
+                }
+
+                $this->upsertEmployeeSalaryRunItem(
+                    $salaryRun,
+                    $employee,
+                    $periodStart,
+                    $periodEnd,
+                    $periodStart,
+                    $periodEnd,
+                    useCustomSalaryPeriod: true,
+                );
             }
 
             return $salaryRun->fresh(['items.employee']);
@@ -211,6 +333,7 @@ class SalaryRunService
         Carbon $endDate,
         Carbon $calendarMonthStart,
         Carbon $calendarMonthEndDay,
+        bool $useCustomSalaryPeriod = false,
     ): SalaryRunItem {
         $existingItem = SalaryRunItem::where('salary_run_id', $salaryRun->id)
             ->where('employee_id', $employee->id)
@@ -222,11 +345,9 @@ class SalaryRunService
         $fullAllowances = (float) ($employee->allowances ?? 0);
         $fullGrossSalary = $fullBasicSalary + $fullAllowances;
 
-        $proration = $this->resolveEmploymentProration(
-            $employee,
-            $calendarMonthStart,
-            $calendarMonthEndDay
-        );
+        $proration = $useCustomSalaryPeriod
+            ? $this->resolveCustomPeriodProration($employee, $calendarMonthStart, $calendarMonthEndDay)
+            : $this->resolveEmploymentProration($employee, $calendarMonthStart, $calendarMonthEndDay);
         $salaryFactor = $proration['factor'];
 
         $hireDateTz = $employee->hire_date !== null
@@ -383,7 +504,9 @@ class SalaryRunService
                 'date' => $calendarMonthStart->format('Y-m-d').' / '.$calendarMonthEndDay->format('Y-m-d'),
                 'action_type' => 'employment_proration',
                 'action_value' => round($salaryFactor * 100, 2),
-                'action_text' => 'Salary prorated from hire date (calendar month)',
+                'action_text' => $useCustomSalaryPeriod
+                    ? 'Salary prorated for selected period'
+                    : 'Salary prorated from hire date (calendar month)',
                 'amount' => $grossSalary,
                 'source' => 'employment_proration',
             ];
@@ -405,6 +528,8 @@ class SalaryRunService
                 'basic_salary' => $basicSalary,
                 'allowances' => $allowances,
                 'gross_salary' => $grossSalary,
+                'period_start' => $useCustomSalaryPeriod ? $calendarMonthStart->format('Y-m-d') : null,
+                'period_end' => $useCustomSalaryPeriod ? $calendarMonthEndDay->format('Y-m-d') : null,
                 'penalties_total' => $penaltiesTotal,
                 'additions_total' => $additionsTotal,
                 'social_insurance_deduction_total' => $socialInsuranceDeductionTotal,
@@ -479,6 +604,40 @@ class SalaryRunService
         $factor = min(1.0, max(0.0, $workedDays / $denominator));
 
         return ['factor' => $factor, 'effective_start' => $hireDate];
+    }
+
+    /**
+     * Prorate salary for a custom inclusive date range (supplementary runs).
+     *
+     * @return array{factor: float, effective_start: Carbon}
+     */
+    private function resolveCustomPeriodProration(Employee $employee, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $periodStart = $periodStart->copy()->timezone(self::TZ)->startOfDay();
+        $periodEnd = $periodEnd->copy()->timezone(self::TZ)->startOfDay();
+
+        if ($periodEnd->lt($periodStart)) {
+            return ['factor' => 0.0, 'effective_start' => $periodStart];
+        }
+
+        $effectiveStart = $periodStart;
+
+        if ($employee->hire_date !== null) {
+            $hireDate = Carbon::parse((string) $employee->hire_date, self::TZ)->startOfDay();
+
+            if ($hireDate->gt($periodEnd)) {
+                return ['factor' => 0.0, 'effective_start' => $periodEnd];
+            }
+
+            if ($hireDate->gt($periodStart)) {
+                $effectiveStart = $hireDate;
+            }
+        }
+
+        $workedDays = $effectiveStart->diffInDays($periodEnd) + 1;
+        $factor = min(1.0, max(0.0, $workedDays / 30));
+
+        return ['factor' => $factor, 'effective_start' => $effectiveStart];
     }
 
     /**

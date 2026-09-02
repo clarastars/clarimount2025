@@ -10,10 +10,16 @@
             {{ t('salary_runs.create_salary_run') }}
           </p>
         </div>
-        <Button v-if="canCreateSalaryRuns" @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-          <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
-          {{ t('salary_runs.create_salary_run') }}
-        </Button>
+        <div class="flex flex-wrap gap-2">
+          <Button v-if="canCreateSalaryRuns" @click="openCreateModal" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+            <Icon name="Plus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
+            {{ t('salary_runs.create_salary_run') }}
+          </Button>
+          <Button v-if="canCreateSalaryRuns" variant="outline" @click="openSupplementaryModal">
+            <Icon name="UserPlus" class="mr-2 rtl:mr-0 rtl:ml-2 h-4 w-4" />
+            {{ t('salary_runs.create_supplementary_salary_run') }}
+          </Button>
+        </div>
       </div>
 
       <!-- Salary Runs Table -->
@@ -31,6 +37,9 @@
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('salary_runs.status') }}
+                  </th>
+                  <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    {{ t('salary_runs.run_type') }}
                   </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('salary_runs.employees_count') }}
@@ -54,10 +63,18 @@
                     <div class="text-sm text-gray-900 dark:text-gray-100">
                       {{ getMonthName(salaryRun.month) }}
                     </div>
+                    <div v-if="salaryRun.label" class="text-xs text-muted-foreground mt-1">
+                      {{ salaryRun.label }}
+                    </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <Badge :variant="salaryRun.status === 'finalized' ? 'default' : 'secondary'">
                       {{ salaryRun.status === 'finalized' ? t('salary_runs.status_finalized') : t('salary_runs.status_draft') }}
+                    </Badge>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <Badge variant="outline">
+                      {{ salaryRun.run_type === 'supplementary' ? t('salary_runs.run_type_supplementary') : t('salary_runs.run_type_regular') }}
                     </Badge>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
@@ -73,7 +90,7 @@
                   <td class="px-6 py-4 whitespace-nowrap text-right rtl:text-left">
                     <div class="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="sm" asChild>
-                        <Link :href="route('salary-runs.show', [company.id, salaryRun.year, salaryRun.month])">
+                        <Link :href="route('salary-runs.show', [company.id, salaryRun.id])">
                           <Icon name="Eye" class="h-4 w-4 mr-2 rtl:mr-0 rtl:ml-2" />
                           {{ t('salary_runs.view_details') }}
                         </Link>
@@ -199,6 +216,113 @@
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog v-if="canCreateSalaryRuns" :open="supplementaryModalOpen" @update:open="closeSupplementaryModal">
+        <DialogContent class="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{{ t('salary_runs.create_supplementary_salary_run') }}</DialogTitle>
+          </DialogHeader>
+          <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label for="supp-year">{{ t('salary_runs.year') }}</Label>
+                <Input id="supp-year" v-model="supplementaryForm.year" type="number" min="2020" max="2100" />
+              </div>
+              <div>
+                <Label for="supp-month">{{ t('salary_runs.month') }}</Label>
+                <select
+                  id="supp-month"
+                  v-model="supplementaryForm.month"
+                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  @change="syncSupplementaryDefaultDates"
+                >
+                  <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label for="supp-label">{{ t('salary_runs.supplementary_label') }}</Label>
+              <Input
+                id="supp-label"
+                v-model="supplementaryForm.label"
+                :placeholder="t('salary_runs.supplementary_label_placeholder')"
+              />
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <Label>{{ t('salary_runs.supplementary_employees') }}</Label>
+                <Button type="button" variant="outline" size="sm" @click="addSupplementaryEntry">
+                  <Icon name="Plus" class="h-4 w-4 mr-1" />
+                  {{ t('salary_runs.supplementary_add_employee') }}
+                </Button>
+              </div>
+
+              <div
+                v-for="(entry, index) in supplementaryForm.entries"
+                :key="entry.key"
+                class="rounded-lg border p-4 space-y-3"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <p class="text-sm font-medium">{{ t('employees.employee') }} #{{ index + 1 }}</p>
+                  <Button
+                    v-if="supplementaryForm.entries.length > 1"
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    class="text-red-600"
+                    @click="removeSupplementaryEntry(index)"
+                  >
+                    <Icon name="Trash2" class="h-4 w-4" />
+                  </Button>
+                </div>
+                <div>
+                  <Label>{{ t('employees.employee') }}</Label>
+                  <Input
+                    v-model="entry.search"
+                    :placeholder="t('salary_runs.supplementary_search_employee')"
+                    @input="searchEmployeesForEntry(index)"
+                  />
+                  <div v-if="entry.results.length" class="mt-2 rounded-md border max-h-40 overflow-y-auto">
+                    <button
+                      v-for="employee in entry.results"
+                      :key="employee.id"
+                      type="button"
+                      class="w-full text-start px-3 py-2 text-sm hover:bg-muted"
+                      @click="selectEmployeeForEntry(index, employee)"
+                    >
+                      {{ employee.display_name }}
+                    </button>
+                  </div>
+                  <p v-if="entry.employee_label" class="mt-2 text-sm text-green-700 dark:text-green-400">
+                    {{ entry.employee_label }}
+                  </p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>{{ t('salary_runs.supplementary_period_from') }}</Label>
+                    <Input v-model="entry.period_start" type="date" />
+                  </div>
+                  <div>
+                    <Label>{{ t('salary_runs.supplementary_period_to') }}</Label>
+                    <Input v-model="entry.period_end" type="date" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p v-if="supplementaryForm.errors.entries" class="text-sm text-destructive">
+              {{ supplementaryForm.errors.entries }}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" @click="closeSupplementaryModal">{{ t('common.cancel') }}</Button>
+            <Button @click="createSupplementarySalaryRun" :disabled="creatingSupplementary">
+              {{ creatingSupplementary ? t('common.creating') : t('common.create') }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   </AppLayout>
 </template>
@@ -315,6 +439,53 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
 
 const createModalOpen = ref(false);
 const creating = ref(false);
+const supplementaryModalOpen = ref(false);
+const creatingSupplementary = ref(false);
+let supplementaryEntryCounter = 0;
+
+interface SupplementaryEntryRow {
+  key: number;
+  employee_id: number | null;
+  employee_label: string;
+  search: string;
+  results: Array<{ id: number; display_name: string }>;
+  period_start: string;
+  period_end: string;
+}
+
+const buildDefaultPeriodDates = (year: number, month: number): { start: string; end: string } => {
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  return { start, end };
+};
+
+const createEmptySupplementaryEntry = (year: number, month: number): SupplementaryEntryRow => {
+  const period = buildDefaultPeriodDates(year, month);
+
+  return {
+    key: ++supplementaryEntryCounter,
+    employee_id: null,
+    employee_label: '',
+    search: '',
+    results: [],
+    period_start: period.start,
+    period_end: period.end,
+  };
+};
+
+const supplementaryForm = useForm<{
+  year: number;
+  month: number;
+  label: string;
+  entries: SupplementaryEntryRow[];
+}>({
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+  label: '',
+  entries: [],
+});
 
 const form = useForm({
   year: new Date().getFullYear(),
@@ -358,6 +529,122 @@ const createSalaryRun = () => {
     },
     onFinish: () => {
       creating.value = false;
+    },
+  });
+};
+
+const openSupplementaryModal = () => {
+  supplementaryForm.clearErrors();
+  const now = new Date();
+  supplementaryForm.year = now.getFullYear();
+  supplementaryForm.month = now.getMonth() + 1;
+  supplementaryForm.label = '';
+  supplementaryForm.entries = [createEmptySupplementaryEntry(supplementaryForm.year, supplementaryForm.month)];
+  supplementaryModalOpen.value = true;
+};
+
+const closeSupplementaryModal = () => {
+  supplementaryModalOpen.value = false;
+  supplementaryForm.reset();
+  supplementaryForm.clearErrors();
+};
+
+const syncSupplementaryDefaultDates = () => {
+  const year = Number(supplementaryForm.year);
+  const month = Number(supplementaryForm.month);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return;
+  }
+
+  supplementaryForm.entries = supplementaryForm.entries.map((entry) => {
+    const period = buildDefaultPeriodDates(year, month);
+
+    return {
+      ...entry,
+      period_start: period.start,
+      period_end: period.end,
+    };
+  });
+};
+
+const addSupplementaryEntry = () => {
+  supplementaryForm.entries = [
+    ...supplementaryForm.entries,
+    createEmptySupplementaryEntry(Number(supplementaryForm.year), Number(supplementaryForm.month)),
+  ];
+};
+
+const removeSupplementaryEntry = (index: number) => {
+  supplementaryForm.entries = supplementaryForm.entries.filter((_, rowIndex) => rowIndex !== index);
+};
+
+let searchTimeouts: Record<number, ReturnType<typeof setTimeout>> = {};
+
+const searchEmployeesForEntry = (index: number) => {
+  const entry = supplementaryForm.entries[index];
+  if (!entry) {
+    return;
+  }
+
+  if (searchTimeouts[index]) {
+    clearTimeout(searchTimeouts[index]);
+  }
+
+  const query = entry.search.trim();
+  if (query.length < 2) {
+    entry.results = [];
+    return;
+  }
+
+  searchTimeouts[index] = setTimeout(async () => {
+    try {
+      const response = await fetch(
+        `${route('api.employees.search')}?q=${encodeURIComponent(query)}&company_id=${props.company.id}`,
+        { headers: { Accept: 'application/json' } },
+      );
+      const data = await response.json();
+      entry.results = Array.isArray(data) ? data : [];
+    } catch {
+      entry.results = [];
+    }
+  }, 300);
+};
+
+const selectEmployeeForEntry = (
+  index: number,
+  employee: { id: number; display_name: string },
+) => {
+  const entry = supplementaryForm.entries[index];
+  if (!entry) {
+    return;
+  }
+
+  entry.employee_id = employee.id;
+  entry.employee_label = employee.display_name;
+  entry.search = employee.display_name;
+  entry.results = [];
+};
+
+const createSupplementarySalaryRun = () => {
+  creatingSupplementary.value = true;
+
+  supplementaryForm.transform((data) => ({
+    year: Number(data.year),
+    month: Number(data.month),
+    label: data.label || null,
+    entries: data.entries
+      .filter((entry) => entry.employee_id)
+      .map((entry) => ({
+        employee_id: entry.employee_id,
+        period_start: entry.period_start,
+        period_end: entry.period_end,
+      })),
+  })).post(route('salary-runs.store-supplementary', props.company.id), {
+    onSuccess: () => {
+      closeSupplementaryModal();
+    },
+    onFinish: () => {
+      creatingSupplementary.value = false;
     },
   });
 };

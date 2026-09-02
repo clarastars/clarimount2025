@@ -8,9 +8,15 @@
           <Heading :title="t('salary_runs.salary_run_details')" />
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             {{ getMonthName(salaryRun.month) }} {{ salaryRun.year }}
+            <span v-if="salaryRun.run_type === 'supplementary'">
+              — {{ salaryRun.label || t('salary_runs.run_type_supplementary') }}
+            </span>
           </p>
         </div>
         <div class="flex gap-2 flex-wrap">
+          <Badge v-if="salaryRun.run_type === 'supplementary'" variant="outline">
+            {{ t('salary_runs.run_type_supplementary') }}
+          </Badge>
           <Badge :variant="salaryRun.status === 'finalized' ? 'default' : 'secondary'">
             {{ salaryRun.status === 'finalized' ? t('salary_runs.status_finalized') : t('salary_runs.status_draft') }}
           </Badge>
@@ -219,6 +225,12 @@
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('salary_runs.employee') }}
                   </th>
+                  <th
+                    v-if="salaryRun.run_type === 'supplementary'"
+                    class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                  >
+                    {{ t('salary_runs.employee_period') }}
+                  </th>
                   <th class="px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     {{ t('salary_runs.basic_salary') }}
                   </th>
@@ -259,6 +271,11 @@
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
                       {{ item.employee?.employee_id }}
+                    </div>
+                  </td>
+                  <td v-if="salaryRun.run_type === 'supplementary'" class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-xs text-gray-600 dark:text-gray-300">
+                      {{ formatItemPeriod(item) }}
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
@@ -588,8 +605,12 @@ interface Props {
     year: number;
     month: number;
     status: string;
+    run_type?: string;
+    label?: string | null;
     items: Array<{
       id: number;
+      period_start?: string | null;
+      period_end?: string | null;
       employee: {
         id: number;
         first_name: string;
@@ -649,6 +670,33 @@ function getEmployeeFullName(employee?: { first_name?: string | null; father_nam
     .map((part) => (part ?? '').trim())
     .filter((part) => part.length > 0)
     .join(' ');
+}
+
+function formatDateOnly(value?: string | null): string {
+  if (!value) {
+    return '-';
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) {
+    return value;
+  }
+
+  const [, year, month, day] = match;
+
+  return new Intl.DateTimeFormat(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(Number(year), Number(month) - 1, Number(day)));
+}
+
+function formatItemPeriod(item: { period_start?: string | null; period_end?: string | null }): string {
+  if (!item.period_start || !item.period_end) {
+    return '-';
+  }
+
+  return `${formatDateOnly(item.period_start)} → ${formatDateOnly(item.period_end)}`;
 }
 
 const approvalList = computed(() => props.approvalSteps ?? []);
@@ -749,7 +797,7 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
   },
   {
     title: `${getMonthName(props.salaryRun.month)} ${props.salaryRun.year}`,
-    href: `/companies/${props.company.id}/salary-runs/${props.salaryRun.year}/${props.salaryRun.month}`,
+    href: `/companies/${props.company.id}/salary-runs/${props.salaryRun.id}`,
   },
 ]);
 
