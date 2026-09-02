@@ -239,6 +239,9 @@ class EmployeeEntitlementSettlementService
             return 0.0;
         }
 
+        $periodStart = $this->parseDate($periodStart) ?? $periodStart->copy()->timezone(self::TZ)->startOfDay();
+        $periodEnd = $this->parseDate($periodEnd) ?? $periodEnd->copy()->timezone(self::TZ)->startOfDay();
+
         $total = 0.0;
 
         foreach ($employee->leaves()->where('is_paid', false)->get() as $leave) {
@@ -246,7 +249,25 @@ class EmployeeEntitlementSettlementService
                 continue;
             }
 
-            $total += (float) $leave->daysInDateRange($periodStart, $periodEnd);
+            $leaveStart = $this->parseDate($leave->start_date);
+            $leaveEnd = $this->parseDate($leave->end_date);
+
+            if ($leaveStart === null || $leaveEnd === null) {
+                continue;
+            }
+
+            // Use the recorded leave days when the full leave sits inside the salary window.
+            // This matches the approved request (e.g. 7 days) and avoids date-cast drift.
+            if ($leaveStart->gte($periodStart) && $leaveEnd->lte($periodEnd)) {
+                $total += max(0.0, (float) $leave->days);
+
+                continue;
+            }
+
+            $total += $this->countInclusiveDays(
+                $leaveStart->gt($periodStart) ? $leaveStart : $periodStart,
+                $leaveEnd->lt($periodEnd) ? $leaveEnd : $periodEnd,
+            );
         }
 
         return round($total, 2);
@@ -411,11 +432,14 @@ class EmployeeEntitlementSettlementService
 
     public function countInclusiveDays(Carbon $start, Carbon $end): float
     {
+        $start = $this->parseDate($start) ?? $start->copy()->timezone(self::TZ)->startOfDay();
+        $end = $this->parseDate($end) ?? $end->copy()->timezone(self::TZ)->startOfDay();
+
         if ($start->gt($end)) {
             return 0.0;
         }
 
-        return (float) ((int) round($start->diffInDays($end, false)) + 1);
+        return (float) ($start->diffInDays($end) + 1);
     }
 
     /**
