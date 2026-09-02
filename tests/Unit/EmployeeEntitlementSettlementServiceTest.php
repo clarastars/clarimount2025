@@ -141,6 +141,46 @@ it('counts only elapsed days for leave spanning the settlement date', function (
     expect($elapsed)->toBe(4.0);
 });
 
+it('excludes unpaid leave days from salary dues during the settlement period', function (): void {
+    $employee = makeSettlementEmployee();
+
+    $unpaidLeave = new \App\Models\Leave([
+        'leave_type' => \App\Models\Leave::TYPE_EMERGENCY,
+        'start_date' => '2026-08-10',
+        'end_date' => '2026-08-14',
+        'days' => 5,
+        'deduct_from_balance' => false,
+        'is_paid' => false,
+    ]);
+
+    $leavesQuery = Mockery::mock(\Illuminate\Database\Eloquent\Relations\HasMany::class);
+    $leavesQuery->shouldReceive('where')->with('is_paid', false)->andReturnSelf();
+    $leavesQuery->shouldReceive('get')->andReturn(collect([$unpaidLeave]));
+
+    $employee = Mockery::mock(Employee::class)->makePartial();
+    $employee->id = 1;
+    $employee->basic_salary = 4000;
+    $employee->allowances = 1400;
+    $employee->shouldReceive('leaves')->andReturn($leavesQuery);
+    $employee->shouldReceive('getKey')->andReturn(1);
+
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    {
+        public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
+        {
+            return Carbon::parse('2026-08-01', 'Asia/Riyadh');
+        }
+    };
+
+    $result = $service->calculateSalaryDues(
+        $employee,
+        Carbon::parse('2026-08-23', 'Asia/Riyadh'),
+    );
+
+    expect($result['days'])->toBe(18.0);
+    expect($result['amount'])->toBe(round((5400 / 30) * 18, 2));
+});
+
 it('calculates salary dues from an explicit unpaid start date', function (): void {
     $employee = makeSettlementEmployee();
 

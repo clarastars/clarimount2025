@@ -220,15 +220,36 @@ class EmployeeEntitlementSettlementService
             ];
         }
 
-        $days = $this->countInclusiveDays($unpaidStart, $settlementDate);
+        $totalDays = $this->countInclusiveDays($unpaidStart, $settlementDate);
+        $unpaidLeaveDays = $this->calculateUnpaidLeaveDaysInPeriod($employee, $unpaidStart, $settlementDate);
+        $days = max(0.0, round($totalDays - $unpaidLeaveDays, 2));
         $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;
 
         return [
-            'days' => round($days, 2),
+            'days' => $days,
             'amount' => $amount,
             'from' => $unpaidStart->toDateString(),
             'to' => $settlementDate->toDateString(),
         ];
+    }
+
+    public function calculateUnpaidLeaveDaysInPeriod(Employee $employee, Carbon $periodStart, Carbon $periodEnd): float
+    {
+        if ($employee->getKey() === null) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach ($employee->leaves()->where('is_paid', false)->get() as $leave) {
+            if (! $leave->overlapsDateRange($periodStart, $periodEnd)) {
+                continue;
+            }
+
+            $total += (float) $leave->daysInDateRange($periodStart, $periodEnd);
+        }
+
+        return round($total, 2);
     }
 
     /**
