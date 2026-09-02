@@ -23,11 +23,8 @@ class AttendancePenaltyApprovedMail extends Mailable
     {
         $this->penalty->loadMissing('employee.user');
 
-        $employeeLanguage = $this->penalty->employee?->user?->language;
-
-        $this->locale(in_array($employeeLanguage, ['ar', 'en'], true)
-            ? $employeeLanguage
-            : 'ar');
+        // HR penalty notices are always sent in Arabic for employees.
+        $this->locale('ar');
     }
 
     public function envelope(): Envelope

@@ -40,7 +40,7 @@ class AttendancePenaltyEmailContextBuilder
 
         return [
             'scenario' => $scenario,
-            'date' => $penalty->attendance_date?->format('Y-m-d'),
+            'date' => $this->formatDate($penalty->attendance_date),
             'scheduled_check_in' => $timing['scheduled_check_in'],
             'scheduled_check_out' => $timing['scheduled_check_out'],
             'actual_check_in' => $timing['actual_check_in'],
@@ -174,5 +174,22 @@ class AttendancePenaltyEmailContextBuilder
             : ($hour24 < 12 ? 'AM' : 'PM');
 
         return sprintf('%02d:%s %s', $hour12, $minute, $period);
+    }
+
+    private function formatDate(mixed $attendanceDate): ?string
+    {
+        if ($attendanceDate === null) {
+            return null;
+        }
+
+        $date = $attendanceDate instanceof CarbonInterface
+            ? Carbon::instance($attendanceDate)->copy()->timezone(self::TZ)
+            : Carbon::parse((string) $attendanceDate, self::TZ);
+
+        if (app()->getLocale() === 'ar') {
+            return $date->locale('ar')->translatedFormat('l j F Y');
+        }
+
+        return $date->format('Y-m-d');
     }
 }
