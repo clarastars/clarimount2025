@@ -234,6 +234,51 @@ class LeaveAccrualService
     }
 
     /**
+     * Days earned from hire through a specific date (the last month is pro-rated).
+     * Months that have not completed yet as of today are excluded, so settlement
+     * never pays leave that is still in progress on the live balance.
+     */
+    public function projectedAccruedBalanceThroughDate(Employee $employee, Carbon $asOf): float
+    {
+        $monthlyDays = $this->monthlyAccrualDays($employee);
+
+        if ($monthlyDays <= 0) {
+            return 0.0;
+        }
+
+        $through = $this->resolveSettlementEarnedThroughDate($employee, $asOf);
+        $hireDate = $this->resolveHireDate($employee);
+
+        if ($hireDate === null) {
+            return $this->projectAccruedWithoutHireDateThrough($employee, $through);
+        }
+
+        if ($hireDate->gt($through)) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach ($this->eligibleAccrualPeriods($hireDate, $through) as $period) {
+            $daysForPeriod = $this->accrualDaysForPeriod(
+                $employee,
+                $period,
+                $hireDate,
+                $through,
+                prorateToAsOf: true,
+            );
+
+            if ($daysForPeriod <= 0) {
+                continue;
+            }
+
+            $total = round($total + $daysForPeriod, 2);
+        }
+
+        return $total;
+    }
+
+    /**
      * Set accrued balance from hire date through the last completed month (or departure date).
      */
     public function initializeAccruedBalanceForEmployee(Employee $employee, bool $replaceExistingLogs = true): float
@@ -281,6 +326,7 @@ class LeaveAccrualService
         string $period,
         ?Carbon $hireDate = null,
         ?Carbon $asOf = null,
+        bool $prorateToAsOf = false,
     ): float {
         if (! preg_match('/^\d{4}-\d{2}$/', $period)) {
             throw new \InvalidArgumentException('Accrual period must be in YYYY-MM format.');
@@ -313,6 +359,10 @@ class LeaveAccrualService
 
         if ($departureDate !== null && $departureDate->lt($rangeEnd)) {
             $rangeEnd = $departureDate->copy()->startOfDay();
+        }
+
+        if ($prorateToAsOf && $asOf->lt($rangeEnd)) {
+            $rangeEnd = $asOf->copy()->startOfDay();
         }
 
         if ($rangeStart->gt($rangeEnd)) {
@@ -424,6 +474,55 @@ class LeaveAccrualService
                 'balance_after' => $newBalance,
             ]);
         });
+    }
+
+    /**
+     * Cap a settlement as-of date at the last completed month (and departure).
+     */
+    private function resolveSettlementEarnedThroughDate(Employee $employee, Carbon $asOf): Carbon
+    {
+        $through = $this->calendarDateInRiyadh($asOf) ?? Carbon::now(self::TZ)->startOfDay();
+        $lastCompleted = $this->resolveLastCompletedAccrualDate();
+
+        if ($through->gt($lastCompleted)) {
+            $through = $lastCompleted->copy();
+        }
+
+        $departureDate = $this->resolveDepartureDate($employee);
+        if ($departureDate !== null && $through->gt($departureDate)) {
+            $through = $departureDate->copy();
+        }
+
+        return $through;
+    }
+
+    private function projectAccruedWithoutHireDateThrough(Employee $employee, Carbon $through): float
+    {
+        $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
+        $storedThrough = $this->resolveEarnedThroughDate($employee);
+
+        if ($through->gte($storedThrough)) {
+            return $currentAccrued;
+        }
+
+        $monthlyDays = $this->monthlyAccrualDays($employee);
+        $unearned = 0.0;
+        $cursor = $through->copy()->addDay()->startOfDay();
+
+        while ($cursor->lte($storedThrough)) {
+            $monthEnd = $cursor->copy()->endOfMonth()->startOfDay();
+            $chunkEnd = $storedThrough->lt($monthEnd) ? $storedThrough->copy() : $monthEnd;
+            $daysInMonth = $cursor->daysInMonth;
+            $days = (int) round($cursor->diffInDays($chunkEnd, false)) + 1;
+
+            $unearned = $days >= $daysInMonth
+                ? round($unearned + $monthlyDays, 2)
+                : round($unearned + ($days / $daysInMonth) * $monthlyDays, 2);
+
+            $cursor = $chunkEnd->copy()->addDay()->startOfDay();
+        }
+
+        return max(0.0, round($currentAccrued - $unearned, 2));
     }
 
     private function projectAccruedWithoutHireDate(Employee $employee, Carbon $asOf): float

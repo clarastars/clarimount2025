@@ -274,14 +274,14 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
-     * Pay out annual leave earned through the settlement date only.
-     * Later accrued days stay on the employee balance (typical for a back-dated settlement).
+     * Pay out annual leave earned through the settlement date (last month pro-rated).
+     * Days after that date stay on the employee balance.
      *
      * @return array{days: float, amount: float}
      */
     public function calculateAnnualLeaveDues(Employee $employee, Carbon $settlementDate): array
     {
-        $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceAsOf($employee, $settlementDate);
+        $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceThroughDate($employee, $settlementDate);
         $previouslyPaid = $this->previouslySettledLeaveDays($employee);
         $days = max(0, round($accruedAsOf - $previouslyPaid, 2));
         $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;

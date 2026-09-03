@@ -76,7 +76,7 @@ it('excludes the in-progress month when projecting earned leave for today', func
     expect($projected)->toBe(9.94);
 });
 
-it('projects accrued leave only through a past settlement date', function (): void {
+it('prorates the settlement month through a past date instead of dropping that month', function (): void {
     Carbon::setTestNow(Carbon::parse('2026-09-03', 'Asia/Riyadh'));
 
     $service = new LeaveAccrualService;
@@ -86,12 +86,19 @@ it('projects accrued leave only through a past settlement date', function (): vo
         'leave_accrued_balance' => 9.94,
     ]);
 
-    $projected = $service->projectedAccruedBalanceAsOf(
-        $employee,
-        Carbon::parse('2026-08-25', 'Asia/Riyadh'),
-    );
+    $asOf = Carbon::parse('2026-08-25', 'Asia/Riyadh');
 
-    expect($projected)->toBe(8.19);
+    // Completed months as of 25 Aug still stop at July
+    expect($service->projectedAccruedBalanceAsOf($employee, $asOf))->toBe(8.19);
+
+    // Settlement includes Aug 1–25: Mar 1.19 + Apr–Jul 7.00 + (25/31)*1.75 = 9.60
+    expect($service->projectedAccruedBalanceThroughDate($employee, $asOf))->toBe(9.60);
+
+    // A settlement dated today still stops at the last completed month (August)
+    expect($service->projectedAccruedBalanceThroughDate(
+        $employee,
+        Carbon::now('Asia/Riyadh'),
+    ))->toBe(9.94);
 });
 
 it('pro-rates the departure month immediately even if that month is still in progress', function (): void {

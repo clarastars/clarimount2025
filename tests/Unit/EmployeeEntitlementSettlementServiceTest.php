@@ -81,10 +81,10 @@ it('calculates annual leave dues only through the settlement date', function ():
         Carbon::parse('2026-08-25', 'Asia/Riyadh'),
     );
 
-    // Last completed month as of 25 Aug is July: Mar 1.19 + Apr–Jul 7.00
-    expect($throughPastDate['days'])->toBe(8.19);
+    // Mar 11–31 1.19 + Apr–Jul 7.00 + Aug 1–25 1.41 = 9.60; Aug 26–31 stays on balance
+    expect($throughPastDate['days'])->toBe(9.6);
     expect($throughPastDate['amount'])->toBe(
-        app(ManualDeductionAmountService::class)->fromGrossDays($employee, 8.19)
+        app(ManualDeductionAmountService::class)->fromGrossDays($employee, 9.6)
     );
 });
 
