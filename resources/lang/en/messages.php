@@ -1076,7 +1076,7 @@ return [
         'submit' => 'Save Leave',
         'annual_leave_balance' => 'Annual Leave Balance',
         'annual_leave_balance_placeholder' => '21',
-        'annual_leave_balance_hint' => 'Annual leave days entitlement (divided by 12 and accrued automatically each month).',
+        'annual_leave_balance_hint' => 'Annual leave days entitlement (divided by 12 and added after each month ends, not in advance).',
         'annual_leave_section' => 'Annual Leave Balance',
         'accrued_leave_balance' => 'Accrued balance',
         'leave_days_used' => 'Leave days already used',

@@ -33,35 +33,60 @@ it('pro-rates the hire month and accrues full months thereafter', function (): v
     expect($augustDays)->toBe(2.5);
 });
 
-it('sums pro-rated hire month and full later months for initialization', function (): void {
+it('defaults monthly jobs to the last completed month, not the in-progress month', function (): void {
+    $service = new LeaveAccrualService;
+
+    expect($service->resolveLastCompletedAccrualPeriod())->toBe('2026-07');
+    expect($service->resolveLastCompletedAccrualDate()->toDateString())->toBe('2026-07-31');
+});
+
+it('earns leave only through the last completed month', function (): void {
     $service = new LeaveAccrualService;
     $employee = makeEmployeeForAccrual();
 
+    $earnedThrough = $service->resolveEarnedThroughDate($employee);
     $periods = $service->eligibleAccrualPeriods(
         Carbon::parse('2026-07-26', 'Asia/Riyadh'),
-        Carbon::parse('2026-08-05', 'Asia/Riyadh'),
+        $earnedThrough,
     );
 
     $total = 0.0;
-
     foreach ($periods as $period) {
-        $total = round($total + $service->accrualDaysForPeriod($employee, $period), 2);
+        $total = round($total + $service->accrualDaysForPeriod($employee, $period, null, $earnedThrough), 2);
     }
 
-    expect($periods)->toBe(['2026-07', '2026-08']);
-    expect($total)->toBe(2.98);
+    expect($earnedThrough->toDateString())->toBe('2026-07-31');
+    expect($periods)->toBe(['2026-07']);
+    expect($total)->toBe(0.48);
+    expect($service->projectedAccruedBalanceAsOf($employee, Carbon::now('Asia/Riyadh')))->toBe(0.48);
 });
 
-it('pro-rates the departure month', function (): void {
+it('excludes the in-progress month when projecting earned leave for today', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-03', 'Asia/Riyadh'));
+
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual([
+        'hire_date' => '2026-03-11',
+        'annual_leave_balance' => 21,
+    ]);
+
+    $projected = $service->projectedAccruedBalanceAsOf($employee, Carbon::now('Asia/Riyadh'));
+
+    // March 11–31: (21/31)*1.75 = 1.19, plus Apr–Aug full months (5 × 1.75)
+    expect($projected)->toBe(9.94);
+});
+
+it('pro-rates the departure month immediately even if that month is still in progress', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-08-20', 'Asia/Riyadh'));
+
     $service = new LeaveAccrualService;
     $employee = makeEmployeeForAccrual([
         'hire_date' => '2026-01-10',
         'departure_date' => '2026-08-15',
     ]);
 
-    $augustDays = $service->accrualDaysForPeriod($employee, '2026-08');
-
-    expect($augustDays)->toBe(1.21);
+    expect($service->resolveEarnedThroughDate($employee)->toDateString())->toBe('2026-08-15');
+    expect($service->accrualDaysForPeriod($employee, '2026-08'))->toBe(1.21);
 });
 
 it('returns zero when the hire date is after the accrual period', function (): void {
@@ -82,7 +107,7 @@ it('returns the full monthly amount for a complete month', function (): void {
     expect($service->accrualDaysForPeriod($employee, '2026-06'))->toBe(2.5);
 });
 
-it('projects full monthly accrual through a future start date', function (): void {
+it('projects completed months only through a future start date', function (): void {
     $service = new LeaveAccrualService;
     $employee = makeEmployeeForAccrual([
         'hire_date' => '2026-01-01',
@@ -92,7 +117,8 @@ it('projects full monthly accrual through a future start date', function (): voi
     $asOf = Carbon::parse('2026-11-01', 'Asia/Riyadh');
     $projected = $service->projectedAccruedBalanceAsOf($employee, $asOf);
 
-    expect($projected)->toBe(27.5);
+    // Last completed month as of 1 Nov is October: Jan–Oct = 10 × 2.5
+    expect($projected)->toBe(25.0);
 });
 
 it('includes the hire-month pro-rate when projecting a future leave date', function (): void {
@@ -102,7 +128,8 @@ it('includes the hire-month pro-rate when projecting a future leave date', funct
     $asOf = Carbon::parse('2026-11-01', 'Asia/Riyadh');
     $projected = $service->projectedAccruedBalanceAsOf($employee, $asOf);
 
-    expect($projected)->toBe(10.48);
+    // Last completed as of 1 Nov is October: Jul 0.48 + Aug–Oct 7.5
+    expect($projected)->toBe(7.98);
 });
 
 it('treats a UTC midnight hire date as the same calendar day in Riyadh', function (): void {
@@ -115,7 +142,7 @@ it('treats a UTC midnight hire date as the same calendar day in Riyadh', functio
     expect($service->accrualDaysForPeriod($employee, '2025-11'))->toBe(1.28);
 });
 
-it('adds only later months onto stored accrual instead of rebuilding from hire date', function (): void {
+it('adds only later completed months onto stored accrual', function (): void {
     Carbon::setTestNow(Carbon::parse('2026-08-16', 'Asia/Riyadh'));
 
     $service = new LeaveAccrualService;
@@ -130,5 +157,14 @@ it('adds only later months onto stored accrual instead of rebuilding from hire d
         Carbon::parse('2026-09-20', 'Asia/Riyadh'),
     );
 
+    // Stored is through July; by 20 Sep only August has completed
     expect($futureDays)->toBe(2.5);
+
+    $throughOctober = $service->futureAccrualDaysUntil(
+        $employee,
+        Carbon::parse('2026-10-20', 'Asia/Riyadh'),
+    );
+
+    // August + September; October is still in progress
+    expect($throughOctober)->toBe(5.0);
 });

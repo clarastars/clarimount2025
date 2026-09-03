@@ -27,7 +27,7 @@ class AccrueMonthlyLeaveBalanceJob implements ShouldQueue
 
     public function handle(LeaveAccrualService $service): void
     {
-        $period = $this->period ?? $service->resolveCurrentAccrualPeriod();
+        $period = $this->period ?? $service->resolveLastCompletedAccrualPeriod();
         $result = $service->accrueForPeriod($period, $this->force);
 
         Log::info('Monthly leave accrual completed.', [

@@ -111,8 +111,8 @@ class LeaveAccrualService
     }
 
     /**
-     * Extra leave days that will accrue after the current month through the as-of month.
-     * Uses the stored monthly rate; does not rebuild history from hire date.
+     * Extra leave days that will have been earned by the as-of date, beyond today's stored balance.
+     * Only completed months are counted (the in-progress month is not accrued in advance).
      */
     public function futureAccrualDaysUntil(Employee $employee, Carbon $asOf): float
     {
@@ -122,19 +122,30 @@ class LeaveAccrualService
             return 0.0;
         }
 
-        $asOf = $this->resolveAccrualAsOfDate($employee, $asOf);
-        $today = $this->resolveAccrualAsOfDate($employee, Carbon::now(self::TZ)->startOfDay());
+        $todayEarnedThrough = $this->resolveEarnedThroughDate($employee);
+        $asOfEarnedThrough = $this->resolveEarnedThroughDate($employee, $asOf);
 
-        if ($asOf->lte($today->copy()->endOfMonth()->startOfDay())) {
+        if ($asOfEarnedThrough->lte($todayEarnedThrough)) {
             return 0.0;
         }
 
-        $cursor = $today->copy()->startOfMonth()->addMonth();
-        $asOfMonth = $asOf->copy()->startOfMonth();
+        $hireDate = $this->resolveHireDate($employee);
+        $cursor = $todayEarnedThrough->copy()->addDay()->startOfMonth();
+        $endMonth = $asOfEarnedThrough->copy()->startOfMonth();
         $extra = 0.0;
 
-        while ($cursor->lte($asOfMonth)) {
-            $extra = round($extra + $monthlyDays, 2);
+        while ($cursor->lte($endMonth)) {
+            $daysForPeriod = $this->accrualDaysForPeriod(
+                $employee,
+                $cursor->format('Y-m'),
+                $hireDate,
+                $asOfEarnedThrough,
+            );
+
+            if ($daysForPeriod > 0) {
+                $extra = round($extra + $daysForPeriod, 2);
+            }
+
             $cursor->addMonth();
         }
 
@@ -147,11 +158,48 @@ class LeaveAccrualService
     }
 
     /**
-     * Accrued days the employee will have earned by the given date (hire-to-date, including the as-of month).
+     * Last fully completed calendar month (YYYY-MM). On 3 Sep this is 2026-08.
+     */
+    public function resolveLastCompletedAccrualPeriod(?Carbon $date = null): string
+    {
+        return $this->resolveLastCompletedAccrualDate($date)->format('Y-m');
+    }
+
+    /**
+     * Last day of the last fully completed calendar month.
+     */
+    public function resolveLastCompletedAccrualDate(?Carbon $date = null): Carbon
+    {
+        $date = $date === null
+            ? Carbon::now(self::TZ)->startOfDay()
+            : ($this->calendarDateInRiyadh($date) ?? Carbon::now(self::TZ)->startOfDay());
+
+        return $date->copy()->timezone(self::TZ)->startOfMonth()->subDay()->startOfDay();
+    }
+
+    /**
+     * Date through which leave has actually been earned: last completed month,
+     * or the departure date when the employee has already left.
+     */
+    public function resolveEarnedThroughDate(Employee $employee, ?Carbon $date = null): Carbon
+    {
+        $asOf = $date === null
+            ? Carbon::now(self::TZ)->startOfDay()
+            : ($this->calendarDateInRiyadh($date) ?? Carbon::now(self::TZ)->startOfDay());
+
+        $departureDate = $this->resolveDepartureDate($employee);
+        if ($departureDate !== null && $departureDate->lte($asOf)) {
+            return $departureDate;
+        }
+
+        return $this->resolveLastCompletedAccrualDate($asOf);
+    }
+
+    /**
+     * Accrued days earned by the given date (completed months only, unless already departed).
      */
     public function projectedAccruedBalanceAsOf(Employee $employee, Carbon $asOf): float
     {
-        $asOf = $this->resolveAccrualAsOfDate($employee, $asOf);
         $monthlyDays = $this->monthlyAccrualDays($employee);
 
         if ($monthlyDays <= 0) {
@@ -161,17 +209,19 @@ class LeaveAccrualService
         $hireDate = $this->resolveHireDate($employee);
 
         if ($hireDate === null) {
-            return $this->projectAccruedWithoutHireDate($employee, $asOf, $monthlyDays);
+            return $this->projectAccruedWithoutHireDate($employee, $asOf);
         }
 
-        if ($hireDate->gt($asOf)) {
+        $earnedThrough = $this->resolveEarnedThroughDate($employee, $asOf);
+
+        if ($hireDate->gt($earnedThrough)) {
             return 0.0;
         }
 
         $total = 0.0;
 
-        foreach ($this->eligibleAccrualPeriods($hireDate, $asOf) as $period) {
-            $daysForPeriod = $this->accrualDaysForPeriod($employee, $period, $hireDate, $asOf);
+        foreach ($this->eligibleAccrualPeriods($hireDate, $earnedThrough) as $period) {
+            $daysForPeriod = $this->accrualDaysForPeriod($employee, $period, $hireDate, $earnedThrough);
 
             if ($daysForPeriod <= 0) {
                 continue;
@@ -184,12 +234,12 @@ class LeaveAccrualService
     }
 
     /**
-     * Set accrued balance from hire date through today and sync accrual logs (for new employees or hire/entitlement changes).
+     * Set accrued balance from hire date through the last completed month (or departure date).
      */
     public function initializeAccruedBalanceForEmployee(Employee $employee, bool $replaceExistingLogs = true): float
     {
         $employee->refresh();
-        $asOf = $this->resolveAccrualAsOfDate($employee);
+        $asOf = $this->resolveEarnedThroughDate($employee);
         $monthlyDays = $this->monthlyAccrualDays($employee);
 
         if ($monthlyDays <= 0) {
@@ -376,25 +426,11 @@ class LeaveAccrualService
         });
     }
 
-    private function projectAccruedWithoutHireDate(Employee $employee, Carbon $asOf, float $monthlyDays): float
+    private function projectAccruedWithoutHireDate(Employee $employee, Carbon $asOf): float
     {
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
-        $today = $this->resolveAccrualAsOfDate($employee, Carbon::now(self::TZ)->startOfDay());
 
-        if ($asOf->lte($today->copy()->endOfMonth()->startOfDay())) {
-            return $currentAccrued;
-        }
-
-        $cursor = $today->copy()->startOfMonth()->addMonth();
-        $asOfMonth = $asOf->copy()->startOfMonth();
-        $extra = 0.0;
-
-        while ($cursor->lte($asOfMonth)) {
-            $extra = round($extra + $monthlyDays, 2);
-            $cursor->addMonth();
-        }
-
-        return round($currentAccrued + $extra, 2);
+        return round($currentAccrued + $this->futureAccrualDaysUntil($employee, $asOf), 2);
     }
 
     private function resolveHireDate(Employee $employee): ?Carbon

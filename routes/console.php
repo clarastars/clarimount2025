@@ -26,8 +26,8 @@ Schedule::job(new \App\Jobs\ProcessEarlyDeparturePenaltiesJob())
     ->timezone('Asia/Riyadh')
     ->description('Process early departure attendance penalties for today');
 
-// Monthly leave accrual: annual entitlement ÷ 12 per active employee (e.g. 21 → 1.75/month)
+// Monthly leave accrual: previous completed month (e.g. on 1 Sep accrue August; 21 → 1.75/month)
 Schedule::job(new \App\Jobs\AccrueMonthlyLeaveBalanceJob())
     ->monthlyOn(1, '02:00')
     ->timezone('Asia/Riyadh')
-    ->description('Accrue monthly leave balance for active employees');
+    ->description('Accrue leave balance for the last completed month');

@@ -1074,7 +1074,7 @@ return [
         'submit' => 'حفظ الإجازة',
         'annual_leave_balance' => 'رصيد الإجازة السنوية',
         'annual_leave_balance_placeholder' => '21',
-        'annual_leave_balance_hint' => 'عدد أيام الإجازة السنوية المستحقة (يُقسَّم على 12 ويُضاف شهرياً تلقائياً).',
+        'annual_leave_balance_hint' => 'عدد أيام الإجازة السنوية المستحقة (يُقسَّم على 12 ويُضاف بعد انتهاء كل شهر، وليس مقدماً).',
         'annual_leave_section' => 'رصيد الإجازة السنوية',
         'accrued_leave_balance' => 'الرصيد المتراكم',
         'leave_days_used' => 'أيام الإجازة المستخدمة مسبقاً',

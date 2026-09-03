@@ -11,13 +11,13 @@ use InvalidArgumentException;
 class AccrueMonthlyLeaveBalanceMissingHireDateCommand extends Command
 {
     protected $signature = 'leaves:accrue-monthly-missing-hire-date
-                            {--period= : Accrual period in YYYY-MM (defaults to current month in Asia/Riyadh)}';
+                            {--period= : Accrual period in YYYY-MM (defaults to last completed month in Asia/Riyadh)}';
 
-    protected $description = 'Accrue monthly leave for active employees missing hire_date (keeps entitlement + duplicate-period protection)';
+    protected $description = 'Accrue the last completed month for active employees missing hire_date (keeps entitlement + duplicate-period protection)';
 
     public function handle(LeaveAccrualService $service): int
     {
-        $period = $this->option('period') ?: $service->resolveCurrentAccrualPeriod();
+        $period = $this->option('period') ?: $service->resolveLastCompletedAccrualPeriod();
 
         if (! is_string($period) || ! preg_match('/^\d{4}-\d{2}$/', $period)) {
             $this->error('Period must be in YYYY-MM format, e.g. 2026-07.');

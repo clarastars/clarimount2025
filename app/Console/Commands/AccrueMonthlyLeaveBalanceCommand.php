@@ -11,15 +11,15 @@ use Illuminate\Console\Command;
 class AccrueMonthlyLeaveBalanceCommand extends Command
 {
     protected $signature = 'leaves:accrue-monthly
-                            {--period= : Accrual period in YYYY-MM (defaults to current month)}
+                            {--period= : Accrual period in YYYY-MM (defaults to last completed month)}
                             {--force : Re-run accrual for the period even if already processed}
                             {--sync : Run synchronously instead of dispatching a queue job}';
 
-    protected $description = 'Accrue monthly leave balance for active employees (annual entitlement ÷ 12)';
+    protected $description = 'Accrue leave for the last completed month (annual entitlement ÷ 12)';
 
     public function handle(LeaveAccrualService $service): int
     {
-        $period = $this->option('period') ?: $service->resolveCurrentAccrualPeriod();
+        $period = $this->option('period') ?: $service->resolveLastCompletedAccrualPeriod();
         $force = (bool) $this->option('force');
 
         if ($this->option('sync')) {
