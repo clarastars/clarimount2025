@@ -41,7 +41,7 @@ class LeaveApprovalNotificationService
                 continue;
             }
 
-            if ($this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($this->userIsAssignedToApprovalStep($user, $firstStep, $leaveRequest->employee)) {
                 $this->send($user, 'your_turn', $payload);
             }
         }
@@ -67,7 +67,7 @@ class LeaveApprovalNotificationService
                 continue;
             }
 
-            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep)) {
+            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep, $leaveRequest->employee)) {
                 $this->send($user, 'your_turn', [
                     ...$basePayload,
                     'step_id' => $nextStep->id,
@@ -120,7 +120,7 @@ class LeaveApprovalNotificationService
                 continue;
             }
 
-            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep, $leaveRequest->employee)) {
                 $this->send($user, 'your_turn', [
                     ...$payload,
                     'step_id' => $firstStep->id,
@@ -216,9 +216,14 @@ class LeaveApprovalNotificationService
 
         $userIds = collect([$company->owner_id])->filter();
         $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($leaveRequest->employee);
 
         foreach ($teamIds as $teamId) {
-            $teamMemberIds = $roleService->userIdsForTeamInCompany((int) $teamId, (int) $company->id);
+            $teamMemberIds = $roleService->userIdsForTeamInCompanyScoped(
+                (int) $teamId,
+                (int) $company->id,
+                $departmentId,
+            );
 
             if ($teamMemberIds === []) {
                 continue;
@@ -240,16 +245,19 @@ class LeaveApprovalNotificationService
             ->values();
     }
 
-    private function userIsAssignedToApprovalStep(User $user, LeaveApprovalStep $step): bool
+    private function userIsAssignedToApprovalStep(User $user, LeaveApprovalStep $step, ?Employee $employee = null): bool
     {
         if ($step->team_id === null) {
             return false;
         }
 
-        return app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany(
+        $roleService = app(EmployeeUserRoleService::class);
+
+        return $roleService->userBelongsToTeamInCompanyScoped(
             $user,
             (int) $step->team_id,
-            (int) $step->company_id
+            (int) $step->company_id,
+            $roleService->departmentIdForEmployeeScope($employee),
         );
     }
 

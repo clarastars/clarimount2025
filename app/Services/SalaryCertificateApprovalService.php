@@ -302,8 +302,11 @@ class SalaryCertificateApprovalService
         }
 
         $stepTeamId = (int) $step->team_id;
+        $roleService = app(EmployeeUserRoleService::class);
+        $request->loadMissing('employee');
+        $departmentId = $roleService->departmentIdForEmployeeScope($request->employee);
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
+        if (! $roleService->userBelongsToTeamInCompanyScoped($user, $stepTeamId, (int) $company->id, $departmentId)) {
             return false;
         }
 

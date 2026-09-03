@@ -628,6 +628,41 @@ class EmployeeUserRoleService
             ->all();
     }
 
+    /**
+     * Team members who should act for this employee: department-scoped users when
+     * any exist, otherwise company-wide (department_id NULL) users for the team.
+     *
+     * @return array<int, int>
+     */
+    public function userIdsForTeamInCompanyScoped(int $teamId, int $companyId, ?string $departmentId): array
+    {
+        if ($departmentId !== null && $departmentId !== '') {
+            $departmentUserIds = DB::table('company_user_access')
+                ->where('team_id', $teamId)
+                ->where('company_id', $companyId)
+                ->where('department_id', $departmentId)
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($departmentUserIds !== []) {
+                return $departmentUserIds;
+            }
+        }
+
+        return DB::table('company_user_access')
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->whereNull('department_id')
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function userBelongsToTeamInCompany(User $portalUser, int $teamId, int $companyId): bool
     {
         if (! $this->userBelongsToTeam($portalUser, $teamId)) {
@@ -639,6 +674,23 @@ class EmployeeUserRoleService
             ->where('team_id', $teamId)
             ->where('company_id', $companyId)
             ->exists();
+    }
+
+    public function userBelongsToTeamInCompanyScoped(
+        User $portalUser,
+        int $teamId,
+        int $companyId,
+        ?string $departmentId,
+    ): bool {
+        if (! $this->userBelongsToTeam($portalUser, $teamId)) {
+            return false;
+        }
+
+        return in_array(
+            (int) $portalUser->id,
+            $this->userIdsForTeamInCompanyScoped($teamId, $companyId, $departmentId),
+            true,
+        );
     }
 
     /**

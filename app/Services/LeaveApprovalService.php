@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\LeaveApprovalStep;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestApprovalRejection;
@@ -25,7 +26,7 @@ class LeaveApprovalService
     ];
 
     /**
-     * Cached step assignees keyed by "{companyId}:{teamId}".
+     * Cached step assignees keyed by "{companyId}:{teamId}:{departmentId|company}".
      *
      * @var array<string, list<array{id: int, name: string, email: string|null}>>
      */
@@ -132,6 +133,7 @@ class LeaveApprovalService
      */
     public function buildApprovalPayload(LeaveRequest $leaveRequest, User $user, Company $company): array
     {
+        $leaveRequest->loadMissing('employee');
         $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = LeaveRequestStepApproval::query()
             ->where('leave_request_id', $leaveRequest->id)
@@ -157,7 +159,7 @@ class LeaveApprovalService
                 'sort_order' => $step->sort_order,
                 'team_id' => $step->team_id,
                 'team_name' => $step->team?->name,
-                'assignees' => $this->assigneesForStep($step, $company),
+                'assignees' => $this->assigneesForStep($step, $company, $leaveRequest->employee),
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
                 'can_approve' => $canApprove,
@@ -182,6 +184,7 @@ class LeaveApprovalService
             return null;
         }
 
+        $leaveRequest->loadMissing('employee');
         $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = LeaveRequestStepApproval::query()
             ->where('leave_request_id', $leaveRequest->id)
@@ -217,7 +220,7 @@ class LeaveApprovalService
                 'title' => $step->title,
                 'sort_order' => $step->sort_order,
                 'team_name' => $step->team?->name,
-                'assignees' => $this->assigneesForStep($step, $company),
+                'assignees' => $this->assigneesForStep($step, $company, $leaveRequest->employee),
                 'status' => $status,
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
@@ -341,8 +344,11 @@ class LeaveApprovalService
         }
 
         $stepTeamId = (int) $step->team_id;
+        $roleService = app(EmployeeUserRoleService::class);
+        $leaveRequest->loadMissing('employee');
+        $departmentId = $roleService->departmentIdForEmployeeScope($leaveRequest->employee);
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
+        if (! $roleService->userBelongsToTeamInCompanyScoped($user, $stepTeamId, (int) $company->id, $departmentId)) {
             return false;
         }
 
@@ -459,24 +465,29 @@ class LeaveApprovalService
     }
 
     /**
-     * Users assigned to the step's team for this company who can approve leaves.
+     * Users assigned to the step's team for this employee (department first, else company-wide).
      *
      * @return list<array{id: int, name: string, email: string|null}>
      */
-    public function assigneesForStep(LeaveApprovalStep $step, Company $company): array
+    public function assigneesForStep(LeaveApprovalStep $step, Company $company, ?Employee $employee = null): array
     {
         if ($step->team_id === null) {
             return [];
         }
 
-        $cacheKey = (int) $company->id.':'.(int) $step->team_id;
+        $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($employee);
+        $cacheKey = (int) $company->id.':'.(int) $step->team_id.':'.($departmentId ?? 'company');
 
         if (isset($this->assigneesCache[$cacheKey])) {
             return $this->assigneesCache[$cacheKey];
         }
 
-        $userIds = app(EmployeeUserRoleService::class)
-            ->userIdsForTeamInCompany((int) $step->team_id, (int) $company->id);
+        $userIds = $roleService->userIdsForTeamInCompanyScoped(
+            (int) $step->team_id,
+            (int) $company->id,
+            $departmentId,
+        );
 
         if ($userIds === []) {
             return $this->assigneesCache[$cacheKey] = [];

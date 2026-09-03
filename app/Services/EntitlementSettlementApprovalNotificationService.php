@@ -138,9 +138,14 @@ class EntitlementSettlementApprovalNotificationService
 
         $userIds = collect([$company->owner_id])->filter();
         $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($settlement->employee);
 
         foreach ($teamIds as $teamId) {
-            $teamMemberIds = $roleService->userIdsForTeamInCompany((int) $teamId, (int) $company->id);
+            $teamMemberIds = $roleService->userIdsForTeamInCompanyScoped(
+                (int) $teamId,
+                (int) $company->id,
+                $departmentId,
+            );
 
             if ($teamMemberIds === []) {
                 continue;
@@ -162,16 +167,19 @@ class EntitlementSettlementApprovalNotificationService
             ->values();
     }
 
-    private function userIsAssignedToApprovalStep(User $user, EntitlementSettlementApprovalStep $step): bool
+    private function userIsAssignedToApprovalStep(User $user, EntitlementSettlementApprovalStep $step, ?Employee $employee = null): bool
     {
         if ($step->team_id === null) {
             return false;
         }
 
-        return app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany(
+        $roleService = app(EmployeeUserRoleService::class);
+
+        return $roleService->userBelongsToTeamInCompanyScoped(
             $user,
             (int) $step->team_id,
-            (int) $step->company_id
+            (int) $step->company_id,
+            $roleService->departmentIdForEmployeeScope($employee),
         );
     }
 

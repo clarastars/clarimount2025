@@ -192,8 +192,11 @@ class EntitlementSettlementApprovalService
         }
 
         $stepTeamId = (int) $step->team_id;
+        $roleService = app(EmployeeUserRoleService::class);
+        $settlement->loadMissing('employee');
+        $departmentId = $roleService->departmentIdForEmployeeScope($settlement->employee);
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
+        if (! $roleService->userBelongsToTeamInCompanyScoped($user, $stepTeamId, (int) $company->id, $departmentId)) {
             return false;
         }
 
