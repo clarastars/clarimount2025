@@ -76,6 +76,24 @@ it('excludes the in-progress month when projecting earned leave for today', func
     expect($projected)->toBe(9.94);
 });
 
+it('projects accrued leave only through a past settlement date', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-03', 'Asia/Riyadh'));
+
+    $service = new LeaveAccrualService;
+    $employee = makeEmployeeForAccrual([
+        'hire_date' => '2026-03-11',
+        'annual_leave_balance' => 21,
+        'leave_accrued_balance' => 9.94,
+    ]);
+
+    $projected = $service->projectedAccruedBalanceAsOf(
+        $employee,
+        Carbon::parse('2026-08-25', 'Asia/Riyadh'),
+    );
+
+    expect($projected)->toBe(8.19);
+});
+
 it('pro-rates the departure month immediately even if that month is still in progress', function (): void {
     Carbon::setTestNow(Carbon::parse('2026-08-20', 'Asia/Riyadh'));
 

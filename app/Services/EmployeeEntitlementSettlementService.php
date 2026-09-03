@@ -18,7 +18,7 @@ class EmployeeEntitlementSettlementService
 
     public function __construct(
         private ManualDeductionAmountService $amountService,
-        private LeaveBalanceService $leaveBalanceService,
+        private LeaveAccrualService $leaveAccrualService,
     ) {}
 
     /**
@@ -274,21 +274,34 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
-     * Pay out the employee's accrued annual leave entitlement at settlement.
-     * Uses projected accrued balance (not remaining after scheduled future leave).
+     * Pay out annual leave earned through the settlement date only.
+     * Later accrued days stay on the employee balance (typical for a back-dated settlement).
      *
      * @return array{days: float, amount: float}
      */
     public function calculateAnnualLeaveDues(Employee $employee, Carbon $settlementDate): array
     {
-        $forecast = $this->leaveBalanceService->forecastForDate($employee, $settlementDate);
-        $days = max(0, round((float) $forecast['projected_accrued'], 2));
+        $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceAsOf($employee, $settlementDate);
+        $previouslyPaid = $this->previouslySettledLeaveDays($employee);
+        $days = max(0, round($accruedAsOf - $previouslyPaid, 2));
         $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;
 
         return [
             'days' => $days,
             'amount' => $amount,
         ];
+    }
+
+    public function previouslySettledLeaveDays(Employee $employee): float
+    {
+        if ($employee->getKey() === null) {
+            return 0.0;
+        }
+
+        return round((float) EmployeeEntitlementSettlement::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', EmployeeEntitlementSettlement::STATUS_APPROVED)
+            ->sum('remaining_leave_days'), 2);
     }
 
     /**
@@ -352,8 +365,12 @@ class EmployeeEntitlementSettlementService
             $settlementDate = $this->parseDate($lockedSettlement->settlement_date)?->endOfDay();
             $settlementCreatedAt = $lockedSettlement->created_at?->copy();
 
+            $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
+            $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
+            $remainingAccrued = max(0.0, round($currentAccrued - $paidLeaveDays, 2));
+
             $employee->update([
-                'leave_accrued_balance' => 0,
+                'leave_accrued_balance' => $remainingAccrued,
                 'leave_days_used' => 0,
             ]);
 

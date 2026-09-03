@@ -429,8 +429,24 @@ class LeaveAccrualService
     private function projectAccruedWithoutHireDate(Employee $employee, Carbon $asOf): float
     {
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
+        $todayEarnedThrough = $this->resolveEarnedThroughDate($employee);
+        $asOfEarnedThrough = $this->resolveEarnedThroughDate($employee, $asOf);
 
-        return round($currentAccrued + $this->futureAccrualDaysUntil($employee, $asOf), 2);
+        if ($asOfEarnedThrough->gte($todayEarnedThrough)) {
+            return round($currentAccrued + $this->futureAccrualDaysUntil($employee, $asOf), 2);
+        }
+
+        $monthlyDays = $this->monthlyAccrualDays($employee);
+        $cursor = $asOfEarnedThrough->copy()->addDay()->startOfMonth();
+        $endMonth = $todayEarnedThrough->copy()->startOfMonth();
+        $laterMonths = 0.0;
+
+        while ($cursor->lte($endMonth)) {
+            $laterMonths = round($laterMonths + $monthlyDays, 2);
+            $cursor->addMonth();
+        }
+
+        return max(0.0, round($currentAccrued - $laterMonths, 2));
     }
 
     private function resolveHireDate(Employee $employee): ?Carbon

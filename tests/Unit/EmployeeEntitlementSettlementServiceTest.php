@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Employee;
 use App\Services\EmployeeEntitlementSettlementService;
-use App\Services\LeaveBalanceService;
+use App\Services\LeaveAccrualService;
 use App\Services\ManualDeductionAmountService;
 use Carbon\Carbon;
 
@@ -58,29 +58,34 @@ it('uses gross salary for salary dues amount', function (): void {
     expect($amountService->fromGrossDays($employee, 23))->toBe(round((5400 / 30) * 23, 2));
 });
 
-it('calculates annual leave dues from projected accrued days and gross salary', function (): void {
-    $employee = makeSettlementEmployee();
+it('calculates annual leave dues only through the settlement date', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-03', 'Asia/Riyadh'));
 
-    $leaveBalanceService = Mockery::mock(LeaveBalanceService::class);
-    $leaveBalanceService->shouldReceive('forecastForDate')
-        ->once()
-        ->andReturn([
-            'projected_accrued' => 18.73,
-            'projected_remaining' => 0.73,
-        ]);
+    $employee = makeSettlementEmployee([
+        'hire_date' => '2026-03-11',
+        'annual_leave_balance' => 21,
+        'leave_accrued_balance' => 9.94,
+        'leave_days_used' => 0,
+    ]);
 
-    $service = new EmployeeEntitlementSettlementService(
-        app(ManualDeductionAmountService::class),
-        $leaveBalanceService,
-    );
+    $service = app(EmployeeEntitlementSettlementService::class);
 
-    $result = $service->calculateAnnualLeaveDues(
+    $throughToday = $service->calculateAnnualLeaveDues(
         $employee,
-        Carbon::parse('2026-09-13', 'Asia/Riyadh'),
+        Carbon::parse('2026-09-03', 'Asia/Riyadh'),
+    );
+    expect($throughToday['days'])->toBe(9.94);
+
+    $throughPastDate = $service->calculateAnnualLeaveDues(
+        $employee,
+        Carbon::parse('2026-08-25', 'Asia/Riyadh'),
     );
 
-    expect($result['days'])->toBe(18.73);
-    expect($result['amount'])->toBe(app(ManualDeductionAmountService::class)->fromGrossDays($employee, 18.73));
+    // Last completed month as of 25 Aug is July: Mar 1.19 + Apr–Jul 7.00
+    expect($throughPastDate['days'])->toBe(8.19);
+    expect($throughPastDate['amount'])->toBe(
+        app(ManualDeductionAmountService::class)->fromGrossDays($employee, 8.19)
+    );
 });
 
 it('does not deduct approved future leave from annual leave settlement', function (): void {
@@ -162,7 +167,7 @@ it('deducts all recorded unpaid leave days when leave is fully inside salary per
     $employee->shouldReceive('leaves')->andReturn($leavesQuery);
     $employee->shouldReceive('getKey')->andReturn(1);
 
-    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveAccrualService::class)) extends EmployeeEntitlementSettlementService
     {
         public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
         {
@@ -202,7 +207,7 @@ it('excludes unpaid leave days from salary dues during the settlement period', f
     $employee->shouldReceive('leaves')->andReturn($leavesQuery);
     $employee->shouldReceive('getKey')->andReturn(1);
 
-    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveAccrualService::class)) extends EmployeeEntitlementSettlementService
     {
         public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
         {
@@ -222,7 +227,7 @@ it('excludes unpaid leave days from salary dues during the settlement period', f
 it('calculates salary dues from an explicit unpaid start date', function (): void {
     $employee = makeSettlementEmployee();
 
-    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveAccrualService::class)) extends EmployeeEntitlementSettlementService
     {
         public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
         {
@@ -244,7 +249,7 @@ it('calculates salary dues from an explicit unpaid start date', function (): voi
 it('calculates salary dues for a future settlement date across months', function (): void {
     $employee = makeSettlementEmployee();
 
-    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveAccrualService::class)) extends EmployeeEntitlementSettlementService
     {
         public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
         {
@@ -266,7 +271,7 @@ it('falls back to start of settlement month when hire date is missing', function
         'hire_date' => null,
     ]);
 
-    $service = new class(app(ManualDeductionAmountService::class), app(LeaveBalanceService::class)) extends EmployeeEntitlementSettlementService
+    $service = new class(app(ManualDeductionAmountService::class), app(LeaveAccrualService::class)) extends EmployeeEntitlementSettlementService
     {
         public function resolveUnpaidSalaryStartDate(Employee $employee, Carbon $settlementDate): ?Carbon
         {
