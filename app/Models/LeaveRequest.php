@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasLeaveAttachments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LeaveRequest extends Model
 {
+    use HasLeaveAttachments;
+
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
@@ -33,6 +36,7 @@ class LeaveRequest extends Model
         'is_paid',
         'notes',
         'attachment_path',
+        'attachment_paths',
         'status',
         'reviewed_by',
         'reviewed_at',
@@ -48,6 +52,7 @@ class LeaveRequest extends Model
         'projected_remaining_at_start' => 'decimal:2',
         'deduct_from_balance' => 'boolean',
         'is_paid' => 'boolean',
+        'attachment_paths' => 'array',
         'reviewed_at' => 'datetime',
     ];
 

@@ -47,6 +47,7 @@ class RedirectIfEmployeePortalUser
             'employee.leaves.index',
             'employee.leaves.store',
             'employee.leaves.destroy',
+            'leave-attachments.show',
             'employee.salary-certificates.index',
             'employee.salary-certificates.store',
             'employee.salary-certificates.destroy',

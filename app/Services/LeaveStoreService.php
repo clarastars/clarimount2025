@@ -16,6 +16,7 @@ class LeaveStoreService
     public function __construct(
         private LeaveTypeService $leaveTypeService,
         private LeaveBalanceService $leaveBalanceService,
+        private LeaveAttachmentService $leaveAttachmentService,
     ) {}
 
     public function validateAndCreate(Request $request, Employee $employee): Leave
@@ -27,7 +28,7 @@ class LeaveStoreService
             'deduct_from_balance' => 'required|boolean',
             'is_paid' => 'required|boolean',
             'notes' => 'nullable|string|max:2000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            ...$this->leaveAttachmentService->validationRules(),
         ]);
 
         if ($this->leaveTypeService->findActiveByKey((string) $validated['leave_type']) === null) {
@@ -44,10 +45,9 @@ class LeaveStoreService
             $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
-        $attachmentPath = null;
-        if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('leave-attachments', 'public');
-        }
+        $attachmentPayload = $this->leaveAttachmentService->persistPayload(
+            $this->leaveAttachmentService->storeFromRequest($request),
+        );
 
         return Leave::create([
             'employee_id' => $employee->id,
@@ -58,7 +58,8 @@ class LeaveStoreService
             'deduct_from_balance' => $validated['deduct_from_balance'],
             'is_paid' => $validated['is_paid'],
             'notes' => $validated['notes'] ?? null,
-            'attachment_path' => $attachmentPath,
+            'attachment_path' => $attachmentPayload['attachment_path'],
+            'attachment_paths' => $attachmentPayload['attachment_paths'],
         ]);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasLeaveAttachments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Leave extends Model
 {
     use HasFactory;
+    use HasLeaveAttachments;
 
     public const TYPE_ANNUAL = 'annual';
     public const TYPE_SICK = 'sick';
@@ -38,6 +40,7 @@ class Leave extends Model
         'is_paid',
         'notes',
         'attachment_path',
+        'attachment_paths',
     ];
 
     protected $casts = [
@@ -46,6 +49,7 @@ class Leave extends Model
         'days' => 'integer',
         'deduct_from_balance' => 'boolean',
         'is_paid' => 'boolean',
+        'attachment_paths' => 'array',
     ];
 
     /**

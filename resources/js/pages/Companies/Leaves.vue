@@ -77,6 +77,7 @@ interface LeaveRequestItem {
     status?: string;
     review_notes?: string | null;
     attachment_url?: string | null;
+    attachment_urls?: string[];
     created_at?: string | null;
     reviewed_at?: string | null;
     reviewer_name?: string | null;
@@ -164,7 +165,7 @@ const form = useForm({
     deduct_from_balance: false,
     is_paid: true,
     notes: '',
-    attachment: null as File | null,
+    attachments: [] as File[],
 });
 
 const selectedLeaveType = computed(() =>
@@ -231,8 +232,8 @@ function closeCreateForm() {
     form.clearErrors();
 }
 
-function onAttachmentChange(file: File | null) {
-    form.attachment = file;
+function onAttachmentsChange(files: File[]) {
+    form.attachments = files;
 }
 
 const submit = () => {
@@ -278,6 +279,14 @@ const showDirectReviewActions = computed(() =>
 
 const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
+const requestAttachmentUrls = computed(() => {
+    const urls = selectedRequest.value?.attachment_urls ?? [];
+    if (urls.length > 0) {
+        return urls;
+    }
+
+    return selectedRequest.value?.attachment_url ? [selectedRequest.value.attachment_url] : [];
+});
 const expandedAssigneeStepIds = ref<number[]>([]);
 
 const isAssigneesOpen = (stepId: number): boolean =>
@@ -704,16 +713,20 @@ function submitRejectStep() {
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.review_notes') }}</p>
                                 <p class="font-medium whitespace-pre-wrap">{{ selectedRequest.review_notes }}</p>
                             </div>
-                            <div v-if="selectedRequest.attachment_url" class="rounded-md border px-3 py-2.5 sm:col-span-2">
-                                <p class="text-xs text-muted-foreground mb-0.5">{{ t('leaves.attachment') }}</p>
-                                <a
-                                    :href="selectedRequest.attachment_url"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="text-primary hover:underline font-medium"
-                                >
-                                    {{ t('leaves.view_attachment') }}
-                                </a>
+                            <div v-if="requestAttachmentUrls.length" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                <p class="text-xs text-muted-foreground mb-1">{{ t('leaves.attachment') }}</p>
+                                <ul class="space-y-1">
+                                    <li v-for="(url, index) in requestAttachmentUrls" :key="url">
+                                        <a
+                                            :href="url"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="text-primary hover:underline font-medium"
+                                        >
+                                            {{ t('leaves.view_attachment') }} {{ requestAttachmentUrls.length > 1 ? index + 1 : '' }}
+                                        </a>
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -886,7 +899,7 @@ function submitRejectStep() {
                             show-employee-select
                             :employees="employees"
                             :leave-types="leaveTypes"
-                            @attachment-change="onAttachmentChange"
+                            @attachments-change="onAttachmentsChange"
                         />
 
                         <DialogFooter>

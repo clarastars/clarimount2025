@@ -22,6 +22,7 @@ class LeaveRequestService
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
         private LeaveTypeService $leaveTypeService,
         private LeaveBalanceService $leaveBalanceService,
+        private LeaveAttachmentService $leaveAttachmentService,
     ) {}
 
     public function submitForEmployee(Employee $employee, Request $request, ?User $submittedBy = null): LeaveRequest
@@ -33,7 +34,7 @@ class LeaveRequestService
             'deduct_from_balance' => 'required|boolean',
             'is_paid' => 'required|boolean',
             'notes' => 'nullable|string|max:2000',
-            'attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            ...$this->leaveAttachmentService->validationRules(),
         ]);
 
         $leaveType = $this->leaveTypeService->findActiveByKey((string) $validated['leave_type']);
@@ -58,10 +59,9 @@ class LeaveRequestService
             $forecast = $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
-        $attachmentPath = null;
-        if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('leave-attachments', 'public');
-        }
+        $attachmentPayload = $this->leaveAttachmentService->persistPayload(
+            $this->leaveAttachmentService->storeFromRequest($request),
+        );
 
         $leaveRequest = LeaveRequest::query()->create([
             'employee_id' => $employee->id,
@@ -74,7 +74,8 @@ class LeaveRequestService
             'deduct_from_balance' => $validated['deduct_from_balance'],
             'is_paid' => $validated['is_paid'],
             'notes' => $validated['notes'] ?? null,
-            'attachment_path' => $attachmentPath,
+            'attachment_path' => $attachmentPayload['attachment_path'],
+            'attachment_paths' => $attachmentPayload['attachment_paths'],
             'status' => LeaveRequest::STATUS_PENDING,
         ]);
 
@@ -127,6 +128,7 @@ class LeaveRequestService
                 'is_paid' => $leaveRequest->is_paid,
                 'notes' => $leaveRequest->notes,
                 'attachment_path' => $leaveRequest->attachment_path,
+                'attachment_paths' => $leaveRequest->attachmentPaths(),
             ]);
 
             $leaveRequest->update([

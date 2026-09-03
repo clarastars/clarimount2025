@@ -19,7 +19,6 @@ use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -429,9 +428,8 @@ class CompanyLeaveController extends Controller
             'notes' => $leaveRequest->notes,
             'status' => $leaveRequest->status,
             'review_notes' => $leaveRequest->review_notes,
-            'attachment_url' => $leaveRequest->attachment_path
-                ? Storage::disk('public')->url($leaveRequest->attachment_path)
-                : null,
+            'attachment_url' => $leaveRequest->attachmentUrls()[0] ?? null,
+            'attachment_urls' => $leaveRequest->attachmentUrls(),
             'created_at' => $leaveRequest->created_at?->toIso8601String(),
             'reviewed_at' => $leaveRequest->reviewed_at?->toIso8601String(),
             'reviewer_name' => $leaveRequest->reviewer?->name,

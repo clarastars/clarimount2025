@@ -70,15 +70,21 @@
         </div>
 
         <div>
-            <Label for="attachment" class="mb-2">{{ t('leaves.attachment') }}</Label>
+            <Label for="attachments" class="mb-2">{{ t('leaves.attachment') }}</Label>
             <Input
-                id="attachment"
+                id="attachments"
                 type="file"
+                multiple
                 accept=".pdf,.jpg,.jpeg,.png"
-                @change="onAttachmentChange"
+                @change="onAttachmentsChange"
             />
             <p class="text-xs text-muted-foreground mt-1">{{ t('leaves.attachment_hint') }}</p>
-            <p v-if="form.errors.attachment" class="text-red-500 text-sm mt-1">{{ form.errors.attachment }}</p>
+            <ul v-if="(form.attachments ?? []).length > 0" class="mt-2 space-y-1 text-sm text-muted-foreground">
+                <li v-for="(file, index) in form.attachments" :key="`${file.name}-${index}`">
+                    {{ file.name }}
+                </li>
+            </ul>
+            <p v-if="attachmentError" class="text-red-500 text-sm mt-1">{{ attachmentError }}</p>
         </div>
 
         <div>
@@ -193,12 +199,12 @@ interface LeaveForm {
     deduct_from_balance: boolean;
     is_paid: boolean;
     notes: string;
-    attachment: File | null;
+    attachments: File[];
     errors: Record<string, string>;
 }
 
 const emit = defineEmits<{
-    attachmentChange: [file: File | null];
+    attachmentsChange: [files: File[]];
 }>();
 
 const { t, locale } = useI18n();
@@ -336,8 +342,18 @@ function roundDays(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
-function onAttachmentChange(event: Event) {
+const attachmentError = computed(() => {
+    if (props.form.errors.attachments) {
+        return props.form.errors.attachments;
+    }
+
+    const nested = Object.entries(props.form.errors).find(([key]) => key.startsWith('attachments.'));
+
+    return nested?.[1] ?? props.form.errors.attachment ?? '';
+});
+
+function onAttachmentsChange(event: Event) {
     const target = event.target as HTMLInputElement;
-    emit('attachmentChange', target.files?.[0] ?? null);
+    emit('attachmentsChange', target.files ? Array.from(target.files) : []);
 }
 </script>

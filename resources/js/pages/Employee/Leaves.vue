@@ -58,6 +58,7 @@ interface LeaveRequestRow extends LeaveRow {
     current_remaining_at_submit?: number | null;
     projected_remaining_at_start?: number | null;
     uses_future_accrual?: boolean;
+    attachment_urls?: string[];
 }
 
 interface LeaveTypeOption {
@@ -102,7 +103,7 @@ const form = useForm({
     deduct_from_balance: false,
     is_paid: true,
     notes: '',
-    attachment: null as File | null,
+    attachments: [] as File[],
 });
 
 const selectedLeaveType = computed(() =>
@@ -190,8 +191,8 @@ function closeCreateForm() {
     form.clearErrors();
 }
 
-function onAttachmentChange(file: File | null) {
-    form.attachment = file;
+function onAttachmentsChange(files: File[]) {
+    form.attachments = files;
 }
 
 const submit = () => {
@@ -358,7 +359,21 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                                 }) }}
                                             </p>
                                         </td>
-                                        <td class="py-3 px-2">{{ displayValue(request.notes) }}</td>
+                                        <td class="py-3 px-2">
+                                            <p>{{ displayValue(request.notes) }}</p>
+                                            <div v-if="request.attachment_urls?.length" class="mt-1 space-y-0.5">
+                                                <a
+                                                    v-for="(url, index) in request.attachment_urls"
+                                                    :key="url"
+                                                    :href="url"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="block text-xs text-primary hover:underline"
+                                                >
+                                                    {{ t('leaves.view_attachment') }} {{ request.attachment_urls.length > 1 ? index + 1 : '' }}
+                                                </a>
+                                            </div>
+                                        </td>
                                         <td class="py-3 px-2">
                                             <div class="flex flex-wrap gap-2">
                                                 <Button
@@ -537,7 +552,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             :leave-types="leaveTypes"
                             :current-remaining="employee.remaining_annual_leave_balance"
                             :monthly-accrual="employee.monthly_leave_accrual"
-                            @attachment-change="onAttachmentChange"
+                            @attachments-change="onAttachmentsChange"
                         />
 
                         <DialogFooter>

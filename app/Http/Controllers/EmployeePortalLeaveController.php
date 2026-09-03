@@ -149,6 +149,7 @@ class EmployeePortalLeaveController extends Controller
             'notes' => $leaveRequest->notes,
             'status' => $leaveRequest->status,
             'review_notes' => $leaveRequest->review_notes,
+            'attachment_urls' => $leaveRequest->attachmentUrls(),
             'created_at' => $leaveRequest->created_at?->toIso8601String(),
             'reviewed_at' => $leaveRequest->reviewed_at?->toIso8601String(),
             'current_remaining_at_submit' => $leaveRequest->current_remaining_at_submit !== null

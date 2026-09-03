@@ -18,7 +18,7 @@
                             :leave-types="leaveTypes"
                             :current-remaining="employee.remaining_annual_leave_balance"
                             :monthly-accrual="employee.monthly_leave_accrual"
-                            @attachment-change="onAttachmentChange"
+                            @attachments-change="onAttachmentsChange"
                         />
 
                         <div class="flex justify-end gap-4 pt-4">
@@ -76,7 +76,7 @@ const form = useForm({
     deduct_from_balance: false,
     is_paid: true,
     notes: '',
-    attachment: null as File | null,
+    attachments: [] as File[],
 });
 
 const selectedLeaveType = computed(() =>
@@ -86,8 +86,8 @@ const selectedLeaveType = computed(() =>
 const formatLocalizedNumber = (value: number) =>
     new Intl.NumberFormat(locale.value === 'ar' ? 'ar-SA' : 'en-US').format(value);
 
-function onAttachmentChange(file: File | null) {
-    form.attachment = file;
+function onAttachmentsChange(files: File[]) {
+    form.attachments = files;
 }
 
 const submit = () => {

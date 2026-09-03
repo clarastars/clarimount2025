@@ -28,6 +28,7 @@ use App\Http\Controllers\EmployeePortalLeaveController;
 use App\Http\Controllers\EmployeePortalSalaryCertificateController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
+use App\Http\Controllers\LeaveAttachmentController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
@@ -266,6 +267,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'update'])->name('companies.entitlement-settlement-approvals.update');
     Route::delete('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'destroy'])->name('companies.entitlement-settlement-approvals.destroy');
     Route::post('companies/{company}/entitlement-settlement-approvals/reorder', [CompanyEntitlementSettlementApprovalStepsController::class, 'reorder'])->name('companies.entitlement-settlement-approvals.reorder');
+
+    Route::get('leave-attachments/{filename}', [LeaveAttachmentController::class, 'show'])
+        ->where('filename', '[A-Za-z0-9._-]+')
+        ->name('leave-attachments.show');
 
     // Employee portal — self-service leaves
     Route::get('my/leaves', [EmployeePortalLeaveController::class, 'index'])->name('employee.leaves.index');
