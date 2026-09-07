@@ -21,6 +21,19 @@
                             {{ t('entitlement_settlement.history_title') }}
                         </Link>
                     </Button>
+                    <Button v-if="can_edit" variant="outline" as-child>
+                        <Link :href="route('employees.entitlement-settlement.edit', [employee.id, settlement.id])">
+                            {{ t('entitlement_settlement.edit') }}
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="can_delete"
+                        variant="destructive"
+                        :disabled="isDeleting"
+                        @click="deleteSettlement"
+                    >
+                        {{ t('entitlement_settlement.delete') }}
+                    </Button>
                     <Button as-child>
                         <Link :href="route('employees.entitlement-settlement.create', employee.id)">
                             {{ t('employees.settle_entitlements') }}
@@ -260,12 +273,15 @@ const props = defineProps<{
     settlement: SettlementDetail;
     has_approval_workflow?: boolean;
     approval_steps?: ApprovalStep[];
+    can_edit?: boolean;
+    can_delete?: boolean;
 }>();
 
 const { t, locale } = useI18n();
 const approvalProcessing = ref(false);
 const rejectingStepId = ref<number | null>(null);
 const rejectReason = ref('');
+const isDeleting = ref(false);
 
 const has_approval_workflow = computed(() => props.has_approval_workflow ?? false);
 const approval_steps = computed(() => props.approval_steps ?? []);
@@ -403,6 +419,22 @@ function rejectStep(stepId: number) {
             onFinish: () => {
                 approvalProcessing.value = false;
                 cancelReject();
+            },
+        },
+    );
+}
+
+function deleteSettlement() {
+    if (!window.confirm(t('entitlement_settlement.delete_confirm'))) {
+        return;
+    }
+
+    isDeleting.value = true;
+    router.delete(
+        route('employees.entitlement-settlement.destroy', [props.employee.id, props.settlement.id]),
+        {
+            onFinish: () => {
+                isDeleting.value = false;
             },
         },
     );

@@ -116,4 +116,20 @@ class EmployeeEntitlementSettlement extends Model
     {
         return $this->status === self::STATUS_REJECTED;
     }
+
+    /**
+     * Editable only while pending and before any approval step is recorded.
+     */
+    public function isEditable(): bool
+    {
+        if (! $this->isPending()) {
+            return false;
+        }
+
+        if ($this->relationLoaded('stepApprovals')) {
+            return $this->stepApprovals->isEmpty();
+        }
+
+        return ! $this->stepApprovals()->exists();
+    }
 }

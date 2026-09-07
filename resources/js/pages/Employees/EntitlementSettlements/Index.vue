@@ -67,11 +67,32 @@
                                 </td>
                                 <td class="px-4 py-3 text-muted-foreground">{{ item.created_by_name || '—' }}</td>
                                 <td class="px-4 py-3 text-end">
-                                    <Button variant="outline" size="sm" as-child>
-                                        <Link :href="route('employees.entitlement-settlement.show', [employee.id, item.id])">
-                                            {{ t('entitlement_settlement.view') }}
-                                        </Link>
-                                    </Button>
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <Button variant="outline" size="sm" as-child>
+                                            <Link :href="route('employees.entitlement-settlement.show', [employee.id, item.id])">
+                                                {{ t('entitlement_settlement.view') }}
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            v-if="item.can_edit"
+                                            variant="outline"
+                                            size="sm"
+                                            as-child
+                                        >
+                                            <Link :href="route('employees.entitlement-settlement.edit', [employee.id, item.id])">
+                                                {{ t('entitlement_settlement.edit') }}
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            v-if="item.can_delete"
+                                            variant="destructive"
+                                            size="sm"
+                                            :disabled="deletingId === item.id"
+                                            @click="deleteSettlement(item)"
+                                        >
+                                            {{ t('entitlement_settlement.delete') }}
+                                        </Button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -83,8 +104,8 @@
 </template>
 
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Button } from '@/components/ui/button';
@@ -100,6 +121,8 @@ type SettlementSummary = {
     total_deductions: number;
     net_due: number;
     created_by_name?: string | null;
+    can_edit?: boolean;
+    can_delete?: boolean;
 };
 
 const props = defineProps<{
@@ -108,6 +131,7 @@ const props = defineProps<{
 }>();
 
 const { t, locale } = useI18n();
+const deletingId = ref<number | null>(null);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },
@@ -148,4 +172,17 @@ const statusBadgeClass = (status: string) => {
 
     return `${base} bg-amber-100 text-amber-800`;
 };
+
+function deleteSettlement(item: SettlementSummary) {
+    if (!window.confirm(t('entitlement_settlement.delete_confirm'))) {
+        return;
+    }
+
+    deletingId.value = item.id;
+    router.delete(route('employees.entitlement-settlement.destroy', [props.employee.id, item.id]), {
+        onFinish: () => {
+            deletingId.value = null;
+        },
+    });
+}
 </script>

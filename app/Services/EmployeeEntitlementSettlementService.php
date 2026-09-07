@@ -171,6 +171,105 @@ class EmployeeEntitlementSettlementService
         ]);
     }
 
+    /**
+     * Recalculate and update a settlement that has not received any approval yet.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function updateSettlement(EmployeeEntitlementSettlement $settlement, array $payload): EmployeeEntitlementSettlement
+    {
+        if (! $settlement->isEditable()) {
+            throw new \RuntimeException(__('messages.entitlement_settlement.edit_not_allowed'));
+        }
+
+        $employee = $settlement->employee()->firstOrFail();
+        $preview = $this->buildPreview(
+            $employee,
+            (string) $payload['settlement_date'],
+            $payload,
+        );
+
+        $settlement->update([
+            'settlement_date' => $preview['settlement_date'],
+            'reason' => trim((string) $payload['reason']),
+            'last_settlement_date' => $preview['last_settlement_date'],
+            'service_days' => $preview['service_days'],
+            'basic_salary' => $preview['salary_breakdown']['basic_salary'],
+            'allowances' => $preview['salary_breakdown']['allowances'],
+            'gross_salary' => $preview['salary_breakdown']['gross_salary'],
+            'remaining_leave_days' => $preview['dues']['remaining_leave_days'],
+            'salary_unpaid_days' => $preview['dues']['salary_unpaid_days'],
+            'used_annual_leave_days' => $preview['deductions']['used_annual_leave_days'],
+            'end_of_service_bonus' => $preview['dues']['end_of_service_bonus'],
+            'travel_tickets' => $preview['dues']['travel_tickets'],
+            'due_commissions' => $preview['dues']['due_commissions'],
+            'salary_dues' => $preview['dues']['salary_dues'],
+            'annual_leave_dues' => $preview['dues']['annual_leave_dues'],
+            'other_dues' => $preview['dues']['other_dues'],
+            'total_dues' => $preview['dues']['total_dues'],
+            'advances_deduction' => $preview['deductions']['advances'],
+            'custody_deduction' => $preview['deductions']['custody'],
+            'excess_leave_deduction' => $preview['deductions']['excess_leave'],
+            'social_insurance_deduction' => $preview['deductions']['social_insurance'],
+            'used_annual_leave_deduction' => $preview['deductions']['used_annual_leave_deduction'],
+            'total_deductions' => $preview['deductions']['total_deductions'],
+            'net_due' => $preview['net_due'],
+            'notes' => $preview['notes'],
+            'status' => EmployeeEntitlementSettlement::STATUS_PENDING,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'review_notes' => null,
+        ]);
+
+        return $settlement->fresh() ?? $settlement;
+    }
+
+    public function deleteSettlement(EmployeeEntitlementSettlement $settlement): void
+    {
+        if ($settlement->isApproved()) {
+            throw new \RuntimeException(__('messages.entitlement_settlement.delete_not_allowed_approved'));
+        }
+
+        DB::transaction(function () use ($settlement): void {
+            $lockedSettlement = EmployeeEntitlementSettlement::query()
+                ->lockForUpdate()
+                ->findOrFail($settlement->id);
+
+            if ($lockedSettlement->isApproved()) {
+                throw new \RuntimeException(__('messages.entitlement_settlement.delete_not_allowed_approved'));
+            }
+
+            $lockedSettlement->stepApprovals()->delete();
+            $lockedSettlement->approvalRejections()->delete();
+            $lockedSettlement->delete();
+        });
+    }
+
+    /**
+     * Best-effort undo of leave-balance changes from an approved settlement.
+     * Deleted advances (debts) cannot be restored.
+     */
+    public function reverseApprovedSettlementAdjustments(EmployeeEntitlementSettlement $settlement): void
+    {
+        if (! $settlement->isApproved()) {
+            return;
+        }
+
+        $employee = Employee::query()
+            ->lockForUpdate()
+            ->findOrFail($settlement->employee_id);
+
+        $paidLeaveDays = max(0.0, round((float) $settlement->remaining_leave_days, 2));
+        $usedLeaveDays = max(0.0, round((float) $settlement->used_annual_leave_days, 2));
+        $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
+        $currentUsed = round((float) ($employee->leave_days_used ?? 0), 2);
+
+        $employee->update([
+            'leave_accrued_balance' => round($currentAccrued + $paidLeaveDays, 2),
+            'leave_days_used' => round($currentUsed + $usedLeaveDays, 2),
+        ]);
+    }
+
     public function resolveLastSettlementDate(Employee $employee): ?Carbon
     {
         $previous = EmployeeEntitlementSettlement::query()

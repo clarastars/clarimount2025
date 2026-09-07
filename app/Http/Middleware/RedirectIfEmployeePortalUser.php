@@ -249,6 +249,9 @@ class RedirectIfEmployeePortalUser
                 'employees.entitlement-settlement.index',
                 'employees.entitlement-settlement.store',
                 'employees.entitlement-settlement.show',
+                'employees.entitlement-settlement.edit',
+                'employees.entitlement-settlement.update',
+                'employees.entitlement-settlement.destroy',
             ]);
         }
 

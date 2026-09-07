@@ -36,6 +36,7 @@ class EmployeeEntitlementSettlementController extends Controller
 
         $settlements = $employee->entitlementSettlements()
             ->with(['creator:id,name'])
+            ->withCount('stepApprovals')
             ->orderByDesc('settlement_date')
             ->orderByDesc('id')
             ->get()
@@ -48,6 +49,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 'employee_id' => $employee->employee_id,
             ],
             'settlements' => $settlements,
+            'can_manage_settlements' => true,
         ]);
     }
 
@@ -64,8 +66,10 @@ class EmployeeEntitlementSettlementController extends Controller
         abort_unless($company !== null, 404);
 
         $entitlementSettlement->load(['creator:id,name', 'reviewer:id,name']);
+        $entitlementSettlement->loadCount('stepApprovals');
 
         $hasWorkflow = $this->approvalService->hasActiveStepsForCompany($company);
+        $canManage = $this->canSettleEmployeeEntitlementsForEmployee($user, $employee);
 
         return Inertia::render('Employees/EntitlementSettlements/Show', [
             'employee' => [
@@ -78,6 +82,8 @@ class EmployeeEntitlementSettlementController extends Controller
             'approval_steps' => $hasWorkflow
                 ? $this->approvalService->buildApprovalPayload($entitlementSettlement, $user, $company)
                 : [],
+            'can_edit' => $canManage && $entitlementSettlement->isEditable(),
+            'can_delete' => $canManage && ! $entitlementSettlement->isApproved(),
         ]);
     }
 
@@ -163,11 +169,144 @@ class EmployeeEntitlementSettlementController extends Controller
             $this->settlementService->applyApprovedSettlementAdjustments($settlement);
         }
 
-        return redirect()
+            return redirect()
             ->route('employees.entitlement-settlement.show', [$employee, $settlement])
             ->with('success', $hasWorkflow
                 ? __('messages.entitlement_settlement.saved_pending_approval')
                 : __('messages.entitlement_settlement.saved_success'));
+    }
+
+    public function edit(Request $request, Employee $employee, EmployeeEntitlementSettlement $entitlementSettlement): Response|RedirectResponse
+    {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        $this->abortUnlessCanSettleEmployeeEntitlementsForEmployee($user, $employee);
+
+        if (! $entitlementSettlement->isEditable()) {
+            return redirect()
+                ->route('employees.entitlement-settlement.show', [$employee, $entitlementSettlement])
+                ->with('error', __('messages.entitlement_settlement.edit_not_allowed'));
+        }
+
+        $settlementDate = $request->query(
+            'settlement_date',
+            $entitlementSettlement->settlement_date?->toDateString() ?? now('Asia/Riyadh')->toDateString(),
+        );
+
+        $manualInput = [
+            'end_of_service_bonus' => $request->query('end_of_service_bonus', $entitlementSettlement->end_of_service_bonus),
+            'travel_tickets' => $request->query('travel_tickets', $entitlementSettlement->travel_tickets),
+            'due_commissions' => $request->query('due_commissions', $entitlementSettlement->due_commissions),
+            'other_dues' => $request->query('other_dues', $entitlementSettlement->other_dues),
+            'custody_deduction' => $request->query('custody_deduction', $entitlementSettlement->custody_deduction),
+            'excess_leave_deduction' => $request->query('excess_leave_deduction', $entitlementSettlement->excess_leave_deduction),
+            'social_insurance_deduction' => $request->query('social_insurance_deduction', $entitlementSettlement->social_insurance_deduction),
+            'notes' => $request->query('notes', $entitlementSettlement->notes),
+        ];
+
+        $preview = $this->settlementService->buildPreview($employee, (string) $settlementDate, $manualInput);
+        $previousSettlementsCount = $employee->entitlementSettlements()->count();
+        $employee->loadMissing('company');
+        $hasWorkflow = $employee->company !== null
+            && $this->approvalService->hasActiveStepsForCompany($employee->company);
+
+        return Inertia::render('Employees/EntitlementSettlement', [
+            'employee' => [
+                'id' => $employee->id,
+                'full_name' => $employee->full_name,
+                'employee_id' => $employee->employee_id,
+            ],
+            'preview' => $preview,
+            'previous_settlements_count' => $previousSettlementsCount,
+            'has_approval_workflow' => $hasWorkflow,
+            'settlement_id' => $entitlementSettlement->id,
+            'defaults' => [
+                'settlement_date' => (string) $settlementDate,
+                'reason' => (string) $request->query('reason', $entitlementSettlement->reason),
+                'end_of_service_bonus' => (float) $manualInput['end_of_service_bonus'],
+                'travel_tickets' => (float) $manualInput['travel_tickets'],
+                'due_commissions' => (float) $manualInput['due_commissions'],
+                'other_dues' => (float) $manualInput['other_dues'],
+                'custody_deduction' => (float) $manualInput['custody_deduction'],
+                'excess_leave_deduction' => (float) $manualInput['excess_leave_deduction'],
+                'social_insurance_deduction' => (float) $manualInput['social_insurance_deduction'],
+                'notes' => (string) ($manualInput['notes'] ?? ''),
+            ],
+        ]);
+    }
+
+    public function update(
+        Request $request,
+        Employee $employee,
+        EmployeeEntitlementSettlement $entitlementSettlement,
+    ): RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        $this->abortUnlessCanSettleEmployeeEntitlementsForEmployee($user, $employee);
+
+        if (! $entitlementSettlement->isEditable()) {
+            return redirect()
+                ->route('employees.entitlement-settlement.show', [$employee, $entitlementSettlement])
+                ->with('error', __('messages.entitlement_settlement.edit_not_allowed'));
+        }
+
+        $validated = $request->validate([
+            'settlement_date' => ['required', 'date'],
+            'reason' => ['required', 'string', 'max:500'],
+            'end_of_service_bonus' => ['nullable', 'numeric', 'min:0'],
+            'travel_tickets' => ['nullable', 'numeric', 'min:0'],
+            'due_commissions' => ['nullable', 'numeric', 'min:0'],
+            'other_dues' => ['nullable', 'numeric', 'min:0'],
+            'custody_deduction' => ['nullable', 'numeric', 'min:0'],
+            'excess_leave_deduction' => ['nullable', 'numeric', 'min:0'],
+            'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $settlement = $this->settlementService->updateSettlement($entitlementSettlement, $validated);
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('employees.entitlement-settlement.show', [$employee, $entitlementSettlement])
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('employees.entitlement-settlement.show', [$employee, $settlement])
+            ->with('success', __('messages.entitlement_settlement.updated_success'));
+    }
+
+    public function destroy(
+        Employee $employee,
+        EmployeeEntitlementSettlement $entitlementSettlement,
+    ): RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        $this->abortUnlessCanSettleEmployeeEntitlementsForEmployee($user, $employee);
+
+        if ($entitlementSettlement->isApproved()) {
+            return redirect()
+                ->route('employees.entitlement-settlement.show', [$employee, $entitlementSettlement])
+                ->with('error', __('messages.entitlement_settlement.delete_not_allowed_approved'));
+        }
+
+        try {
+            $this->settlementService->deleteSettlement($entitlementSettlement);
+        } catch (\RuntimeException $exception) {
+            return redirect()
+                ->route('employees.entitlement-settlement.show', [$employee, $entitlementSettlement])
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('employees.entitlement-settlement.index', $employee)
+            ->with('success', __('messages.entitlement_settlement.deleted_success'));
     }
 
     public function approveWorkflowStep(
@@ -286,6 +425,8 @@ class EmployeeEntitlementSettlementController extends Controller
      */
     private function serializeSettlementSummary(EmployeeEntitlementSettlement $settlement): array
     {
+        $canEdit = $settlement->isEditable();
+
         return [
             'id' => $settlement->id,
             'settlement_date' => $settlement->settlement_date?->toDateString(),
@@ -297,6 +438,8 @@ class EmployeeEntitlementSettlementController extends Controller
             'net_due' => (float) $settlement->net_due,
             'created_by_name' => $settlement->creator?->name,
             'created_at' => $settlement->created_at?->toIso8601String(),
+            'can_edit' => $canEdit,
+            'can_delete' => ! $settlement->isApproved(),
         ];
     }
 

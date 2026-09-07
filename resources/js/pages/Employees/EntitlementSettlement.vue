@@ -5,7 +5,9 @@
         <div class="mx-auto max-w-6xl space-y-6 px-4 py-6">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">{{ t('entitlement_settlement.title') }}</h1>
+                    <h1 class="text-2xl font-bold tracking-tight">
+                        {{ isEditing ? t('entitlement_settlement.edit_title') : t('entitlement_settlement.title') }}
+                    </h1>
                     <p class="mt-1 text-sm text-muted-foreground">
                         {{ employee.full_name }} — {{ t('entitlement_settlement.description') }}
                     </p>
@@ -264,7 +266,13 @@
                             </p>
                         </div>
                         <Button type="submit" size="lg" :disabled="form.processing">
-                            {{ form.processing ? t('common.saving') : t('entitlement_settlement.save') }}
+                            {{
+                                form.processing
+                                    ? t('common.saving')
+                                    : isEditing
+                                        ? t('entitlement_settlement.update')
+                                        : t('entitlement_settlement.save')
+                            }}
                         </Button>
                     </CardContent>
                 </Card>
@@ -336,34 +344,52 @@ type Preview = {
 const props = defineProps<{
     employee: { id: number; full_name: string; employee_id?: string | null };
     preview: Preview;
-    defaults: { settlement_date: string; reason: string };
+    defaults: {
+        settlement_date: string;
+        reason: string;
+        end_of_service_bonus?: number;
+        travel_tickets?: number;
+        due_commissions?: number;
+        other_dues?: number;
+        custody_deduction?: number;
+        excess_leave_deduction?: number;
+        social_insurance_deduction?: number;
+        notes?: string;
+    };
     previous_settlements_count?: number;
     has_approval_workflow?: boolean;
+    settlement_id?: number | null;
 }>();
 
 const { t, locale } = useI18n();
 const isRefreshing = ref(false);
 const previousSettlementsCount = computed(() => props.previous_settlements_count ?? 0);
 const hasApprovalWorkflow = computed(() => props.has_approval_workflow ?? false);
+const isEditing = computed(() => props.settlement_id != null);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },
     { title: t('employees.title'), href: '/employees' },
     { title: props.employee.full_name, href: route('employees.show', props.employee.id) },
-    { title: t('entitlement_settlement.title'), href: route('employees.entitlement-settlement.create', props.employee.id) },
+    {
+        title: isEditing.value ? t('entitlement_settlement.edit_title') : t('entitlement_settlement.title'),
+        href: isEditing.value
+            ? route('employees.entitlement-settlement.edit', [props.employee.id, props.settlement_id])
+            : route('employees.entitlement-settlement.create', props.employee.id),
+    },
 ]);
 
 const form = useForm({
     settlement_date: props.defaults.settlement_date,
     reason: props.defaults.reason,
-    end_of_service_bonus: 0,
-    travel_tickets: 0,
-    due_commissions: 0,
-    other_dues: 0,
-    custody_deduction: 0,
-    excess_leave_deduction: 0,
-    social_insurance_deduction: 0,
-    notes: props.preview.notes ?? '',
+    end_of_service_bonus: props.defaults.end_of_service_bonus ?? 0,
+    travel_tickets: props.defaults.travel_tickets ?? 0,
+    due_commissions: props.defaults.due_commissions ?? 0,
+    other_dues: props.defaults.other_dues ?? 0,
+    custody_deduction: props.defaults.custody_deduction ?? 0,
+    excess_leave_deduction: props.defaults.excess_leave_deduction ?? 0,
+    social_insurance_deduction: props.defaults.social_insurance_deduction ?? 0,
+    notes: props.defaults.notes ?? props.preview.notes ?? '',
 });
 
 const preview = computed(() => props.preview);
@@ -482,8 +508,12 @@ function refreshPreview(settlementDate = form.settlement_date) {
     isRefreshing.value = true;
     isPreviewRequest = true;
 
+    const previewRoute = isEditing.value
+        ? route('employees.entitlement-settlement.edit', [props.employee.id, props.settlement_id])
+        : route('employees.entitlement-settlement.create', props.employee.id);
+
     router.get(
-        route('employees.entitlement-settlement.create', props.employee.id),
+        previewRoute,
         {
             settlement_date: settlementDate,
             reason: form.reason,
@@ -509,6 +539,12 @@ function refreshPreview(settlementDate = form.settlement_date) {
 }
 
 function submit() {
+    if (isEditing.value && props.settlement_id != null) {
+        form.put(route('employees.entitlement-settlement.update', [props.employee.id, props.settlement_id]));
+
+        return;
+    }
+
     form.post(route('employees.entitlement-settlement.store', props.employee.id));
 }
 </script>

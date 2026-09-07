@@ -228,6 +228,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('employees.entitlement-settlement.index');
     Route::post('employees/{employee}/entitlement-settlement', [EmployeeEntitlementSettlementController::class, 'store'])
         ->name('employees.entitlement-settlement.store');
+    Route::get('employees/{employee}/entitlement-settlement/{entitlementSettlement}/edit', [EmployeeEntitlementSettlementController::class, 'edit'])
+        ->name('employees.entitlement-settlement.edit');
+    Route::put('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'update'])
+        ->name('employees.entitlement-settlement.update');
+    Route::delete('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'destroy'])
+        ->name('employees.entitlement-settlement.destroy');
     Route::get('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'show'])
         ->name('employees.entitlement-settlement.show');
     Route::post(
