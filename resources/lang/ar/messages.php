@@ -85,6 +85,8 @@ return [
             'salary_runs' => 'مسير الرواتب',
             'awaiting_you' => 'بانتظارك',
             'view_all' => 'عرض الكل',
+            'collapse' => 'إخفاء',
+            'expand' => 'عرض',
             'view_request' => 'عرض',
             'no_items' => 'لا توجد طلبات بانتظارك حالياً.',
             'current_step' => 'الخطوة الحالية',

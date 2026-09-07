@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
-import { computed } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import {
     Wallet,
     Banknote,
     Inbox,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-vue-next';
 
 const { t } = useI18n();
@@ -125,6 +127,28 @@ const pendingSections = computed(() => [
 
 const hasPendingSections = computed(() => pendingSections.value.length > 0);
 
+const openPendingSections = reactive<Record<string, boolean>>({});
+
+watch(
+    pendingSections,
+    (sections) => {
+        for (const section of sections) {
+            if (openPendingSections[section.key] === undefined) {
+                openPendingSections[section.key] = true;
+            }
+        }
+    },
+    { immediate: true },
+);
+
+function isPendingSectionOpen(key: string): boolean {
+    return openPendingSections[key] !== false;
+}
+
+function togglePendingSection(key: string): void {
+    openPendingSections[key] = !isPendingSectionOpen(key);
+}
+
 const summaryToneClass = (tone: string) => {
     const map: Record<string, string> = {
         blue: 'border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300',
@@ -192,8 +216,9 @@ const formatRemainingText = (daysRemaining: number) => {
                 <Card
                     v-for="section in pendingSections"
                     :key="'summary-' + section.key"
-                    class="border"
+                    class="cursor-pointer border transition-opacity hover:opacity-90"
                     :class="summaryToneClass(section.tone)"
+                    @click="togglePendingSection(section.key)"
                 >
                     <CardContent class="flex items-center justify-between gap-3 p-4">
                         <div class="min-w-0 space-y-1">
@@ -201,8 +226,14 @@ const formatRemainingText = (daysRemaining: number) => {
                             <p class="text-2xl font-bold tabular-nums">{{ section.bucket.count }}</p>
                             <p class="text-[11px] opacity-70">{{ t('dashboard.pending.awaiting_you') }}</p>
                         </div>
-                        <div class="rounded-lg p-2.5" :class="iconToneClass(section.tone)">
-                            <component :is="section.icon" class="size-5" />
+                        <div class="flex flex-col items-end gap-2">
+                            <div class="rounded-lg p-2.5" :class="iconToneClass(section.tone)">
+                                <component :is="section.icon" class="size-5" />
+                            </div>
+                            <component
+                                :is="isPendingSectionOpen(section.key) ? ChevronUp : ChevronDown"
+                                class="size-4 opacity-70"
+                            />
                         </div>
                     </CardContent>
                 </Card>
@@ -220,19 +251,24 @@ const formatRemainingText = (daysRemaining: number) => {
                                 </Badge>
                             </CardTitle>
                             <Button
-                                v-if="section.bucket.view_all_url"
-                                asChild
                                 variant="outline"
                                 size="sm"
+                                type="button"
+                                @click="togglePendingSection(section.key)"
                             >
-                                <Link :href="section.bucket.view_all_url">
-                                    {{ t('dashboard.pending.view_all') }}
-                                    <ArrowUpRight class="ms-2 size-4" />
-                                </Link>
+                                {{
+                                    isPendingSectionOpen(section.key)
+                                        ? t('dashboard.pending.collapse')
+                                        : t('dashboard.pending.expand')
+                                }}
+                                <component
+                                    :is="isPendingSectionOpen(section.key) ? ChevronUp : ChevronDown"
+                                    class="ms-2 size-4"
+                                />
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent class="p-5">
+                    <CardContent v-show="isPendingSectionOpen(section.key)" class="p-5">
                         <div class="grid gap-3 md:grid-cols-1 lg:grid-cols-2">
                             <Card
                                 v-for="item in section.bucket.preview"

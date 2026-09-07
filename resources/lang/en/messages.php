@@ -85,6 +85,8 @@ return [
             'salary_runs' => 'Salary runs',
             'awaiting_you' => 'Awaiting you',
             'view_all' => 'View all',
+            'collapse' => 'Collapse',
+            'expand' => 'Expand',
             'view_request' => 'View',
             'no_items' => 'No requests are waiting for you right now.',
             'current_step' => 'Current step',
