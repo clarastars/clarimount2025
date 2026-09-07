@@ -237,13 +237,13 @@ class EmployeeController extends Controller
     public function expiringDocuments(Request $request, EmployeeExpiryService $employeeExpiryService): Response|RedirectResponse
     {
         $user = Auth::user();
-        $this->abortUnlessCanViewEmployees($user);
+        $this->abortUnlessCanViewEmployeeExpiryDocuments($user);
 
-        $companies = $this->employeeQueryableCompanyIds($user);
+        $companies = $this->employeeExpiryCompanyIds($user);
 
         if ($companies->isEmpty()) {
-            return redirect()->route('employees.index')
-                ->with('info', 'No companies available to view employee documents.');
+            return redirect()->route('dashboard')
+                ->with('info', __('messages.employees.expiry.no_companies'));
         }
 
         $days = (int) ($request->input('days') ?: EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD);

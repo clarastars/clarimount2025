@@ -98,6 +98,38 @@ trait AuthorizesEmployeeAccess
         return false;
     }
 
+    protected function canViewEmployeeExpiryDocuments(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.expiry.view');
+    }
+
+    /**
+     * Companies whose employee expiry documents this user may see.
+     *
+     * @return Collection<int, int>
+     */
+    protected function employeeExpiryCompanyIds(User $user): Collection
+    {
+        if ($user->hasRole('super-admin')) {
+            return Company::query()->pluck('id')->map(fn ($id): int => (int) $id);
+        }
+
+        $ownedIds = $user->ownedCompanies()->pluck('id')->map(fn ($id): int => (int) $id);
+        if ($ownedIds->isNotEmpty()) {
+            return $ownedIds->values();
+        }
+
+        return collect($this->roleService()->companyIdsWhereCan($user, ['employees.expiry.view']));
+    }
+
     protected function canSyncEmployeeFingerprintMonth(User $user, Employee $employee): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -509,6 +541,11 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanViewEmployees(User $user): void
     {
         abort_unless($this->canViewEmployees($user), 403);
+    }
+
+    protected function abortUnlessCanViewEmployeeExpiryDocuments(User $user): void
+    {
+        abort_unless($this->canViewEmployeeExpiryDocuments($user), 403);
     }
 
     protected function abortUnlessCanManageEmployees(User $user): void

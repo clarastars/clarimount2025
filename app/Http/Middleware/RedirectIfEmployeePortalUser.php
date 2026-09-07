@@ -105,8 +105,15 @@ class RedirectIfEmployeePortalUser
             $allowed = array_merge($allowed, [
                 'employees.index',
                 'employees.show',
-                'employees.expiring-documents.index',
                 'api.employees.search',
+            ]);
+        }
+
+        if ($can('employees.expiry.view')) {
+            $allowed = array_merge($allowed, [
+                'dashboard',
+                'employees.expiring-documents.index',
+                'employees.show',
             ]);
         }
 

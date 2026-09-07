@@ -4,21 +4,50 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
+use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
+use App\Services\DashboardPendingApprovalsService;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Models\Permission;
 
 class DashboardController extends Controller
 {
-    public function index(EmployeeExpiryService $employeeExpiryService): Response|RedirectResponse
-    {
-        $user = Auth::user();
+    use AuthorizesEmployeeAccess;
 
-        if ($this->isEmployeePortalUser($user)) {
+    /** @var list<string> */
+    private const HR_DASHBOARD_PERMISSIONS = [
+        'leaves.approve',
+        'leaves.company.view',
+        'leaves.create',
+        'leaves.requests.receive-email',
+        'employees.entitlements.approve',
+        'employees.entitlements.settle',
+        'employees.readonly',
+        'employees.expiry.view',
+        'employees.manage',
+        'salary-runs.approve',
+        'salary-runs.readonly',
+        'salary-runs.create',
+        'company.readonly',
+    ];
+
+    public function index(
+        EmployeeExpiryService $employeeExpiryService,
+        DashboardPendingApprovalsService $pendingApprovalsService,
+    ): Response|RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        Permission::query()->firstOrCreate([
+            'name' => 'employees.expiry.view',
+            'guard_name' => 'web',
+        ]);
+
+        if ($this->shouldUseEmployeeDashboard($user)) {
             $employee = $user->employee;
             if (! $employee) {
                 return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
@@ -37,32 +66,58 @@ class DashboardController extends Controller
         }
 
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
+        $accessibleCompanyIds = $ownedCompanyIds
+            ->merge($user->accessibleCompanies()->pluck('companies.id'))
+            ->unique()
+            ->values();
 
-        if (! $ownedCompanyIds->count()) {
+        if ($accessibleCompanyIds->isEmpty() && ! $user->hasRole('super-admin')) {
             return redirect()->route('companies.create')
                 ->with('info', 'Please create a company first to manage employees.');
         }
 
-        $expiringRows = $employeeExpiryService->getExpiringDocumentRows($ownedCompanyIds, EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD);
-        $expiredRows = $employeeExpiryService->getExpiredDocumentRows($ownedCompanyIds);
+        $canViewExpiryDocuments = $this->canViewEmployeeExpiryDocuments($user);
+        $expiryCompanyIds = $canViewExpiryDocuments
+            ? $this->employeeExpiryCompanyIds($user)
+            : collect();
+
+        $expiringRows = $expiryCompanyIds->isNotEmpty()
+            ? $employeeExpiryService->getExpiringDocumentRows($expiryCompanyIds, EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD)
+            : collect();
+        $expiredRows = $expiryCompanyIds->isNotEmpty()
+            ? $employeeExpiryService->getExpiredDocumentRows($expiryCompanyIds)
+            : collect();
+
+        $pendingApprovals = $pendingApprovalsService->forUser($user);
 
         return Inertia::render('Dashboard', [
+            'canViewExpiryDocuments' => $canViewExpiryDocuments,
             'expiringEmployeesPreview' => $expiringRows->take(5)->values(),
             'expiredEmployeesPreview' => $expiredRows->take(5)->values(),
             'expiringEmployeesCount' => $expiringRows->count(),
             'expiredEmployeesCount' => $expiredRows->count(),
             'expiryDaysThreshold' => EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD,
+            'pendingApprovals' => $pendingApprovals,
         ]);
     }
 
-    private function isEmployeePortalUser($user): bool
+    private function shouldUseEmployeeDashboard($user): bool
     {
         if (! $user) {
             return false;
         }
 
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->exists()) {
+            return false;
+        }
+
+        $roleService = app(EmployeeUserRoleService::class);
+        foreach (self::HR_DASHBOARD_PERMISSIONS as $permission) {
+            if ($roleService->canInAnyAssignedTeam($user, $permission)) {
+                return false;
+            }
+        }
+
         return $user->roles()->where('name', 'employee')->exists() || $user->employee()->exists();
     }
 }
-
-
