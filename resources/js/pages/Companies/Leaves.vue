@@ -60,6 +60,20 @@ interface LatestRejectionState {
     cleared_approvals_count: number;
 }
 
+interface OverlappingLeaveItem {
+    employee_id: number;
+    employee_name: string;
+    department_id?: string | null;
+    department_name?: string | null;
+    leave_type: string;
+    leave_type_label?: string;
+    start_date: string;
+    end_date: string;
+    days: number;
+    overlap_days: number;
+    status: 'approved' | 'pending';
+}
+
 interface LeaveRequestItem {
     id: number;
     leave_type: string;
@@ -84,11 +98,17 @@ interface LeaveRequestItem {
     employee: {
         id: number;
         full_name: string;
+        department_name?: string | null;
         leave_accrued_balance?: number | null;
         remaining_annual_leave_balance?: number | null;
     };
     approval_steps?: ApprovalStepState[];
     latest_rejection?: LatestRejectionState | null;
+    overlapping_leaves?: {
+        department: OverlappingLeaveItem[];
+        company: OverlappingLeaveItem[];
+        total: number;
+    } | null;
 }
 
 interface CompanyItem {
@@ -279,6 +299,12 @@ const showDirectReviewActions = computed(() =>
 
 const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
+const overlappingLeaves = computed(() => selectedRequest.value?.overlapping_leaves ?? null);
+
+const overlapStatusLabel = (status: string) =>
+    status === 'pending'
+        ? t('leaves.overlap_status_pending')
+        : t('leaves.overlap_status_approved');
 const requestAttachmentUrls = computed(() => {
     const urls = selectedRequest.value?.attachment_urls ?? [];
     if (urls.length > 0) {
@@ -595,6 +621,12 @@ function submitRejectStep() {
                                         {{ leaveTypeLabel(request.leave_type, request.leave_type_label) }} — {{ request.start_date }} → {{ request.end_date }} ({{ request.days }} {{ t('leaves.days') }})
                                     </p>
                                     <p
+                                        v-if="requestsTab === 'pending' && (request.overlapping_leaves?.total ?? 0) > 0"
+                                        class="text-xs mt-1 text-amber-700 dark:text-amber-400"
+                                    >
+                                        {{ t('leaves.overlap_list_hint', { count: request.overlapping_leaves?.total }) }}
+                                    </p>
+                                    <p
                                         v-if="request.deduct_from_balance && request.projected_remaining_at_start != null"
                                         class="text-xs mt-1"
                                         :class="request.uses_future_accrual ? 'text-sky-700 dark:text-sky-400' : 'text-muted-foreground'"
@@ -727,6 +759,93 @@ function submitRejectStep() {
                                         </a>
                                     </li>
                                 </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="selectedRequest.status === 'pending'"
+                        class="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-800 dark:bg-amber-950/20"
+                    >
+                        <div>
+                            <p class="font-medium text-amber-900 dark:text-amber-200">
+                                {{ t('leaves.overlap_section_title') }}
+                            </p>
+                            <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                                {{ t('leaves.overlap_section_hint') }}
+                            </p>
+                        </div>
+
+                        <p
+                            v-if="!overlappingLeaves || overlappingLeaves.total === 0"
+                            class="text-sm text-amber-800 dark:text-amber-300"
+                        >
+                            {{ t('leaves.overlap_empty') }}
+                        </p>
+
+                        <div v-else class="space-y-4">
+                            <div v-if="overlappingLeaves.department.length">
+                                <p class="mb-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+                                    {{ t('leaves.overlap_same_department') }}
+                                    <span v-if="selectedRequest.employee.department_name">
+                                        ({{ selectedRequest.employee.department_name }})
+                                    </span>
+                                </p>
+                                <div class="space-y-2">
+                                    <div
+                                        v-for="item in overlappingLeaves.department"
+                                        :key="'dept-' + item.employee_id + '-' + item.start_date + '-' + item.status"
+                                        class="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-900 dark:bg-gray-950"
+                                    >
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="font-medium">{{ item.employee_name }}</p>
+                                            <Badge variant="outline" class="text-[10px] font-normal">
+                                                {{ overlapStatusLabel(item.status) }}
+                                            </Badge>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ leaveTypeLabel(item.leave_type, item.leave_type_label) }}
+                                            — {{ item.start_date }} → {{ item.end_date }}
+                                            ({{ item.days }} {{ t('leaves.days') }})
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                                            {{ t('leaves.overlap_days_label', { days: item.overlap_days }) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="overlappingLeaves.company.length">
+                                <p class="mb-2 text-xs font-medium text-amber-900 dark:text-amber-200">
+                                    {{ t('leaves.overlap_same_company') }}
+                                </p>
+                                <div class="space-y-2">
+                                    <div
+                                        v-for="item in overlappingLeaves.company"
+                                        :key="'co-' + item.employee_id + '-' + item.start_date + '-' + item.status"
+                                        class="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm dark:border-amber-900 dark:bg-gray-950"
+                                    >
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="font-medium">
+                                                {{ item.employee_name }}
+                                                <span v-if="item.department_name" class="text-xs font-normal text-muted-foreground">
+                                                    — {{ item.department_name }}
+                                                </span>
+                                            </p>
+                                            <Badge variant="outline" class="text-[10px] font-normal">
+                                                {{ overlapStatusLabel(item.status) }}
+                                            </Badge>
+                                        </div>
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ leaveTypeLabel(item.leave_type, item.leave_type_label) }}
+                                            — {{ item.start_date }} → {{ item.end_date }}
+                                            ({{ item.days }} {{ t('leaves.days') }})
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-amber-800 dark:text-amber-300">
+                                            {{ t('leaves.overlap_days_label', { days: item.overlap_days }) }}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

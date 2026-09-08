@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\LeaveApprovalNotificationService;
 use App\Services\LeaveApprovalService;
 use App\Services\LeaveBalanceService;
+use App\Services\LeaveOverlapService;
 use App\Services\LeaveRequestService;
 use App\Services\LeaveTypeService;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +33,7 @@ class CompanyLeaveController extends Controller
         private LeaveApprovalNotificationService $leaveApprovalNotificationService,
         private LeaveTypeService $leaveTypeService,
         private LeaveBalanceService $leaveBalanceService,
+        private LeaveOverlapService $leaveOverlapService,
     ) {}
 
     public function index(Company $company): Response
@@ -350,6 +352,7 @@ class CompanyLeaveController extends Controller
                         'father_name',
                         'last_name',
                         'company_id',
+                        'department_id',
                         'hire_date',
                         'departure_date',
                         'termination_date',
@@ -360,6 +363,7 @@ class CompanyLeaveController extends Controller
                         'leaves as leave_days_deducted' => fn ($leaveQuery) => $leaveQuery->where('deduct_from_balance', true),
                     ], 'days');
                 },
+                'employee.department:id,name',
                 'reviewer:id,name',
             ]);
 
@@ -369,13 +373,18 @@ class CompanyLeaveController extends Controller
             $query->orderBy($orderColumn);
         }
 
-        return $query
-            ->get()
+        $leaveRequests = $query->get();
+        $overlapsByRequestId = $status === LeaveRequest::STATUS_PENDING
+            ? $this->leaveOverlapService->forPendingRequests($company, $leaveRequests)
+            : [];
+
+        return $leaveRequests
             ->map(fn (LeaveRequest $leaveRequest): array => $this->mapLeaveRequest(
                 $leaveRequest,
                 $company,
                 $user,
                 $includeWorkflow,
+                $overlapsByRequestId[(int) $leaveRequest->id] ?? null,
             ))
             ->values()
             ->all();
@@ -384,11 +393,15 @@ class CompanyLeaveController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /**
+     * @param  array{department: list<array<string, mixed>>, company: list<array<string, mixed>>, total: int}|null  $overlappingLeaves
+     */
     private function mapLeaveRequest(
         LeaveRequest $leaveRequest,
         Company $company,
         User $user,
         bool $includeWorkflow = false,
+        ?array $overlappingLeaves = null,
     ): array {
         $employee = $leaveRequest->employee;
         $accruedBalance = (float) ($employee->leave_accrued_balance ?? 0);
@@ -436,9 +449,11 @@ class CompanyLeaveController extends Controller
             'employee' => [
                 'id' => $employee->id,
                 'full_name' => $employee->full_name,
+                'department_name' => $employee->department?->name,
                 'leave_accrued_balance' => $accruedBalance,
                 'remaining_annual_leave_balance' => $remainingBalance,
             ],
+            'overlapping_leaves' => $overlappingLeaves,
         ];
 
         if ($includeWorkflow && $leaveRequest->isPending()) {
