@@ -2374,6 +2374,7 @@ return [
         'custody' => 'Custody',
         'excess_leave' => 'Excess leave period',
         'social_insurance' => 'Social insurance',
+        'penalties' => 'Penalties',
         'used_annual_leave' => 'Used annual leave balance',
         'total_deductions' => 'Total deductions',
         'net_due' => 'Net due',

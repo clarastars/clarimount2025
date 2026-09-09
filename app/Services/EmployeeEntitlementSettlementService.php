@@ -30,6 +30,7 @@ class EmployeeEntitlementSettlementService
      *     custody_deduction?: float|int|string|null,
      *     excess_leave_deduction?: float|int|string|null,
      *     social_insurance_deduction?: float|int|string|null,
+     *     penalties_deduction?: float|int|string|null,
      *     notes?: string|null,
      * }  $manualInput
      * @return array<string, mixed>
@@ -65,6 +66,7 @@ class EmployeeEntitlementSettlementService
             + $manual['custody_deduction']
             + $manual['excess_leave_deduction']
             + $manual['social_insurance_deduction']
+            + $manual['penalties_deduction']
             + $usedLeave['amount'],
             2
         );
@@ -116,6 +118,7 @@ class EmployeeEntitlementSettlementService
                 'custody' => $manual['custody_deduction'],
                 'excess_leave' => $manual['excess_leave_deduction'],
                 'social_insurance' => $manual['social_insurance_deduction'],
+                'penalties' => $manual['penalties_deduction'],
                 'used_annual_leave_days' => $usedLeave['days'],
                 'used_annual_leave_deduction' => $usedLeave['amount'],
                 'total_deductions' => $totalDeductions,
@@ -160,6 +163,7 @@ class EmployeeEntitlementSettlementService
             'custody_deduction' => $preview['deductions']['custody'],
             'excess_leave_deduction' => $preview['deductions']['excess_leave'],
             'social_insurance_deduction' => $preview['deductions']['social_insurance'],
+            'penalties_deduction' => $preview['deductions']['penalties'],
             'used_annual_leave_deduction' => $preview['deductions']['used_annual_leave_deduction'],
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
@@ -211,6 +215,7 @@ class EmployeeEntitlementSettlementService
             'custody_deduction' => $preview['deductions']['custody'],
             'excess_leave_deduction' => $preview['deductions']['excess_leave'],
             'social_insurance_deduction' => $preview['deductions']['social_insurance'],
+            'penalties_deduction' => $preview['deductions']['penalties'],
             'used_annual_leave_deduction' => $preview['deductions']['used_annual_leave_deduction'],
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
@@ -568,6 +573,7 @@ class EmployeeEntitlementSettlementService
      *     custody_deduction: float,
      *     excess_leave_deduction: float,
      *     social_insurance_deduction: float,
+     *     penalties_deduction: float,
      *     notes: ?string
      * }
      */
@@ -581,6 +587,7 @@ class EmployeeEntitlementSettlementService
             'custody_deduction' => $this->normalizeMoney($manualInput['custody_deduction'] ?? 0),
             'excess_leave_deduction' => $this->normalizeMoney($manualInput['excess_leave_deduction'] ?? 0),
             'social_insurance_deduction' => $this->normalizeMoney($manualInput['social_insurance_deduction'] ?? 0),
+            'penalties_deduction' => $this->normalizeMoney($manualInput['penalties_deduction'] ?? 0),
             'notes' => isset($manualInput['notes']) && trim((string) $manualInput['notes']) !== ''
                 ? trim((string) $manualInput['notes'])
                 : null,

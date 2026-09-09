@@ -354,6 +354,7 @@ const props = defineProps<{
         custody_deduction?: number;
         excess_leave_deduction?: number;
         social_insurance_deduction?: number;
+        penalties_deduction?: number;
         notes?: string;
     };
     previous_settlements_count?: number;
@@ -389,6 +390,7 @@ const form = useForm({
     custody_deduction: props.defaults.custody_deduction ?? 0,
     excess_leave_deduction: props.defaults.excess_leave_deduction ?? 0,
     social_insurance_deduction: props.defaults.social_insurance_deduction ?? 0,
+    penalties_deduction: props.defaults.penalties_deduction ?? 0,
     notes: props.defaults.notes ?? props.preview.notes ?? '',
 });
 
@@ -425,6 +427,7 @@ const manualDeductionFields = computed(() => [
     { key: 'custody_deduction' as const, label: t('entitlement_settlement.custody') },
     { key: 'excess_leave_deduction' as const, label: t('entitlement_settlement.excess_leave') },
     { key: 'social_insurance_deduction' as const, label: t('entitlement_settlement.social_insurance') },
+    { key: 'penalties_deduction' as const, label: t('entitlement_settlement.penalties') },
 ]);
 
 const parseAmount = (value: unknown) => {
@@ -449,6 +452,7 @@ const totalDeductions = computed(() =>
             + parseAmount(form.custody_deduction)
             + parseAmount(form.excess_leave_deduction)
             + parseAmount(form.social_insurance_deduction)
+            + parseAmount(form.penalties_deduction)
             + preview.value.deductions.used_annual_leave_deduction,
     ),
 );
@@ -524,6 +528,7 @@ function refreshPreview(settlementDate = form.settlement_date) {
             custody_deduction: form.custody_deduction,
             excess_leave_deduction: form.excess_leave_deduction,
             social_insurance_deduction: form.social_insurance_deduction,
+            penalties_deduction: form.penalties_deduction,
             notes: form.notes,
         },
         {

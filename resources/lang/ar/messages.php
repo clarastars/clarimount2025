@@ -2387,6 +2387,7 @@ return [
         'custody' => 'عهد',
         'excess_leave' => 'المدة الزائدة عن الإجازات المستحقة',
         'social_insurance' => 'تأمينات اجتماعية',
+        'penalties' => 'جزاءات',
         'used_annual_leave' => 'رصيد مستخدم من الإجازة السنوية',
         'total_deductions' => 'إجمالي الاستقطاعات',
         'net_due' => 'صافي المستحق',

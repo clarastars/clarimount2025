@@ -260,6 +260,7 @@ type SettlementDetail = {
     custody_deduction: number;
     excess_leave_deduction: number;
     social_insurance_deduction: number;
+    penalties_deduction: number;
     used_annual_leave_deduction: number;
     total_deductions: number;
     net_due: number;
@@ -319,6 +320,7 @@ const deductionRows = computed(() => [
     { label: t('entitlement_settlement.custody'), value: props.settlement.custody_deduction },
     { label: t('entitlement_settlement.excess_leave'), value: props.settlement.excess_leave_deduction },
     { label: t('entitlement_settlement.social_insurance'), value: props.settlement.social_insurance_deduction },
+    { label: t('entitlement_settlement.penalties'), value: props.settlement.penalties_deduction },
     {
         label: t('entitlement_settlement.used_annual_leave'),
         value: props.settlement.used_annual_leave_deduction,

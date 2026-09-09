@@ -103,6 +103,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'custody_deduction',
             'excess_leave_deduction',
             'social_insurance_deduction',
+            'penalties_deduction',
             'notes',
         ]));
 
@@ -144,6 +145,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'custody_deduction' => ['nullable', 'numeric', 'min:0'],
             'excess_leave_deduction' => ['nullable', 'numeric', 'min:0'],
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
+            'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -203,6 +205,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'custody_deduction' => $request->query('custody_deduction', $entitlementSettlement->custody_deduction),
             'excess_leave_deduction' => $request->query('excess_leave_deduction', $entitlementSettlement->excess_leave_deduction),
             'social_insurance_deduction' => $request->query('social_insurance_deduction', $entitlementSettlement->social_insurance_deduction),
+            'penalties_deduction' => $request->query('penalties_deduction', $entitlementSettlement->penalties_deduction),
             'notes' => $request->query('notes', $entitlementSettlement->notes),
         ];
 
@@ -232,6 +235,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 'custody_deduction' => (float) $manualInput['custody_deduction'],
                 'excess_leave_deduction' => (float) $manualInput['excess_leave_deduction'],
                 'social_insurance_deduction' => (float) $manualInput['social_insurance_deduction'],
+                'penalties_deduction' => (float) $manualInput['penalties_deduction'],
                 'notes' => (string) ($manualInput['notes'] ?? ''),
             ],
         ]);
@@ -264,6 +268,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'custody_deduction' => ['nullable', 'numeric', 'min:0'],
             'excess_leave_deduction' => ['nullable', 'numeric', 'min:0'],
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
+            'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -467,6 +472,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'custody_deduction' => (float) $settlement->custody_deduction,
             'excess_leave_deduction' => (float) $settlement->excess_leave_deduction,
             'social_insurance_deduction' => (float) $settlement->social_insurance_deduction,
+            'penalties_deduction' => (float) $settlement->penalties_deduction,
             'used_annual_leave_deduction' => (float) $settlement->used_annual_leave_deduction,
             'notes' => $settlement->notes,
             'reviewed_by_name' => $settlement->reviewer?->name,
