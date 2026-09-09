@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -19,9 +19,13 @@ const props = withDefaults(defineProps<Props>(), {
     loginEmail: '',
 });
 
+const page = usePage();
 const step = ref<'email' | 'otp' | 'password'>(props.loginStep);
 const email = ref(props.loginEmail);
 const currentYear = new Date().getFullYear();
+const flashError = computed(
+    () => ((page.props.flash as { error?: string } | undefined)?.error) ?? '',
+);
 
 watch(
     () => [props.loginStep, props.loginEmail] as const,
@@ -113,6 +117,13 @@ const stepMessage = computed(() => {
                 <div class="mb-8 text-center">
                     <h2 class="text-2xl font-bold text-foreground sm:text-3xl">{{ stepTitle }}</h2>
                     <p class="mt-3 text-base leading-relaxed text-muted-foreground">{{ stepMessage }}</p>
+                </div>
+
+                <div
+                    v-if="flashError"
+                    class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+                >
+                    {{ flashError }}
                 </div>
 
                 <div

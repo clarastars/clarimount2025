@@ -9,6 +9,7 @@ use App\Services\DashboardPendingApprovalsService;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,6 +37,7 @@ class DashboardController extends Controller
     ];
 
     public function index(
+        Request $request,
         EmployeeExpiryService $employeeExpiryService,
         DashboardPendingApprovalsService $pendingApprovalsService,
     ): Response|RedirectResponse {
@@ -50,7 +52,13 @@ class DashboardController extends Controller
         if ($this->shouldUseEmployeeDashboard($user)) {
             $employee = $user->employee;
             if (! $employee) {
-                return redirect()->route('logout')->with('error', __('messages.employee_portal_no_employee'));
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()
+                    ->route('login')
+                    ->with('error', __('messages.employee_portal_no_employee'));
             }
             $roleService = app(EmployeeUserRoleService::class);
             $teamNames = $roleService->dashboardTeamSubtitleFor($user);
