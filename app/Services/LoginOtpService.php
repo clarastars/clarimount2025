@@ -35,7 +35,7 @@ class LoginOtpService
             return false;
         }
 
-        if (User::query()->where('email', $normalizedEmail)->exists()) {
+        if (User::query()->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])->exists()) {
             return true;
         }
 
@@ -48,22 +48,7 @@ class LoginOtpService
 
     public function resolveUserByWorkEmail(string $email): ?User
     {
-        $normalizedEmail = $this->normalizeEmail($email);
-
-        $user = User::query()->where('email', $normalizedEmail)->first();
-        if ($user) {
-            return $user;
-        }
-
-        $employee = Employee::query()
-            ->where('work_email', $normalizedEmail)
-            ->first();
-
-        if (! $employee) {
-            return null;
-        }
-
-        return $this->employeePortalUserService->createOrSyncPortalUser($employee);
+        return $this->employeePortalUserService->resolveByLoginEmail($email);
     }
 
     public function usesPasswordLogin(User $user): bool

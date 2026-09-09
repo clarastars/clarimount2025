@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Services\DashboardPendingApprovalsService;
 use App\Services\EmployeeExpiryService;
+use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,8 @@ class DashboardController extends Controller
         ]);
 
         if ($this->shouldUseEmployeeDashboard($user)) {
-            $employee = $user->employee;
+            $employee = $user->employee
+                ?? app(EmployeePortalUserService::class)->ensureLinkedEmployee($user);
             if (! $employee) {
                 Auth::guard('web')->logout();
                 $request->session()->invalidate();

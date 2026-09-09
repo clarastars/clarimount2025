@@ -2,10 +2,11 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Models\User;
+use App\Services\LoginOtpService;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -43,9 +44,13 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         $email = Str::lower(trim((string) $this->input('email')));
-        $user = User::query()->where('email', $email)->first();
+        $user = app(LoginOtpService::class)->resolveUserByWorkEmail($email);
 
-        if (! $user || ! $user->uses_password_login) {
+        if (
+            ! $user
+            || ! $user->uses_password_login
+            || ! Hash::check((string) $this->input('password'), (string) $user->password)
+        ) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -53,13 +58,7 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        if (! Auth::attempt(['email' => $email, 'password' => $this->input('password')], $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
-            ]);
-        }
+        Auth::login($user, $this->boolean('remember'));
 
         RateLimiter::clear($this->throttleKey());
     }

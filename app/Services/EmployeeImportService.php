@@ -1148,6 +1148,8 @@ class EmployeeImportService
                             app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
                         }
 
+                        app(EmployeePortalUserService::class)->createOrSyncPortalUser($employee->fresh());
+
                         $updated++;
                     } else {
                         $createData = $data;
@@ -1159,6 +1161,8 @@ class EmployeeImportService
                         if (trim((string) ($data['leave_accrued_balance'] ?? '')) === '') {
                             app(LeaveAccrualService::class)->initializeAccruedBalanceForEmployee($employee->fresh());
                         }
+
+                        app(EmployeePortalUserService::class)->createOrSyncPortalUser($employee->fresh());
 
                         $created++;
                     }
