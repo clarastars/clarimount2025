@@ -79,6 +79,30 @@ trait AuthorizesEmployeeAccess
         return collect($this->roleService()->companyIdsWhereCan($user, ['employees.manage']));
     }
 
+    /**
+     * Companies available when creating/editing an employee's company field.
+     * Includes all companies when the user has employees.assign-any-company.
+     *
+     * @return Collection<int, int>
+     */
+    protected function employeeAssignableCompanyIds(User $user): Collection
+    {
+        if ($this->canAssignAnyCompany($user)) {
+            return Company::query()->pluck('id')->map(fn ($id): int => (int) $id);
+        }
+
+        return $this->employeeManageableCompanyIds($user)->map(fn ($id): int => (int) $id);
+    }
+
+    protected function canAssignAnyCompany(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.assign-any-company');
+    }
+
     protected function canViewEmployees(User $user): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -387,6 +411,10 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
+        if ($this->canAssignAnyCompany($user) && $this->canManageEmployees($user)) {
+            return true;
+        }
+
         if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
             return true;
         }
@@ -516,6 +544,10 @@ trait AuthorizesEmployeeAccess
 
     protected function canAccessEmployee(User $user, Employee $employee): bool
     {
+        if ($this->canAssignAnyCompany($user) && $this->canViewEmployees($user)) {
+            return true;
+        }
+
         if (! $this->employeeQueryableCompanyIds($user)->contains($employee->company_id)) {
             return false;
         }

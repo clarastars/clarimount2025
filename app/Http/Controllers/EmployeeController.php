@@ -282,7 +282,7 @@ class EmployeeController extends Controller
         $user = Auth::user();
         $this->abortUnlessCanManageEmployees($user);
 
-        $companyIds = $this->employeeManageableCompanyIds($user);
+        $companyIds = $this->employeeAssignableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
         $canAssignAnyDepartment = $this->canAssignAnyDepartment($user);
         $departments = $this->departmentsForEmployeeForm($user, $companyIds, $canAssignAnyDepartment);
@@ -320,7 +320,7 @@ class EmployeeController extends Controller
         $this->abortUnlessCanManageEmployees($user);
 
         $isSuperAdmin = $user->hasRole('super-admin');
-        $ownedCompanyIds = $this->employeeManageableCompanyIds($user);
+        $ownedCompanyIds = $this->employeeAssignableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             return redirect()->route('employees.index')
@@ -577,7 +577,7 @@ class EmployeeController extends Controller
         $user = Auth::user();
         $this->abortUnlessCanManageEmployee($user, $employee);
 
-        $companyIds = $this->employeeManageableCompanyIds($user);
+        $companyIds = $this->employeeAssignableCompanyIds($user);
         $companies = Company::query()->whereIn('id', $companyIds->isEmpty() ? [-1] : $companyIds)->orderBy('name_en')->get();
         $canAssignAnyDepartment = $this->canAssignAnyDepartment($user);
         $departments = $this->departmentsForEmployeeForm($user, $companyIds, $canAssignAnyDepartment);
@@ -637,7 +637,7 @@ class EmployeeController extends Controller
         $this->abortUnlessCanManageEmployee($user, $employee);
 
         $isSuperAdmin = $user->hasRole('super-admin');
-        $ownedCompanyIds = $this->employeeManageableCompanyIds($user);
+        $ownedCompanyIds = $this->employeeAssignableCompanyIds($user);
 
         if ($ownedCompanyIds->isEmpty()) {
             abort(403);
