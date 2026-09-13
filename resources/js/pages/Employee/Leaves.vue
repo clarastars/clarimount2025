@@ -240,6 +240,24 @@ const formatShortDate = (iso: string | null | undefined): string => {
     }
 };
 
+const formatDateTime = (iso: string | null | undefined): string => {
+    if (!iso) {
+        return '—';
+    }
+
+    try {
+        return new Date(iso).toLocaleString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    } catch {
+        return iso;
+    }
+};
+
 const stepStatusLabel = (step: ApprovalProgressStep): string => {
     if (step.status === 'approved' && step.approver_name) {
         return t('leaves.approval_step_approved_by', { name: step.approver_name });
@@ -319,6 +337,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             <thead>
                                 <tr class="border-b text-muted-foreground">
                                     <th class="py-3 px-2 text-start font-medium">{{ t('leaves.leave_type') }}</th>
+                                    <th class="py-3 px-2 text-start font-medium">{{ t('leaves.request_submitted_at') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('leaves.start_date') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('leaves.end_date') }}</th>
                                     <th class="py-3 px-2 text-start font-medium">{{ t('leaves.days') }}</th>
@@ -331,6 +350,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                 <template v-for="request in leaveRequests" :key="request.id">
                                     <tr class="border-b last:border-0">
                                         <td class="py-3 px-2">{{ leaveTypeLabel(request.leave_type, request.leave_type_label) }}</td>
+                                        <td class="py-3 px-2 whitespace-nowrap">{{ formatDateTime(request.created_at) }}</td>
                                         <td class="py-3 px-2">{{ request.start_date }}</td>
                                         <td class="py-3 px-2">{{ request.end_date }}</td>
                                         <td class="py-3 px-2">
@@ -405,7 +425,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                         v-if="request.approval_progress && isApprovalDetailsOpen(request.id)"
                                         class="border-b last:border-0 bg-muted/20"
                                     >
-                                        <td colspan="7" class="px-2 pb-4 pt-1">
+                                        <td colspan="8" class="px-2 pb-4 pt-1">
                                             <div class="rounded-lg border bg-background p-3 space-y-3">
                                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                                     <p class="text-sm font-medium">{{ t('leaves.approval_workflow_title') }}</p>
