@@ -632,7 +632,12 @@ class EmployeeUserRoleService
 
     /**
      * Team members who should act for this employee: department-scoped users when
-     * any exist, otherwise company-wide (department_id NULL) users for the team.
+     * any exist for that department, otherwise company-wide (department_id NULL)
+     * users for the team + company.
+     *
+     * Department assignees are matched by team_id + department_id only. Department
+     * UUIDs are globally unique, and the assignee may be employed by another company
+     * while still being the department's direct manager.
      *
      * @return array<int, int>
      */
@@ -641,7 +646,6 @@ class EmployeeUserRoleService
         if ($departmentId !== null && $departmentId !== '') {
             $departmentUserIds = DB::table('company_user_access')
                 ->where('team_id', $teamId)
-                ->where('company_id', $companyId)
                 ->where('department_id', $departmentId)
                 ->pluck('user_id')
                 ->map(fn ($id) => (int) $id)
