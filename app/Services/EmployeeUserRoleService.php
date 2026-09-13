@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Department;
+use App\Models\Employee;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -669,6 +671,45 @@ class EmployeeUserRoleService
             ->all();
     }
 
+    /**
+     * Users assigned to a department via company_user_access (any company_id).
+     *
+     * @return array<int, int>
+     */
+    public function userIdsAssignedToDepartment(?string $departmentId): array
+    {
+        if ($departmentId === null || $departmentId === '') {
+            return [];
+        }
+
+        return DB::table('company_user_access')
+            ->where('department_id', $departmentId)
+            ->whereNotNull('team_id')
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Department UUIDs this user is explicitly assigned to (department-scoped roles).
+     *
+     * @return array<int, string>
+     */
+    public function assignedDepartmentIdsFor(User $user): array
+    {
+        return DB::table('company_user_access')
+            ->where('user_id', $user->id)
+            ->whereNotNull('department_id')
+            ->whereNotNull('team_id')
+            ->pluck('department_id')
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function userBelongsToTeamInCompany(User $portalUser, int $teamId, int $companyId): bool
     {
         if (! $this->userBelongsToTeam($portalUser, $teamId)) {
@@ -918,6 +959,8 @@ class EmployeeUserRoleService
      * Team IDs that grant this user access to the given company and department.
      *
      * A NULL department scope means whole-company access for that team.
+     * Department-scoped rows are matched by department UUID globally (assignee may
+     * be employed by another company while managing this department).
      *
      * @return array<int, int>
      */
@@ -938,6 +981,19 @@ class EmployeeUserRoleService
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
+
+        if ($departmentId !== null && $departmentId !== '') {
+            $departmentTeamIds = DB::table('company_user_access')
+                ->where('user_id', $user->id)
+                ->whereNotNull('team_id')
+                ->where('department_id', $departmentId)
+                ->pluck('team_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $scopedTeamIds = $scopedTeamIds->merge($departmentTeamIds)->unique()->values();
+        }
 
         if ($scopedTeamIds->isNotEmpty()) {
             return $scopedTeamIds->all();
@@ -1048,7 +1104,7 @@ class EmployeeUserRoleService
 
     /**
      * @param  array<int, string>  $permissions
-     * @return array<int, array{company_id: int, department_ids: array<int, string>|null}>
+     * @return array<int, array{company_id: int|null, department_ids: array<int, string>|null}>
      */
     public function employeeScopeWhereCan(User $user, array $permissions): array
     {
@@ -1089,27 +1145,28 @@ class EmployeeUserRoleService
             ->values()
             ->all();
 
-        foreach ($accessRows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values() as $companyId) {
-            $teamIds = $this->teamIdsForCompany($user, $companyId);
-            $permittedTeamIds = [];
-
-            foreach ($teamIds as $teamId) {
-                $hasPermission = $this->withTeamContexts($user, [$teamId], function () use ($user, $permissions): bool {
-                    foreach ($permissions as $permission) {
-                        if ($user->can($permission)) {
-                            return true;
-                        }
+        $permittedTeamIds = [];
+        foreach ($accessRows->pluck('team_id')->filter()->map(fn ($id) => (int) $id)->unique()->values() as $teamId) {
+            $hasPermission = $this->withTeamContexts($user, [$teamId], function () use ($user, $permissions): bool {
+                foreach ($permissions as $permission) {
+                    if ($user->can($permission)) {
+                        return true;
                     }
-
-                    return false;
-                });
-
-                if ($hasPermission) {
-                    $permittedTeamIds[] = $teamId;
                 }
-            }
 
-            if ($permittedTeamIds === []) {
+                return false;
+            });
+
+            if ($hasPermission) {
+                $permittedTeamIds[] = $teamId;
+            }
+        }
+
+        foreach ($accessRows->pluck('company_id')->map(fn ($id) => (int) $id)->unique()->values() as $companyId) {
+            $companyTeamIds = $this->teamIdsForCompany($user, $companyId);
+            $companyPermittedTeamIds = array_values(array_intersect($companyTeamIds, $permittedTeamIds));
+
+            if ($companyPermittedTeamIds === [] && ! in_array($companyId, $legacyCompanyIds, true)) {
                 continue;
             }
 
@@ -1123,7 +1180,7 @@ class EmployeeUserRoleService
 
             $companyRows = $accessRows
                 ->where('company_id', $companyId)
-                ->whereIn('team_id', $permittedTeamIds);
+                ->whereIn('team_id', $companyPermittedTeamIds);
 
             if ($companyRows->contains(fn ($row) => $row->department_id === null)) {
                 $scopes[] = [
@@ -1133,6 +1190,7 @@ class EmployeeUserRoleService
                 continue;
             }
 
+            // Company-bound department rows stay company+department for this company.
             $departmentIds = $companyRows->pluck('department_id')
                 ->filter()
                 ->map(fn ($id) => (string) $id)
@@ -1140,13 +1198,30 @@ class EmployeeUserRoleService
                 ->values()
                 ->all();
 
-            if ($departmentIds === []) {
-                continue;
+            if ($departmentIds !== []) {
+                $scopes[] = [
+                    'company_id' => $companyId,
+                    'department_ids' => $departmentIds,
+                ];
             }
+        }
 
+        // Department UUID scopes are global: cover employees in these departments
+        // regardless of employee/company_id (cross-company department assignees).
+        $globalDepartmentIds = $accessRows
+            ->filter(fn ($row) => $row->department_id !== null
+                && $row->team_id !== null
+                && in_array((int) $row->team_id, $permittedTeamIds, true))
+            ->pluck('department_id')
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($globalDepartmentIds !== []) {
             $scopes[] = [
-                'company_id' => $companyId,
-                'department_ids' => $departmentIds,
+                'company_id' => null,
+                'department_ids' => $globalDepartmentIds,
             ];
         }
 
@@ -1155,6 +1230,7 @@ class EmployeeUserRoleService
 
     /**
      * Company IDs where at least one linked team grants any of the given permissions.
+     * Includes companies covered only via department-scoped assignments.
      *
      * @param  array<int, string>  $permissions
      * @return array<int, int>
@@ -1172,7 +1248,7 @@ class EmployeeUserRoleService
 
         $accessRows = DB::table('company_user_access')
             ->where('user_id', $user->id)
-            ->get(['company_id', 'team_id']);
+            ->get(['company_id', 'team_id', 'department_id']);
 
         if ($accessRows->isEmpty()) {
             return [];
@@ -1187,7 +1263,67 @@ class EmployeeUserRoleService
             }
         }
 
+        $permittedDepartmentIds = [];
+        foreach (
+            $accessRows
+                ->filter(fn ($row) => $row->department_id !== null && $row->team_id !== null)
+                ->groupBy(fn ($row) => (int) $row->team_id) as $teamId => $rows
+        ) {
+            $hasPermission = $this->withTeamContexts($user, [(int) $teamId], function () use ($user, $permissions): bool {
+                foreach ($permissions as $permission) {
+                    if ($user->can($permission)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+
+            if (! $hasPermission) {
+                continue;
+            }
+
+            foreach ($rows as $row) {
+                $permittedDepartmentIds[] = (string) $row->department_id;
+            }
+        }
+
+        $permittedDepartmentIds = array_values(array_unique($permittedDepartmentIds));
+
+        if ($permittedDepartmentIds !== []) {
+            $fromDepartments = Department::query()
+                ->whereIn('id', $permittedDepartmentIds)
+                ->pluck('company_id')
+                ->map(fn ($id) => (int) $id);
+
+            $fromEmployees = Employee::query()
+                ->whereIn('department_id', $permittedDepartmentIds)
+                ->pluck('company_id')
+                ->map(fn ($id) => (int) $id);
+
+            $matched = collect($matched)
+                ->merge($fromDepartments)
+                ->merge($fromEmployees)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
         return $matched;
+    }
+
+    /**
+     * Whether the user can reach a company via department-scoped role assignments.
+     *
+     * @param  array<int, string>  $permissions
+     */
+    public function canAccessCompanyViaDepartmentScope(User $user, int $companyId, array $permissions): bool
+    {
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($companyId)->exists()) {
+            return true;
+        }
+
+        return in_array($companyId, $this->companyIdsWhereCan($user, $permissions), true);
     }
 
     /**

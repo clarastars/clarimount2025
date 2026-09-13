@@ -65,11 +65,26 @@ class DashboardPendingApprovalsService
             return Company::query()->pluck('id')->map(fn ($id): int => (int) $id)->all();
         }
 
-        return $user->ownedCompanies()
+        $ownedAndPivot = $user->ownedCompanies()
             ->pluck('id')
             ->merge($user->accessibleCompanies()->pluck('companies.id'))
+            ->map(fn ($id): int => (int) $id);
+
+        // Include companies covered only via department-scoped role assignments
+        // (department priority across companies).
+        $fromDepartmentScope = $this->roleService->companyIdsWhereCan($user, [
+            'leaves.approve',
+            'leaves.company.view',
+            'leaves.create',
+            'employees.entitlements.approve',
+            'employees.entitlements.settle',
+            'salary-runs.approve',
+            'salary-runs.readonly',
+        ]);
+
+        return $ownedAndPivot
+            ->merge($fromDepartmentScope)
             ->unique()
-            ->map(fn ($id): int => (int) $id)
             ->values()
             ->all();
     }
@@ -125,10 +140,11 @@ class DashboardPendingApprovalsService
                 'step_title' => $nextStep?->title,
                 'url' => route('companies.leaves.index', $company),
                 'created_at' => $leaveRequest->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
             ];
         }
 
-        return $this->bucketFromItems($items, $items[0]['url'] ?? null);
+        return $this->bucketFromItems($items, $items[0]['url'] ?? null, $user);
     }
 
     /**
@@ -177,10 +193,11 @@ class DashboardPendingApprovalsService
                 'step_title' => $nextStep?->title,
                 'url' => route('companies.salary-certificates.index', $company),
                 'created_at' => $request->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
             ];
         }
 
-        return $this->bucketFromItems($items, $items[0]['url'] ?? null);
+        return $this->bucketFromItems($items, $items[0]['url'] ?? null, $user);
     }
 
     /**
@@ -236,10 +253,11 @@ class DashboardPendingApprovalsService
                 'step_title' => $nextStep?->title,
                 'url' => route('employees.entitlement-settlement.show', [$employee, $settlement]),
                 'created_at' => $settlement->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
             ];
         }
 
-        return $this->bucketFromItems($items, null);
+        return $this->bucketFromItems($items, null, $user);
     }
 
     /**
@@ -379,15 +397,34 @@ class DashboardPendingApprovalsService
      * @param  list<array<string, mixed>>  $items
      * @return array{visible: bool, count: int, preview: list<array<string, mixed>>, view_all_url: string|null}
      */
-    private function bucketFromItems(array $items, ?string $viewAllUrl): array
+    private function bucketFromItems(array $items, ?string $viewAllUrl, ?User $user = null): array
     {
-        $collection = collect($items)->values();
+        $priorityDepartments = $user !== null
+            ? array_flip($this->roleService->assignedDepartmentIdsFor($user))
+            : [];
+
+        $collection = collect($items)
+            ->sortBy(function (array $item) use ($priorityDepartments): array {
+                $departmentId = isset($item['department_id']) ? (string) $item['department_id'] : '';
+                $isDepartmentPriority = $departmentId !== '' && isset($priorityDepartments[$departmentId]);
+
+                return [
+                    $isDepartmentPriority ? 0 : 1,
+                    -1 * (int) ($item['id'] ?? 0),
+                ];
+            })
+            ->map(function (array $item): array {
+                unset($item['department_id']);
+
+                return $item;
+            })
+            ->values();
 
         return [
             'visible' => true,
             'count' => $collection->count(),
             'preview' => $collection->take(self::PREVIEW_LIMIT)->values()->all(),
-            'view_all_url' => $viewAllUrl,
+            'view_all_url' => $collection->first()['url'] ?? $viewAllUrl,
         ];
     }
 

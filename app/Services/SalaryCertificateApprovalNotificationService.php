@@ -43,7 +43,7 @@ class SalaryCertificateApprovalNotificationService
                 continue;
             }
 
-            if ($this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($this->userIsAssignedToApprovalStep($user, $firstStep, $certificateRequest->employee)) {
                 $this->send($user, 'your_turn', $payload);
             }
         }
@@ -69,7 +69,7 @@ class SalaryCertificateApprovalNotificationService
                 continue;
             }
 
-            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep)) {
+            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep, $certificateRequest->employee)) {
                 $this->send($user, 'your_turn', [
                     ...$basePayload,
                     'step_id' => $nextStep->id,
@@ -125,7 +125,7 @@ class SalaryCertificateApprovalNotificationService
                 continue;
             }
 
-            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep, $certificateRequest->employee)) {
                 $this->send($user, 'your_turn', [
                     ...$payload,
                     'step_id' => $firstStep->id,
@@ -221,26 +221,20 @@ class SalaryCertificateApprovalNotificationService
 
         $userIds = collect([$company->owner_id])->filter();
         $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($employee);
 
         foreach ($teamIds as $teamId) {
-            $teamMemberIds = $roleService->userIdsForTeam((int) $teamId);
+            $teamMemberIds = $roleService->userIdsForTeamInCompanyScoped(
+                (int) $teamId,
+                (int) $company->id,
+                $departmentId,
+            );
 
             if ($teamMemberIds === []) {
                 continue;
             }
 
-            $teamUserIds = User::query()
-                ->whereIn('id', $teamMemberIds)
-                ->where(function ($query) use ($company) {
-                    $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('companies.id', $company->id);
-                    })->orWhereHas('ownedCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('id', $company->id);
-                    });
-                })
-                ->pluck('id');
-
-            $userIds = $userIds->merge($teamUserIds);
+            $userIds = $userIds->merge($teamMemberIds);
         }
 
         return User::query()
@@ -250,13 +244,20 @@ class SalaryCertificateApprovalNotificationService
             ->values();
     }
 
-    private function userIsAssignedToApprovalStep(User $user, SalaryCertificateApprovalStep $step): bool
+    private function userIsAssignedToApprovalStep(User $user, SalaryCertificateApprovalStep $step, ?Employee $employee = null): bool
     {
         if ($step->team_id === null) {
             return false;
         }
 
-        return app(EmployeeUserRoleService::class)->userBelongsToTeam($user, (int) $step->team_id);
+        $roleService = app(EmployeeUserRoleService::class);
+
+        return $roleService->userBelongsToTeamInCompanyScoped(
+            $user,
+            (int) $step->team_id,
+            (int) $step->company_id,
+            $roleService->departmentIdForEmployeeScope($employee),
+        );
     }
 
     private function userCanReceiveWorkflowNotifications(User $user, Company $company, ?Employee $employee = null): bool

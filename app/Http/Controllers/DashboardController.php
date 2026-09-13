@@ -78,6 +78,7 @@ class DashboardController extends Controller
         $ownedCompanyIds = $user->ownedCompanies()->pluck('id');
         $accessibleCompanyIds = $ownedCompanyIds
             ->merge($user->accessibleCompanies()->pluck('companies.id'))
+            ->merge(app(EmployeeUserRoleService::class)->companyIdsWhereCan($user, self::HR_DASHBOARD_PERMISSIONS))
             ->unique()
             ->values();
 

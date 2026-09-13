@@ -105,6 +105,9 @@ class LeaveRequestNotificationService
      */
     public function getRecipientsForCompany(Company $company, ?Employee $employee = null): Collection
     {
+        $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($employee);
+
         $candidateIds = User::query()
             ->where(function ($query) use ($company) {
                 $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
@@ -117,6 +120,7 @@ class LeaveRequestNotificationService
 
         $userIds = collect([$company->owner_id])
             ->merge($candidateIds)
+            ->merge($roleService->userIdsAssignedToDepartment($departmentId))
             ->filter()
             ->unique()
             ->values();

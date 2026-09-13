@@ -25,6 +25,9 @@ trait AuthorizesEmployeeAccess
             ->merge(
                 $user->accessibleCompanies()->pluck('companies.id')
             )
+            ->merge(
+                $this->roleService()->companyIdsWhereCan($user, $this->employeeViewPermissions())
+            )
             ->unique()
             ->map(fn ($id): int => (int) $id)
             ->values()
@@ -515,10 +518,16 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        return $this->roleService()->canAnyForCompany(
+        $permissions = $this->leaveWorkflowAccessPermissions();
+
+        if ($this->roleService()->canAnyForCompany($user, $permissions, (int) $company->id)) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessCompanyViaDepartmentScope(
             $user,
-            $this->leaveWorkflowAccessPermissions(),
-            (int) $company->id
+            (int) $company->id,
+            $permissions,
         );
     }
 
@@ -620,14 +629,16 @@ trait AuthorizesEmployeeAccess
 
     /**
      * Companies assigned to the user's team role only (not owned companies).
+     * Includes companies reached via department-scoped assignments.
      *
      * @return array<int>
      */
     protected function roleAssignedCompanyIds(User $user): array
     {
-        return $user->accessibleCompanies()
-            ->pluck('companies.id')
+        return collect($user->accessibleCompanies()->pluck('companies.id'))
+            ->merge($this->roleService()->companyIdsWhereCan($user, $this->employeeViewPermissions()))
             ->map(fn ($id): int => (int) $id)
+            ->unique()
             ->values()
             ->all();
     }
@@ -699,8 +710,18 @@ trait AuthorizesEmployeeAccess
 
         $query->where(function (Builder $scopeQuery) use ($scopes): void {
             foreach ($scopes as $scope) {
-                $companyId = (int) $scope['company_id'];
+                $companyId = $scope['company_id'];
                 $departmentIds = $scope['department_ids'];
+
+                if ($companyId === null) {
+                    if (is_array($departmentIds) && $departmentIds !== []) {
+                        $scopeQuery->orWhereIn('department_id', $departmentIds);
+                    }
+
+                    continue;
+                }
+
+                $companyId = (int) $companyId;
 
                 if ($departmentIds === null) {
                     $scopeQuery->orWhere('company_id', $companyId);
