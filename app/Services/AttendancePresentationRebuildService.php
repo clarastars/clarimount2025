@@ -177,6 +177,7 @@ class AttendancePresentationRebuildService
         }
 
         $this->persistRows($companyId, $startDate->format('Y-m-d'), $endDate->format('Y-m-d'), $rows);
+        $this->reconcileEarlyDepartureForRows($rows);
     }
 
     public function rebuildEmployeeDateRange(int $employeeId, string $startDateYmd, string $endDateYmd): void
@@ -290,6 +291,7 @@ class AttendancePresentationRebuildService
             $endDate->format('Y-m-d'),
             $rows
         );
+        $this->reconcileEarlyDepartureForRows($rows);
     }
 
     /**
@@ -495,6 +497,26 @@ class AttendancePresentationRebuildService
             ->where('attendance_date', $attDate)
             ->whereNotNull('late_minutes_deduction_amount')
             ->update(['late_minutes_deduction_amount' => null]);
+    }
+
+    /**
+     * Re-evaluate early-departure penalties after presentation rows are persisted.
+     * Uses the final last_punch so overtime checkouts after the 20:00 job clear false positives.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function reconcileEarlyDepartureForRows(array $rows): void
+    {
+        $dates = collect($rows)
+            ->pluck('att_date')
+            ->filter()
+            ->map(static fn ($date): string => (string) $date)
+            ->unique()
+            ->values();
+
+        foreach ($dates as $attDate) {
+            $this->penaltyService->processEarlyDeparturePenaltiesForDate($attDate);
+        }
     }
 
     /**

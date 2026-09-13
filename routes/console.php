@@ -26,6 +26,12 @@ Schedule::job(new \App\Jobs\ProcessEarlyDeparturePenaltiesJob())
     ->timezone('Asia/Riyadh')
     ->description('Process early departure attendance penalties for today');
 
+// Final early-departure pass for yesterday after overtime checkouts can still arrive past 20:00.
+Schedule::job(new \App\Jobs\ProcessEarlyDeparturePenaltiesJob(forYesterday: true))
+    ->dailyAt('00:30')
+    ->timezone('Asia/Riyadh')
+    ->description('Reprocess early departure penalties for yesterday');
+
 // Monthly leave accrual: previous completed month (e.g. on 1 Sep accrue August; 21 → 1.75/month)
 Schedule::job(new \App\Jobs\AccrueMonthlyLeaveBalanceJob())
     ->monthlyOn(1, '02:00')

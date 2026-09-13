@@ -24,20 +24,28 @@ class ProcessEarlyDeparturePenaltiesJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public ?string $attendanceDate = null,
+        public bool $forYesterday = false,
     ) {
         $this->onQueue('default');
     }
 
     public function uniqueId(): string
     {
-        return 'process-early-departure-penalties-'.($this->attendanceDate ?? 'today');
+        if ($this->attendanceDate !== null) {
+            return 'process-early-departure-penalties-'.$this->attendanceDate;
+        }
+
+        return 'process-early-departure-penalties-'.($this->forYesterday ? 'yesterday' : 'today');
     }
 
     public function handle(
         AttendancePresentationRebuildService $presentationService,
         AttendancePenaltyService $penaltyService
     ): void {
-        $date = $this->attendanceDate ?? Carbon::today('Asia/Riyadh')->format('Y-m-d');
+        $date = $this->attendanceDate
+            ?? ($this->forYesterday
+                ? Carbon::yesterday('Asia/Riyadh')->format('Y-m-d')
+                : Carbon::today('Asia/Riyadh')->format('Y-m-d'));
 
         // Refresh day rows first so the job evaluates the latest last-punch value.
         $presentationService->rebuildDateForAllCompanies($date);

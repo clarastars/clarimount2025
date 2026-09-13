@@ -206,6 +206,26 @@ class AttendancePenaltyService
     }
 
     /**
+     * Early-departure penalties must not be created from intermediate punches during the workday.
+     * Past calendar days are always final; today opens at 20:00 Asia/Riyadh.
+     */
+    private function isEarlyDepartureEvaluationWindowOpen(string $attendanceDate): bool
+    {
+        $now = Carbon::now(self::TZ);
+        $today = $now->toDateString();
+
+        if ($attendanceDate < $today) {
+            return true;
+        }
+
+        if ($attendanceDate > $today) {
+            return false;
+        }
+
+        return $now->gte(Carbon::parse($attendanceDate.' 20:00:00', self::TZ));
+    }
+
+    /**
      * Determine violation type based on late minutes
      */
     private function determineViolationType(int $lateMinutes): ?string
@@ -302,7 +322,7 @@ class AttendancePenaltyService
             $penalty = $penalty->fresh();
         }
 
-        return $penalty;
+        return $this->autoApprovalService->applyForPenalty($penalty);
     }
 
     /**
@@ -584,6 +604,14 @@ class AttendancePenaltyService
             return;
         }
 
+        // Mid-day punches look like "early exit" until the real checkout arrives.
+        // Only create/update early-departure penalties after the evaluation window opens
+        // (past days always; today only from 20:00 Asia/Riyadh onward). Continuous rebuilds
+        // after that window clear false positives when a later checkout is synced.
+        if (! $this->isEarlyDepartureEvaluationWindowOpen($attendanceDate)) {
+            return;
+        }
+
         $violationType = $this->determineEarlyDepartureViolationType($earlyMinutes);
         if ($violationType === null) {
             return;
@@ -634,6 +662,16 @@ class AttendancePenaltyService
                 'late_minutes_deduction_amount' => null,
             ]
         );
+
+        $penalty = AttendancePenalty::query()
+            ->where('employee_id', $employee->id)
+            ->where('attendance_date', $attendanceDate)
+            ->where('violation_type', $violationType)
+            ->first();
+
+        if ($penalty !== null) {
+            $this->autoApprovalService->applyForPenalty($penalty);
+        }
 
         $obsoleteIds = $existing
             ->where('violation_type', '!=', $violationType)
