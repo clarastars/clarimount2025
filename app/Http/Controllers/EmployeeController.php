@@ -464,8 +464,9 @@ class EmployeeController extends Controller
             );
 
             $employee->refresh()->load('user');
+            $this->recordPortalPasswordAuditIfChanged($employee, $user, $validated, $isSuperAdmin);
             if ($employee->user && $this->canManageTeamRoleAssignments($user)) {
-                $this->syncPortalUserRoles($employee->user, $user, $validated);
+                $this->syncPortalUserRoles($employee->user, $user, $validated, $employee);
             }
 
             return redirect()->route('employees.show', $employee)
@@ -762,9 +763,10 @@ class EmployeeController extends Controller
         );
 
         $employee->refresh()->load('user');
+        $this->recordPortalPasswordAuditIfChanged($employee, $user, $validated, $isSuperAdmin);
 
         if ($employee->user && $this->canManageTeamRoleAssignments($user)) {
-            $this->syncPortalUserRoles($employee->user, $user, $validated);
+            $this->syncPortalUserRoles($employee->user, $user, $validated, $employee);
         }
 
         return redirect()->route('employees.show', $employee)
@@ -1068,7 +1070,7 @@ class EmployeeController extends Controller
     /**
      * @param  array<string, mixed>  $validated
      */
-    private function syncPortalUserRoles(\App\Models\User $portalUser, $actingUser, array $validated): void
+    private function syncPortalUserRoles(\App\Models\User $portalUser, $actingUser, array $validated, ?Employee $employee = null): void
     {
         if (! $this->canManageTeamRoleAssignments($actingUser)) {
             return;
@@ -1108,12 +1110,60 @@ class EmployeeController extends Controller
                 ->all();
         }
 
+        $employee ??= $portalUser->employee;
+        $beforeFingerprint = $roleService->assignmentFingerprint($portalUser);
+        $beforeSummary = $roleService->assignmentSummaryForAudit($portalUser);
+
         $roleService->sync(
             $portalUser,
             $actingUser,
             $teamRoleAssignments,
             null,
             $roleService->assignedGlobalRoleNames($portalUser),
+        );
+
+        $portalUser->refresh();
+        $afterFingerprint = $roleService->assignmentFingerprint($portalUser);
+
+        if ($employee !== null && $beforeFingerprint !== $afterFingerprint) {
+            app(EmployeeAuditLogPresenter::class)->recordSyntheticUpdate(
+                $employee,
+                ['portal_roles' => $beforeSummary],
+                ['portal_roles' => $roleService->assignmentSummaryForAudit($portalUser)],
+                $actingUser instanceof \App\Models\User ? $actingUser : null,
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function recordPortalPasswordAuditIfChanged(
+        Employee $employee,
+        $actingUser,
+        array $validated,
+        bool $isSuperAdmin
+    ): void {
+        if (! $isSuperAdmin) {
+            return;
+        }
+
+        $passwordSet = filled($validated['portal_password'] ?? null);
+        $passwordReset = (bool) ($validated['portal_password_reset'] ?? false);
+
+        if (! $passwordSet && ! $passwordReset) {
+            return;
+        }
+
+        app(EmployeeAuditLogPresenter::class)->recordSyntheticUpdate(
+            $employee,
+            ['portal_password' => null],
+            [
+                'portal_password' => $passwordReset && ! $passwordSet
+                    ? __('messages.employees.audit_portal_password_reset')
+                    : __('messages.employees.audit_portal_password_changed'),
+            ],
+            $actingUser instanceof \App\Models\User ? $actingUser : null,
         );
     }
 

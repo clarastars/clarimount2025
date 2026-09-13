@@ -834,6 +834,11 @@ return [
         'audit_old_value' => 'Previous value',
         'audit_new_value' => 'New value',
         'audit_no_field_changes' => 'No field details are available for this event.',
+        'portal_roles' => 'Portal roles & access',
+        'audit_portal_roles_none' => 'No team roles assigned',
+        'audit_portal_roles_all_departments' => 'All departments',
+        'audit_portal_password_changed' => 'Password set/changed',
+        'audit_portal_password_reset' => 'Password reset to default',
 
         // New sectional translations for comprehensive employee form
         'general_information' => 'General Information',

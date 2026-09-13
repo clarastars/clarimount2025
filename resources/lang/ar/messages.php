@@ -832,6 +832,11 @@ return [
         'audit_old_value' => 'القيمة السابقة',
         'audit_new_value' => 'القيمة الجديدة',
         'audit_no_field_changes' => 'لا توجد تفاصيل حقول لهذا الحدث.',
+        'portal_roles' => 'أدوار وصلاحيات المنصة',
+        'audit_portal_roles_none' => 'لا توجد أدوار فرق معيّنة',
+        'audit_portal_roles_all_departments' => 'كل الأقسام',
+        'audit_portal_password_changed' => 'تم تعيين/تغيير كلمة المرور',
+        'audit_portal_password_reset' => 'تمت إعادة تعيين كلمة المرور للافتراضية',
 
         // New sectional translations for comprehensive employee form
         'general_information' => 'المعلومات العامة',

@@ -9,8 +9,11 @@ use App\Models\Country;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Shift;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use OwenIt\Auditing\Contracts\Audit;
+use OwenIt\Auditing\Models\Audit as AuditModel;
 
 class EmployeeAuditLogPresenter
 {
@@ -29,6 +32,52 @@ class EmployeeAuditLogPresenter
             ->map(fn (Audit $audit): array => $this->transformAudit($audit))
             ->values()
             ->all();
+    }
+
+    /**
+     * Record synthetic Employee attribute changes (e.g. portal roles) that do not update the employees table.
+     *
+     * @param  array<string, mixed>  $oldValues
+     * @param  array<string, mixed>  $newValues
+     */
+    public function recordSyntheticUpdate(
+        Employee $employee,
+        array $oldValues,
+        array $newValues,
+        ?User $actor = null
+    ): void {
+        $changes = collect($oldValues)
+            ->keys()
+            ->merge(array_keys($newValues))
+            ->unique()
+            ->filter(function (string $field) use ($oldValues, $newValues): bool {
+                return ($oldValues[$field] ?? null) !== ($newValues[$field] ?? null);
+            })
+            ->values();
+
+        if ($changes->isEmpty()) {
+            return;
+        }
+
+        $actor ??= Auth::user();
+
+        AuditModel::query()->create([
+            'auditable_type' => $employee->getMorphClass(),
+            'auditable_id' => $employee->getKey(),
+            'event' => 'updated',
+            'old_values' => $changes
+                ->mapWithKeys(fn (string $field) => [$field => $oldValues[$field] ?? null])
+                ->all(),
+            'new_values' => $changes
+                ->mapWithKeys(fn (string $field) => [$field => $newValues[$field] ?? null])
+                ->all(),
+            'url' => request()->fullUrl(),
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 1023),
+            'tags' => null,
+            'user_id' => $actor?->getKey(),
+            'user_type' => $actor?->getMorphClass(),
+        ]);
     }
 
     /**
@@ -107,6 +156,7 @@ class EmployeeAuditLogPresenter
             'allowance_other', 'allowance_food', 'allowance_personal_car',
             'leave_accrued_balance', 'leave_days_used' => number_format((float) $value, 2),
             'social_insurance_deduction_rate' => number_format((float) $value, 2).'%',
+            'portal_roles', 'portal_password' => (string) $value,
             default => $this->formatGenericValue($field, $value),
         };
     }

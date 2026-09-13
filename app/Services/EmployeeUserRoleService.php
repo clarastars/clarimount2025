@@ -532,6 +532,8 @@ class EmployeeUserRoleService
                 return [
                     'id' => $teamId,
                     'name' => (string) ($teamNames[$teamId] ?? $teamId),
+                    'role_name' => (string) ($row['role_name'] ?? 'team-member'),
+                    'role_label' => __(self::TEAM_ROLES[(string) ($row['role_name'] ?? 'team-member')] ?? ($row['role_name'] ?? 'team-member')),
                     'company_ids' => $companyIds,
                     'company_names' => collect($companyIds)
                         ->map(fn (int $id) => (string) ($companyNames[$id] ?? $id))
@@ -726,6 +728,95 @@ class EmployeeUserRoleService
         }
 
         return false;
+    }
+
+    /**
+     * Stable fingerprint of team/role/company assignments for change detection.
+     */
+    public function assignmentFingerprint(User $portalUser): string
+    {
+        $normalized = collect($this->assignedTeamRoleAssignments($portalUser))
+            ->map(function (array $row): array {
+                $companyDepartments = collect($row['company_departments'] ?? [])
+                    ->mapWithKeys(function ($departmentIds, $companyId): array {
+                        $ids = collect(is_array($departmentIds) ? $departmentIds : [])
+                            ->map(fn ($id) => (string) $id)
+                            ->filter(fn (string $id) => $id !== '')
+                            ->unique()
+                            ->sort()
+                            ->values()
+                            ->all();
+
+                        return [(string) $companyId => $ids];
+                    })
+                    ->sortKeys()
+                    ->all();
+
+                return [
+                    'team_id' => (int) ($row['team_id'] ?? 0),
+                    'role_name' => (string) ($row['role_name'] ?? ''),
+                    'company_ids' => collect($row['company_ids'] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn (int $id) => $id > 0)
+                        ->unique()
+                        ->sort()
+                        ->values()
+                        ->all(),
+                    'company_departments' => $companyDepartments,
+                ];
+            })
+            ->sortBy('team_id')
+            ->values()
+            ->all();
+
+        return json_encode([
+            'primary_team_id' => $portalUser->team_id ? (int) $portalUser->team_id : null,
+            'assignments' => $normalized,
+            'global_roles' => collect($this->assignedGlobalRoleNames($portalUser))->sort()->values()->all(),
+        ], JSON_UNESCAPED_UNICODE) ?: '';
+    }
+
+    /**
+     * Human-readable summary of portal role assignments for the employee audit log.
+     */
+    public function assignmentSummaryForAudit(User $portalUser): string
+    {
+        $teams = $this->assignedTeamsForUi($portalUser);
+
+        if ($teams === []) {
+            return __('messages.employees.audit_portal_roles_none');
+        }
+
+        return collect($teams)
+            ->map(function (array $team): string {
+                $roleLabel = (string) ($team['role_label'] ?? __('messages.settings.team_role_member'));
+                $line = trim(($team['name'] ?? '').' — '.$roleLabel);
+
+                $scopes = collect($team['company_scopes'] ?? [])
+                    ->map(function (array $scope): string {
+                        $companyName = (string) ($scope['company_name'] ?? $scope['company_id'] ?? '');
+                        $departments = collect($scope['department_names'] ?? [])
+                            ->filter()
+                            ->values()
+                            ->all();
+
+                        if ($departments === []) {
+                            return $companyName.' ('.__('messages.employees.audit_portal_roles_all_departments').')';
+                        }
+
+                        return $companyName.' ('.implode(', ', $departments).')';
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if ($scopes !== []) {
+                    $line .= ': '.implode('؛ ', $scopes);
+                }
+
+                return $line;
+            })
+            ->implode("\n");
     }
 
     /**
