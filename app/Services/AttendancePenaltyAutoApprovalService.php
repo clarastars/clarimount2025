@@ -33,11 +33,14 @@ class AttendancePenaltyAutoApprovalService
     }
 
     /**
-     * Auto-approve pending late/early-departure penalty when company policy allows it
-     * and the attendance date falls within the current operational month.
+     * Auto-approve pending late/early-departure penalty when company policy allows it.
      *
-     * Early-departure is only auto-approved after the attendance calendar day ends,
-     * so a later overtime checkout can still clear a false penalty before emailing.
+     * Eligibility is intentionally narrow so month backfills / presentation rebuilds
+     * cannot suddenly approve-and-email historical penalties:
+     * - Must be inside the current operational month.
+     * - Late: attendance date is today or yesterday (Riyadh).
+     * - Early departure: attendance date is yesterday only (day must have ended,
+     *   matching the overnight early-departure job; never auto-approve older days).
      */
     public function applyForPenalty(AttendancePenalty $penalty): AttendancePenalty
     {
@@ -49,15 +52,11 @@ class AttendancePenaltyAutoApprovalService
             return $penalty;
         }
 
-        if ($penalty->isEarlyDepartureViolation() && ! $this->isAttendanceDateBeforeToday($penalty)) {
-            return $penalty;
-        }
-
         if (! $this->isEnabledForEmployee((int) $penalty->employee_id)) {
             return $penalty;
         }
 
-        if (! $this->isWithinCurrentOperationalMonth($penalty)) {
+        if (! $this->isEligibleForAutoApproval($penalty)) {
             return $penalty;
         }
 
@@ -74,8 +73,8 @@ class AttendancePenaltyAutoApprovalService
     }
 
     /**
-     * Toggle company policy; when enabling, approve pending late/early-departure penalties
-     * within the current operational month for its employees.
+     * Toggle company policy; when enabling, approve only fresh pending late/early-
+     * departure penalties (same eligibility window as applyForPenalty).
      *
      * @return int Number of penalties auto-approved when enabling
      */
@@ -101,7 +100,7 @@ class AttendancePenaltyAutoApprovalService
             return 0;
         }
 
-        [$periodStart, $periodEnd] = $this->currentOperationalMonthDateBounds();
+        [$freshStart, $freshEnd] = $this->freshAutoApproveDateBounds();
 
         $pendingPenalties = AttendancePenalty::query()
             ->whereIn('employee_id', $employeeIds)
@@ -110,7 +109,7 @@ class AttendancePenaltyAutoApprovalService
                 $query->whereIn('violation_type', AttendancePenalty::lateViolationTypes())
                     ->orWhereIn('violation_type', AttendancePenalty::earlyDepartureViolationTypes());
             })
-            ->whereBetween('attendance_date', [$periodStart, $periodEnd])
+            ->whereBetween('attendance_date', [$freshStart, $freshEnd])
             ->get();
 
         $approvedCount = 0;
@@ -125,6 +124,30 @@ class AttendancePenaltyAutoApprovalService
         }
 
         return $approvedCount;
+    }
+
+    /**
+     * Whether this pending penalty may be auto-approved (and emailed) right now.
+     */
+    public function isEligibleForAutoApproval(AttendancePenalty $penalty): bool
+    {
+        if (! $this->isWithinCurrentOperationalMonth($penalty)) {
+            return false;
+        }
+
+        $attDate = $this->attendanceDateYmd($penalty);
+        $today = Carbon::now(self::TZ)->toDateString();
+        $yesterday = Carbon::now(self::TZ)->subDay()->toDateString();
+
+        if ($penalty->isEarlyDepartureViolation()) {
+            return $attDate === $yesterday;
+        }
+
+        if ($penalty->isLateViolation()) {
+            return $attDate === $today || $attDate === $yesterday;
+        }
+
+        return false;
     }
 
     /**
@@ -144,17 +167,25 @@ class AttendancePenaltyAutoApprovalService
         ];
     }
 
+    /**
+     * Calendar window used when bulk-scanning pending penalties for auto-approval.
+     *
+     * @return array{0: string, 1: string} [startYmd, endYmd]
+     */
+    private function freshAutoApproveDateBounds(): array
+    {
+        $today = Carbon::now(self::TZ)->toDateString();
+        $yesterday = Carbon::now(self::TZ)->subDay()->toDateString();
+
+        return [$yesterday, $today];
+    }
+
     private function isWithinCurrentOperationalMonth(AttendancePenalty $penalty): bool
     {
         $attDate = $this->attendanceDateYmd($penalty);
         [$periodStart, $periodEnd] = $this->currentOperationalMonthDateBounds();
 
         return $attDate >= $periodStart && $attDate <= $periodEnd;
-    }
-
-    private function isAttendanceDateBeforeToday(AttendancePenalty $penalty): bool
-    {
-        return $this->attendanceDateYmd($penalty) < Carbon::now(self::TZ)->toDateString();
     }
 
     private function attendanceDateYmd(AttendancePenalty $penalty): string
