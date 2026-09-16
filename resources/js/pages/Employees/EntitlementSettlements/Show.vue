@@ -211,6 +211,34 @@
                     </p>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{{ t('entitlement_settlement.attachments') }}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="(settlement.attachments ?? []).length === 0" class="text-sm text-muted-foreground">
+                        {{ t('entitlement_settlement.no_attachments') }}
+                    </div>
+                    <ul v-else class="space-y-2">
+                        <li
+                            v-for="(attachment, index) in settlement.attachments"
+                            :key="attachment.path"
+                        >
+                            <a
+                                :href="attachment.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-sm text-primary hover:underline"
+                            >
+                                {{ t('entitlement_settlement.view_attachment') }}
+                                {{ settlement.attachments.length > 1 ? index + 1 : '' }}
+                                — {{ attachment.name }}
+                            </a>
+                        </li>
+                    </ul>
+                </CardContent>
+            </Card>
         </div>
     </AppLayout>
 </template>
@@ -267,6 +295,7 @@ type SettlementDetail = {
     notes?: string | null;
     created_by_name?: string | null;
     review_notes?: string | null;
+    attachments?: Array<{ path: string; url: string; name: string }>;
 };
 
 const props = defineProps<{

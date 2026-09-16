@@ -21,6 +21,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\EmployeeEntitlementSettlementController;
+use App\Http\Controllers\EntitlementSettlementAttachmentController;
 use App\Http\Controllers\CompanyEntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeImportController;
@@ -236,6 +237,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('employees.entitlement-settlement.destroy');
     Route::get('employees/{employee}/entitlement-settlement/{entitlementSettlement}', [EmployeeEntitlementSettlementController::class, 'show'])
         ->name('employees.entitlement-settlement.show');
+    Route::get(
+        'employees/{employee}/entitlement-settlement/{entitlementSettlement}/attachments/{filename}',
+        [EntitlementSettlementAttachmentController::class, 'show']
+    )->where('filename', '[A-Za-z0-9._-]+')->name('employees.entitlement-settlement.attachments.show');
     Route::post(
         'employees/{employee}/entitlement-settlement/{entitlementSettlement}/approval-steps/{settlementApprovalStep}/approve',
         [EmployeeEntitlementSettlementController::class, 'approveWorkflowStep']

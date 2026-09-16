@@ -168,6 +168,7 @@ class EmployeeEntitlementSettlementService
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
+            'attachment_paths' => $payload['attachment_paths'] ?? null,
             'status' => $payload['status'] ?? EmployeeEntitlementSettlement::STATUS_PENDING,
             'reviewed_by' => $payload['reviewed_by'] ?? null,
             'reviewed_at' => $payload['reviewed_at'] ?? null,
@@ -220,6 +221,9 @@ class EmployeeEntitlementSettlementService
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
+            'attachment_paths' => array_key_exists('attachment_paths', $payload)
+                ? $payload['attachment_paths']
+                : $settlement->attachment_paths,
             'status' => EmployeeEntitlementSettlement::STATUS_PENDING,
             'reviewed_by' => null,
             'reviewed_at' => null,
@@ -244,9 +248,15 @@ class EmployeeEntitlementSettlementService
                 throw new \RuntimeException(__('messages.entitlement_settlement.delete_not_allowed_approved'));
             }
 
+            $attachmentPaths = is_array($lockedSettlement->attachment_paths)
+                ? $lockedSettlement->attachment_paths
+                : null;
+
             $lockedSettlement->stepApprovals()->delete();
             $lockedSettlement->approvalRejections()->delete();
             $lockedSettlement->delete();
+
+            app(EntitlementSettlementAttachmentService::class)->deleteStoredPaths($attachmentPaths);
         });
     }
 

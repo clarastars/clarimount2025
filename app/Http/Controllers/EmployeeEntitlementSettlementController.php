@@ -10,6 +10,7 @@ use App\Models\EmployeeEntitlementSettlement;
 use App\Models\EntitlementSettlementApprovalStep;
 use App\Services\EntitlementSettlementApprovalNotificationService;
 use App\Services\EntitlementSettlementApprovalService;
+use App\Services\EntitlementSettlementAttachmentService;
 use App\Services\EmployeeEntitlementSettlementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class EmployeeEntitlementSettlementController extends Controller
         private EmployeeEntitlementSettlementService $settlementService,
         private EntitlementSettlementApprovalService $approvalService,
         private EntitlementSettlementApprovalNotificationService $approvalNotificationService,
+        private EntitlementSettlementAttachmentService $attachmentService,
     ) {}
 
     public function index(Employee $employee): Response
@@ -135,7 +137,7 @@ class EmployeeEntitlementSettlementController extends Controller
 
         $this->abortUnlessCanSettleEmployeeEntitlementsForEmployee($user, $employee);
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'settlement_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:500'],
             'end_of_service_bonus' => ['nullable', 'numeric', 'min:0'],
@@ -147,11 +149,14 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ], $this->attachmentService->validationRules()));
 
         $employee->loadMissing('company');
         $company = $employee->company;
         abort_unless($company !== null, 404);
+
+        $storedPaths = $this->attachmentService->storeFromRequest($request, (int) $employee->id);
+        $validated['attachment_paths'] = $storedPaths === [] ? null : $storedPaths;
 
         $hasWorkflow = $this->approvalService->hasActiveStepsForCompany($company);
 
@@ -238,6 +243,11 @@ class EmployeeEntitlementSettlementController extends Controller
                 'penalties_deduction' => (float) $manualInput['penalties_deduction'],
                 'notes' => (string) ($manualInput['notes'] ?? ''),
             ],
+            'existing_attachments' => $this->attachmentService->publicAttachmentPayload(
+                $this->attachmentService->normalizeStoredPaths($entitlementSettlement->attachment_paths),
+                (int) $employee->id,
+                (int) $entitlementSettlement->id,
+            ),
         ]);
     }
 
@@ -258,7 +268,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 ->with('error', __('messages.entitlement_settlement.edit_not_allowed'));
         }
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'settlement_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:500'],
             'end_of_service_bonus' => ['nullable', 'numeric', 'min:0'],
@@ -270,7 +280,36 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ], $this->attachmentService->validationRules()));
+
+        $newPaths = $this->attachmentService->storeFromRequest($request, (int) $employee->id);
+        $removePaths = $this->attachmentService->normalizeStoredPaths(
+            $request->input('remove_attachment_paths', []),
+        );
+        $keptExisting = array_values(array_filter(
+            $this->attachmentService->normalizeStoredPaths($entitlementSettlement->attachment_paths),
+            static fn (string $path): bool => ! in_array($path, $removePaths, true),
+        ));
+        $remainingSlots = EntitlementSettlementAttachmentService::MAX_FILES - count($keptExisting);
+
+        if (count($newPaths) > max(0, $remainingSlots)) {
+            $this->attachmentService->deleteStoredPaths($newPaths);
+
+            return back()
+                ->withErrors([
+                    'attachments' => __('messages.entitlement_settlement.attachments_max', [
+                        'max' => EntitlementSettlementAttachmentService::MAX_FILES,
+                    ]),
+                ])
+                ->withInput();
+        }
+
+        $mergedPaths = $this->attachmentService->mergePaths(
+            $this->attachmentService->normalizeStoredPaths($entitlementSettlement->attachment_paths),
+            $newPaths,
+            $removePaths,
+        );
+        $validated['attachment_paths'] = $mergedPaths === [] ? null : $mergedPaths;
 
         try {
             $settlement = $this->settlementService->updateSettlement($entitlementSettlement, $validated);
@@ -478,6 +517,11 @@ class EmployeeEntitlementSettlementController extends Controller
             'reviewed_by_name' => $settlement->reviewer?->name,
             'reviewed_at' => $settlement->reviewed_at?->toIso8601String(),
             'review_notes' => $settlement->review_notes,
+            'attachments' => $this->attachmentService->publicAttachmentPayload(
+                $this->attachmentService->normalizeStoredPaths($settlement->attachment_paths),
+                (int) $settlement->employee_id,
+                (int) $settlement->id,
+            ),
         ];
     }
 }

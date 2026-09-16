@@ -290,6 +290,60 @@
                         />
                     </CardContent>
                 </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{{ t('entitlement_settlement.attachments') }}</CardTitle>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <div v-if="visibleExistingAttachments.length" class="space-y-2">
+                            <p class="text-sm font-medium">{{ t('entitlement_settlement.existing_attachments') }}</p>
+                            <ul class="space-y-2">
+                                <li
+                                    v-for="attachment in visibleExistingAttachments"
+                                    :key="attachment.path"
+                                    class="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                                >
+                                    <a
+                                        :href="attachment.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="text-primary hover:underline"
+                                    >
+                                        {{ t('entitlement_settlement.view_attachment') }} — {{ attachment.name }}
+                                    </a>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        class="text-destructive hover:text-destructive"
+                                        @click="markAttachmentForRemoval(attachment.path)"
+                                    >
+                                        {{ t('entitlement_settlement.remove_attachment') }}
+                                    </Button>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <Label for="settlement-attachments" class="mb-2">{{ t('entitlement_settlement.attachments') }}</Label>
+                            <Input
+                                id="settlement-attachments"
+                                type="file"
+                                multiple
+                                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                @change="onAttachmentsChange"
+                            />
+                            <p class="mt-1 text-xs text-muted-foreground">{{ t('entitlement_settlement.attachments_hint') }}</p>
+                            <ul v-if="form.attachments.length > 0" class="mt-2 space-y-1 text-sm text-muted-foreground">
+                                <li v-for="(file, index) in form.attachments" :key="`${file.name}-${index}`">
+                                    {{ file.name }}
+                                </li>
+                            </ul>
+                            <p v-if="attachmentError" class="mt-1 text-sm text-red-500">{{ attachmentError }}</p>
+                        </div>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     </AppLayout>
@@ -360,6 +414,7 @@ const props = defineProps<{
     previous_settlements_count?: number;
     has_approval_workflow?: boolean;
     settlement_id?: number | null;
+    existing_attachments?: Array<{ path: string; url: string; name: string }>;
 }>();
 
 const { t, locale } = useI18n();
@@ -367,6 +422,7 @@ const isRefreshing = ref(false);
 const previousSettlementsCount = computed(() => props.previous_settlements_count ?? 0);
 const hasApprovalWorkflow = computed(() => props.has_approval_workflow ?? false);
 const isEditing = computed(() => props.settlement_id != null);
+const existingAttachments = computed(() => props.existing_attachments ?? []);
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },
@@ -392,7 +448,36 @@ const form = useForm({
     social_insurance_deduction: props.defaults.social_insurance_deduction ?? 0,
     penalties_deduction: props.defaults.penalties_deduction ?? 0,
     notes: props.defaults.notes ?? props.preview.notes ?? '',
+    attachments: [] as File[],
+    remove_attachment_paths: [] as string[],
 });
+
+const visibleExistingAttachments = computed(() =>
+    existingAttachments.value.filter(
+        (attachment) => !form.remove_attachment_paths.includes(attachment.path),
+    ),
+);
+
+const attachmentError = computed(() => {
+    if (form.errors.attachments) {
+        return form.errors.attachments;
+    }
+
+    const nested = Object.entries(form.errors).find(([key]) => key.startsWith('attachments.'));
+
+    return nested?.[1] ?? '';
+});
+
+function onAttachmentsChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    form.attachments = target.files ? Array.from(target.files) : [];
+}
+
+function markAttachmentForRemoval(path: string) {
+    if (!form.remove_attachment_paths.includes(path)) {
+        form.remove_attachment_paths = [...form.remove_attachment_paths, path];
+    }
+}
 
 const preview = computed(() => props.preview);
 
@@ -545,11 +630,20 @@ function refreshPreview(settlementDate = form.settlement_date) {
 
 function submit() {
     if (isEditing.value && props.settlement_id != null) {
-        form.put(route('employees.entitlement-settlement.update', [props.employee.id, props.settlement_id]));
+        form
+            .transform((data) => ({
+                ...data,
+                _method: 'put',
+            }))
+            .post(route('employees.entitlement-settlement.update', [props.employee.id, props.settlement_id]), {
+                forceFormData: true,
+            });
 
         return;
     }
 
-    form.post(route('employees.entitlement-settlement.store', props.employee.id));
+    form.post(route('employees.entitlement-settlement.store', props.employee.id), {
+        forceFormData: true,
+    });
 }
 </script>

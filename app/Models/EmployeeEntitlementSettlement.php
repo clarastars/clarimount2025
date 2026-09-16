@@ -45,6 +45,7 @@ class EmployeeEntitlementSettlement extends Model
         'total_deductions',
         'net_due',
         'notes',
+        'attachment_paths',
         'status',
         'reviewed_by',
         'reviewed_at',
@@ -76,6 +77,7 @@ class EmployeeEntitlementSettlement extends Model
         'used_annual_leave_deduction' => 'decimal:2',
         'total_deductions' => 'decimal:2',
         'net_due' => 'decimal:2',
+        'attachment_paths' => 'array',
         'reviewed_at' => 'datetime',
     ];
 
