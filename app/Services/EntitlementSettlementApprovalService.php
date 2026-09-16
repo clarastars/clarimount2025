@@ -109,6 +109,11 @@ class EntitlementSettlementApprovalService
                 'team_name' => $step->team?->name,
                 'approved_at' => $record?->approved_at?->toIso8601String(),
                 'approver_name' => $record?->approver?->name,
+                'status' => $isApproved
+                    ? 'approved'
+                    : ($previousStepsApproved && $settlement->isPending()
+                        ? 'current'
+                        : 'waiting'),
                 'can_approve' => $canApprove,
                 'can_reject' => $canApprove,
                 'waiting_previous' => ! $previousStepsApproved && ! $isApproved,

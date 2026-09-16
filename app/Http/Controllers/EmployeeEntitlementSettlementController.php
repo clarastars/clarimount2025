@@ -89,6 +89,59 @@ class EmployeeEntitlementSettlementController extends Controller
         ]);
     }
 
+    public function print(Employee $employee, EmployeeEntitlementSettlement $entitlementSettlement): Response
+    {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        $this->abortUnlessCanViewEntitlementSettlement($user, $employee, $entitlementSettlement);
+
+        $employee->loadMissing(['company', 'department']);
+        $company = $employee->company;
+        abort_unless($company !== null, 404);
+
+        $departmentRelation = $employee->getRelation('department');
+        $departmentLabel = $departmentRelation instanceof \App\Models\Department
+            ? $departmentRelation->name
+            : ($employee->getAttributes()['department'] ?? null);
+
+        $entitlementSettlement->load(['creator:id,name', 'reviewer:id,name']);
+        $entitlementSettlement->loadCount('stepApprovals');
+
+        $hasWorkflow = $this->approvalService->hasActiveStepsForCompany($company);
+        $approvalSteps = $hasWorkflow
+            ? $this->approvalService->buildApprovalPayload($entitlementSettlement, $user, $company)
+            : [];
+
+        $approvedCount = collect($approvalSteps)->where('status', 'approved')->count();
+        $remainingCount = collect($approvalSteps)->whereIn('status', ['current', 'waiting'])->count();
+
+        return Inertia::render('Documents/EntitlementSettlementDocument', [
+            'company' => [
+                'id' => $company->id,
+                'name' => $company->name_ar ?: $company->name_en,
+            ],
+            'employee' => [
+                'id' => $employee->id,
+                'full_name' => $employee->full_name,
+                'employee_id' => $employee->employee_id,
+                'department' => $departmentLabel !== null && $departmentLabel !== '' ? (string) $departmentLabel : null,
+                'job_title' => $employee->job_title,
+            ],
+            'settlement' => $this->serializeSettlementDetail($entitlementSettlement),
+            'has_approval_workflow' => $hasWorkflow,
+            'approval_steps' => $approvalSteps,
+            'approval_summary' => [
+                'total_steps' => count($approvalSteps),
+                'approved_count' => $approvedCount,
+                'remaining_count' => $remainingCount,
+                'current_step_title' => collect($approvalSteps)->firstWhere('status', 'current')['title'] ?? null,
+            ],
+            'generated_at' => now('Asia/Riyadh')->toIso8601String(),
+        ]);
+    }
+
     public function create(Request $request, Employee $employee): Response
     {
         $user = Auth::user();

@@ -17,6 +17,15 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
+                        <a
+                            :href="route('employees.entitlement-settlement.print', [employee.id, settlement.id])"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            {{ t('entitlement_settlement.print') }}
+                        </a>
+                    </Button>
+                    <Button variant="outline" as-child>
                         <Link :href="route('employees.entitlement-settlement.index', employee.id)">
                             {{ t('entitlement_settlement.history_title') }}
                         </Link>
@@ -57,14 +66,16 @@
                                 <p class="font-medium">{{ step.title }}</p>
                                 <p class="text-xs text-muted-foreground">
                                     <span v-if="step.team_name">{{ step.team_name }} · </span>
-                                    <span v-if="step.approved_at">
-                                        {{ step.approver_name }} — {{ formatDateTime(step.approved_at) }}
+                                    <span v-if="step.status === 'approved' || step.approved_at">
+                                        {{ t('entitlement_settlement.step_status_approved') }}
+                                        <span v-if="step.approver_name"> — {{ step.approver_name }}</span>
+                                        <span v-if="step.approved_at"> — {{ formatDateTime(step.approved_at) }}</span>
                                     </span>
-                                    <span v-else-if="step.waiting_previous">
-                                        {{ t('entitlement_settlement.approval_waiting_previous') }}
+                                    <span v-else-if="step.status === 'current' || (!step.waiting_previous && settlement.status === 'pending')">
+                                        {{ t('entitlement_settlement.step_status_current') }}
                                     </span>
-                                    <span v-else-if="settlement.status === 'pending'">
-                                        {{ t('entitlement_settlement.status_pending') }}
+                                    <span v-else>
+                                        {{ t('entitlement_settlement.step_status_waiting') }}
                                     </span>
                                 </p>
                             </div>
@@ -261,6 +272,7 @@ type ApprovalStep = {
     team_name?: string | null;
     approved_at?: string | null;
     approver_name?: string | null;
+    status?: 'approved' | 'current' | 'waiting';
     can_approve: boolean;
     can_reject: boolean;
     waiting_previous: boolean;
