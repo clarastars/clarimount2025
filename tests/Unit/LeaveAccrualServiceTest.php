@@ -70,13 +70,13 @@ it('includes the in-progress month when projecting live accrued leave for today'
         'annual_leave_balance' => 30,
     ]);
 
-    // Jul 26–31: (6/31)*2.5 = 0.48, Aug full 2.5, Sep 1–17: (17/30)*2.5 = 1.42 → 4.40
+    // Accrues through yesterday (16 Sep): Jul 0.48 + Aug 2.5 + Sep 1–16 (16/30)*2.5 = 1.33 → 4.31
     expect($service->projectedLiveAccruedBalanceThroughDate(
         $employee,
         Carbon::now('Asia/Riyadh'),
-    ))->toBe(4.4);
+    ))->toBe(4.31);
 
-    expect($service->resolveLiveAccruedThroughDate($employee)->toDateString())->toBe('2026-09-17');
+    expect($service->resolveLiveAccruedThroughDate($employee)->toDateString())->toBe('2026-09-16');
 });
 
 it('excludes the in-progress month when projecting earned leave for today', function (): void {
@@ -109,14 +109,14 @@ it('prorates the settlement month through a past date instead of dropping that m
     // Completed months as of 25 Aug still stop at July
     expect($service->projectedAccruedBalanceAsOf($employee, $asOf))->toBe(8.19);
 
-    // Settlement includes Aug 1–25: Mar 1.19 + Apr–Jul 7.00 + (25/31)*1.75 = 9.60
-    expect($service->projectedAccruedBalanceThroughDate($employee, $asOf))->toBe(9.60);
+    // Settlement on 25 Aug accrues through 24 Aug: Mar 1.19 + Apr–Jul 7.00 + (24/31)*1.75 = 9.54
+    expect($service->projectedAccruedBalanceThroughDate($employee, $asOf))->toBe(9.54);
 
-    // Settlement dated today includes Sep 1–3: 9.94 + (3/30)*1.75 = 10.12
+    // Settlement dated today (3 Sep) accrues through 2 Sep: 9.94 + (2/30)*1.75 = 10.06
     expect($service->projectedAccruedBalanceThroughDate(
         $employee,
         Carbon::now('Asia/Riyadh'),
-    ))->toBe(10.12);
+    ))->toBe(10.06);
 });
 
 it('pro-rates the departure month immediately even if that month is still in progress', function (): void {
@@ -200,14 +200,15 @@ it('adds live pro-rated days from today through a future leave date', function (
         Carbon::parse('2026-09-20', 'Asia/Riyadh'),
     );
 
-    // Aug 17–31: (15/31)*2.5 = 1.21, Sep 1–20: (20/30)*2.5 = 1.67 → 2.88
-    expect($futureDays)->toBe(2.88);
+    // Live stops day-before: today→15 Aug, asOf→19 Sep
+    // Aug 16–31: (16/31)*2.5 = 1.29, Sep 1–19: (19/30)*2.5 = 1.58 → 2.87
+    expect($futureDays)->toBe(2.87);
 
     $throughOctober = $service->futureAccrualDaysUntil(
         $employee,
         Carbon::parse('2026-10-20', 'Asia/Riyadh'),
     );
 
-    // Aug 17–31 1.21 + Sep full 2.5 + Oct 1–20 (20/31)*2.5 = 1.61 → 5.32
+    // Aug 16–31 1.29 + Sep full 2.5 + Oct 1–19 (19/31)*2.5 = 1.53 → 5.32
     expect($throughOctober)->toBe(5.32);
 });

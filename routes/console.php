@@ -32,9 +32,9 @@ Schedule::job(new \App\Jobs\ProcessEarlyDeparturePenaltiesJob(forYesterday: true
     ->timezone('Asia/Riyadh')
     ->description('Reprocess early departure penalties for yesterday');
 
-// Daily leave accrual for employees with hire_date: rebuild balance through today (current month pro-rated).
+// Daily leave accrual for employees with hire_date: rebuild balance through yesterday (excludes today).
 // Employees without hire_date are skipped — use: php artisan leaves:accrue-monthly-missing-hire-date --period=YYYY-MM
 Schedule::command('leaves:sync-accrued-balances')
     ->dailyAt('02:00')
     ->timezone('Asia/Riyadh')
-    ->description('Sync leave accrued balances through today for employees with hire_date');
+    ->description('Sync leave accrued balances through yesterday for employees with hire_date');

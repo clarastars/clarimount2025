@@ -208,12 +208,17 @@ class LeaveAccrualService
     }
 
     /**
-     * Date through which the live accrued balance is calculated: today (or departure if earlier).
-     * Includes the in-progress month (unlike resolveEarnedThroughDate).
+     * Date through which live/settlement accrued balance is calculated.
+     * Excludes the as-of day itself (today or settlement date), so accrual stops
+     * on the previous calendar day. Still capped at departure when earlier.
      */
     public function resolveLiveAccruedThroughDate(Employee $employee, ?Carbon $date = null): Carbon
     {
-        return $this->resolveAccrualAsOfDate($employee, $date);
+        $asOf = $this->resolveAccrualAsOfDate($employee, $date);
+
+        // Exclude the last day: settlement on the 17th accrues through the 16th;
+        // the daily sync for "today" accrues through yesterday.
+        return $asOf->copy()->subDay()->startOfDay();
     }
 
     /**
@@ -255,8 +260,8 @@ class LeaveAccrualService
     }
 
     /**
-     * Days earned from hire through a specific date (the last month is pro-rated to that date).
-     * Used by entitlement settlement so payout matches the chosen settlement date exactly.
+     * Days earned from hire through the day before a specific date (last day excluded).
+     * Used by entitlement settlement and daily live balance sync.
      */
     public function projectedAccruedBalanceThroughDate(Employee $employee, Carbon $asOf): float
     {
@@ -312,7 +317,7 @@ class LeaveAccrualService
     }
 
     /**
-     * Set accrued balance from hire date through today (current month pro-rated), or departure.
+     * Set accrued balance from hire date through yesterday (current month pro-rated), or day before departure.
      * Employees without hire_date are left unchanged (use leaves:accrue-monthly-missing-hire-date).
      */
     public function initializeAccruedBalanceForEmployee(Employee $employee, bool $replaceExistingLogs = true): float
