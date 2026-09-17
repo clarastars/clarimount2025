@@ -112,11 +112,11 @@ it('prorates the settlement month through a past date instead of dropping that m
     // Settlement includes Aug 1–25: Mar 1.19 + Apr–Jul 7.00 + (25/31)*1.75 = 9.60
     expect($service->projectedAccruedBalanceThroughDate($employee, $asOf))->toBe(9.60);
 
-    // A settlement dated today still stops at the last completed month (August)
+    // Settlement dated today includes Sep 1–3: 9.94 + (3/30)*1.75 = 10.12
     expect($service->projectedAccruedBalanceThroughDate(
         $employee,
         Carbon::now('Asia/Riyadh'),
-    ))->toBe(9.94);
+    ))->toBe(10.12);
 });
 
 it('pro-rates the departure month immediately even if that month is still in progress', function (): void {

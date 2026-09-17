@@ -74,7 +74,8 @@ it('calculates annual leave dues only through the settlement date', function ():
         $employee,
         Carbon::parse('2026-09-03', 'Asia/Riyadh'),
     );
-    expect($throughToday['days'])->toBe(9.94);
+    // Mar 1.19 + Apr–Aug 8.75 + Sep 1–3 0.18 = 10.12
+    expect($throughToday['days'])->toBe(10.12);
 
     $throughPastDate = $service->calculateAnnualLeaveDues(
         $employee,

@@ -388,7 +388,7 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
-     * Pay out annual leave earned through the settlement date (last month pro-rated).
+     * Pay out annual leave earned through the settlement date (pro-rated to that day).
      * Days after that date stay on the employee balance.
      *
      * @return array{days: float, amount: float}

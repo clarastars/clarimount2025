@@ -255,9 +255,8 @@ class LeaveAccrualService
     }
 
     /**
-     * Days earned from hire through a specific date (the last month is pro-rated).
-     * Months that have not completed yet as of today are excluded, so settlement
-     * never pays leave that is still in progress on the live balance.
+     * Days earned from hire through a specific date (the last month is pro-rated to that date).
+     * Used by entitlement settlement so payout matches the chosen settlement date exactly.
      */
     public function projectedAccruedBalanceThroughDate(Employee $employee, Carbon $asOf): float
     {
@@ -267,7 +266,7 @@ class LeaveAccrualService
             return 0.0;
         }
 
-        $through = $this->resolveSettlementEarnedThroughDate($employee, $asOf);
+        $through = $this->resolveLiveAccruedThroughDate($employee, $asOf);
         $hireDate = $this->resolveHireDate($employee);
 
         if ($hireDate === null) {
@@ -301,42 +300,15 @@ class LeaveAccrualService
 
     /**
      * Live accrued days from hire through a date (current month pro-rated to that date).
-     * Used for daily balance sync; does not apply the settlement completed-month cap.
+     * Same math as settlement through-date for employees with hire_date.
      */
     public function projectedLiveAccruedBalanceThroughDate(Employee $employee, Carbon $asOf): float
     {
-        $monthlyDays = $this->monthlyAccrualDays($employee);
-
-        if ($monthlyDays <= 0) {
+        if ($this->resolveHireDate($employee) === null) {
             return 0.0;
         }
 
-        $through = $this->resolveLiveAccruedThroughDate($employee, $asOf);
-        $hireDate = $this->resolveHireDate($employee);
-
-        if ($hireDate === null || $hireDate->gt($through)) {
-            return 0.0;
-        }
-
-        $total = 0.0;
-
-        foreach ($this->eligibleAccrualPeriods($hireDate, $through) as $period) {
-            $daysForPeriod = $this->accrualDaysForPeriod(
-                $employee,
-                $period,
-                $hireDate,
-                $through,
-                prorateToAsOf: true,
-            );
-
-            if ($daysForPeriod <= 0) {
-                continue;
-            }
-
-            $total = round($total + $daysForPeriod, 2);
-        }
-
-        return $total;
+        return $this->projectedAccruedBalanceThroughDate($employee, $asOf);
     }
 
     /**
@@ -547,26 +519,6 @@ class LeaveAccrualService
                 'balance_after' => $newBalance,
             ]);
         });
-    }
-
-    /**
-     * Cap a settlement as-of date at the last completed month (and departure).
-     */
-    private function resolveSettlementEarnedThroughDate(Employee $employee, Carbon $asOf): Carbon
-    {
-        $through = $this->calendarDateInRiyadh($asOf) ?? Carbon::now(self::TZ)->startOfDay();
-        $lastCompleted = $this->resolveLastCompletedAccrualDate();
-
-        if ($through->gt($lastCompleted)) {
-            $through = $lastCompleted->copy();
-        }
-
-        $departureDate = $this->resolveDepartureDate($employee);
-        if ($departureDate !== null && $through->gt($departureDate)) {
-            $through = $departureDate->copy();
-        }
-
-        return $through;
     }
 
     private function projectAccruedWithoutHireDateThrough(Employee $employee, Carbon $through): float
