@@ -123,6 +123,10 @@ const sidebarNavItems = computed((): NavItem[] => {
             title: t('settings.missing_hire_date_export'),
             href: '/settings/missing-hire-date-export',
         });
+        items.push({
+            title: t('settings.leave_days_used_import'),
+            href: '/settings/leave-days-used-import',
+        });
     }
 
     return items;

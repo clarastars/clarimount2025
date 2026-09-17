@@ -11,6 +11,7 @@ use App\Http\Controllers\Settings\EmployeeGlobalSearchSettingsController;
 use App\Http\Controllers\Settings\FlexibleAttendanceSettingsController;
 use App\Http\Controllers\Settings\SalaryCertificateFeeSettingsController;
 use App\Http\Controllers\Settings\MissingHireDateExportController;
+use App\Http\Controllers\Settings\LeaveDaysUsedImportController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SalaryRunApprovalStepsController;
@@ -100,5 +101,14 @@ Route::middleware('auth')->group(function () {
             ->name('settings.missing-hire-date-export.index');
         Route::get('settings/missing-hire-date-export/download', [MissingHireDateExportController::class, 'export'])
             ->name('settings.missing-hire-date-export.download');
+
+        Route::get('settings/leave-days-used-import', [LeaveDaysUsedImportController::class, 'index'])
+            ->name('settings.leave-days-used-import.index');
+        Route::get('settings/leave-days-used-import/sample', [LeaveDaysUsedImportController::class, 'sample'])
+            ->name('settings.leave-days-used-import.sample');
+        Route::post('settings/leave-days-used-import', [LeaveDaysUsedImportController::class, 'store'])
+            ->name('settings.leave-days-used-import.store');
+        Route::post('settings/leave-days-used-import/{import}/undo', [LeaveDaysUsedImportController::class, 'undo'])
+            ->name('settings.leave-days-used-import.undo');
     });
 });
