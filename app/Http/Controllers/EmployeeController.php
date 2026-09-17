@@ -505,7 +505,7 @@ class EmployeeController extends Controller
             'leaves' => fn ($q) => $q->orderBy('start_date', 'desc'),
         ]);
         $employee->loadCount(['assets', 'reportedTickets']);
-        $employee->append('remaining_annual_leave_balance');
+        $employee->append(['remaining_annual_leave_balance', 'total_leave_days_used']);
 
         return Inertia::render('Employees/Show', [
             'employee' => $employee,

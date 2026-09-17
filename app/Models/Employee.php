@@ -251,17 +251,37 @@ class Employee extends Model implements AuditableContract
     }
 
     /**
+     * Days from approved leave records that deduct from annual balance.
+     */
+    public function deductedLeaveDaysFromBalance(): float
+    {
+        if ($this->getKey() === null) {
+            return 0.0;
+        }
+
+        return round((float) $this->leaves()
+            ->where('deduct_from_balance', true)
+            ->sum('days'), 2);
+    }
+
+    /**
+     * Total used leave days shown to users: legacy/pre-system + approved balance-deducting leaves.
+     */
+    public function getTotalLeaveDaysUsedAttribute(): float
+    {
+        $previouslyUsed = round((float) ($this->attributes['leave_days_used'] ?? 0), 2);
+
+        return round($previouslyUsed + $this->deductedLeaveDaysFromBalance(), 2);
+    }
+
+    /**
      * Get remaining annual leave balance (accrued minus pre-system used days minus approved leave deductions).
      */
     public function getRemainingAnnualLeaveBalanceAttribute(): float
     {
         $accrued = (float) ($this->attributes['leave_accrued_balance'] ?? 0);
-        $previouslyUsed = (float) ($this->attributes['leave_days_used'] ?? 0);
-        $deducted = (int) $this->leaves()
-            ->where('deduct_from_balance', true)
-            ->sum('days');
 
-        return max(0, round($accrued - $previouslyUsed - $deducted, 2));
+        return max(0, round($accrued - $this->total_leave_days_used, 2));
     }
 
     public function monthlyLeaveAccrualDays(): float

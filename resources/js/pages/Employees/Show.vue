@@ -316,7 +316,7 @@
                     <div class="grid grid-cols-2 items-stretch gap-3 lg:grid-cols-4">
                         <EmployeeInfoField :label="t('leaves.annual_leave_balance')" :value="displayValue(employee.annual_leave_balance)" highlight />
                         <EmployeeInfoField :label="t('leaves.accrued_leave_balance')" :value="displayValue(employee.leave_accrued_balance)" />
-                        <EmployeeInfoField :label="t('leaves.leave_days_used')" :value="displayValue(employee.leave_days_used)" />
+                        <EmployeeInfoField :label="t('leaves.total_leave_days_used')" :value="displayValue(employee.total_leave_days_used)" />
                         <EmployeeInfoField :label="t('leaves.remaining_balance')" :value="displayValue(employee.remaining_annual_leave_balance)" highlight />
                     </div>
                     <p class="mt-3 text-xs text-muted-foreground">
