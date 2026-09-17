@@ -13,13 +13,16 @@ class SyncLeaveAccruedBalancesCommand extends Command
     protected $signature = 'leaves:sync-accrued-balances
                             {--employee= : Recalculate for a single employee id only}';
 
-    protected $description = 'Recalculate leave_accrued_balance from hire_date through the last completed month';
+    protected $description = 'Recalculate leave_accrued_balance from hire_date through today (current month pro-rated). Skips employees without hire_date.';
 
     public function handle(LeaveAccrualService $service): int
     {
         $employeeId = $this->option('employee');
 
-        $query = Employee::query()->orderBy('id');
+        $query = Employee::query()
+            ->whereNotNull('hire_date')
+            ->orderBy('id');
+
         if ($employeeId !== null && $employeeId !== '') {
             $query->where('id', (int) $employeeId);
         }
@@ -33,7 +36,7 @@ class SyncLeaveAccruedBalancesCommand extends Command
             }
         });
 
-        $this->info("Recalculated accrued balance for {$count} employee(s).");
+        $this->info("Recalculated accrued balance for {$count} employee(s) with hire_date.");
 
         return self::SUCCESS;
     }
