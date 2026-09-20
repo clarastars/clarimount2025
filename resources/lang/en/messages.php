@@ -1315,7 +1315,7 @@ return [
         'request_completed_success' => 'Request approved and salary certificate issued successfully.',
         'request_rejected_success' => 'Salary certificate request rejected.',
         'approval_saved' => 'Approval step saved.',
-        'approval_rejection_saved' => 'Step rejection recorded and the approval chain restarted.',
+        'approval_rejection_saved' => 'Salary certificate request rejected.',
         'request_already_processed' => 'This request has already been processed.',
         'cancel_request' => 'Cancel request',
         'cancel_request_confirm' => 'Are you sure you want to cancel this salary certificate request?',

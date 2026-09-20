@@ -1313,7 +1313,7 @@ return [
         'request_completed_success' => 'تم اعتماد الطلب وإصدار تعريف الراتب بنجاح.',
         'request_rejected_success' => 'تم رفض طلب تعريف الراتب.',
         'approval_saved' => 'تم حفظ اعتماد الخطوة.',
-        'approval_rejection_saved' => 'تم تسجيل رفض الخطوة وإعادة بدء سلسلة الاعتماد.',
+        'approval_rejection_saved' => 'تم رفض طلب تعريف الراتب.',
         'request_already_processed' => 'تمت معالجة هذا الطلب مسبقاً.',
         'cancel_request' => 'إلغاء الطلب',
         'cancel_request_confirm' => 'هل أنت متأكد من إلغاء طلب تعريف الراتب هذا؟',

@@ -118,21 +118,8 @@ class SalaryCertificateApprovalNotificationService
             'reason' => $reason,
         ];
 
-        $firstStep = $this->approvalService->getNextPendingStep($certificateRequest);
-
         foreach ($this->getWorkflowStakeholders($company, $certificateRequest->employee) as $user) {
             if ($user->id === $actor->id) {
-                continue;
-            }
-
-            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep, $certificateRequest->employee)) {
-                $this->send($user, 'your_turn', [
-                    ...$payload,
-                    'step_id' => $firstStep->id,
-                    'step_title' => $firstStep->title,
-                    'after_rejection' => true,
-                ]);
-
                 continue;
             }
 

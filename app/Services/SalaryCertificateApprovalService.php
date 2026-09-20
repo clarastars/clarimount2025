@@ -379,6 +379,10 @@ class SalaryCertificateApprovalService
         string $reason,
     ): SalaryCertificateRequestApprovalRejection {
         return DB::transaction(function () use ($user, $request, $step, $reason) {
+            if (! $request->isPending()) {
+                throw new \RuntimeException(__('messages.salary_certificates.request_already_processed'));
+            }
+
             if ((int) $step->company_id !== (int) $request->employee()->value('company_id')) {
                 throw new \RuntimeException(__('messages.leaves.approval_step_company_mismatch'));
             }
@@ -393,6 +397,13 @@ class SalaryCertificateApprovalService
 
             $clearedCount = $request->stepApprovals()->count();
             $request->stepApprovals()->delete();
+
+            $request->update([
+                'status' => SalaryCertificateRequest::STATUS_REJECTED,
+                'reviewed_by' => $user->id,
+                'reviewed_at' => now(),
+                'review_notes' => $reason,
+            ]);
 
             return SalaryCertificateRequestApprovalRejection::query()->create([
                 'salary_certificate_request_id' => $request->id,

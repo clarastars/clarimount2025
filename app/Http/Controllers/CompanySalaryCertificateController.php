@@ -262,7 +262,7 @@ class CompanySalaryCertificateController extends Controller
             $validated['reason'],
         );
 
-        return back()->with('success', __('messages.salary_certificates.approval_rejection_saved'));
+        return back()->with('success', __('messages.salary_certificates.request_rejected_success'));
     }
 
     public function preview(
