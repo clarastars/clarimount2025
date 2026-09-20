@@ -163,7 +163,8 @@ class AttendancePresentationRebuildService
 
         $company = Company::find($companyId);
         $flexibleEnabled = $company?->flexibleTimeEnabled() ?? false;
-        $flexibleMinutes = $company?->flexibleTimeMinutes() ?? 0;
+        $flexibleBeforeMinutes = $company?->flexibleTimeBeforeMinutes() ?? 0;
+        $flexibleAfterMinutes = $company?->flexibleTimeAfterMinutes() ?? 0;
 
         foreach ($rows as $i => $row) {
             $rows[$i] = $this->withStatusAndLateMinutes(
@@ -171,7 +172,8 @@ class AttendancePresentationRebuildService
                 $employeesKeyed,
                 $shiftWorkdayMaps,
                 $flexibleEnabled,
-                $flexibleMinutes
+                $flexibleBeforeMinutes,
+                $flexibleAfterMinutes
             );
             $this->reconcileLatePenalty($rows[$i]);
         }
@@ -271,7 +273,8 @@ class AttendancePresentationRebuildService
 
         $company = $employee->company_id ? Company::find($employee->company_id) : null;
         $flexibleEnabled = $company?->flexibleTimeEnabled() ?? false;
-        $flexibleMinutes = $company?->flexibleTimeMinutes() ?? 0;
+        $flexibleBeforeMinutes = $company?->flexibleTimeBeforeMinutes() ?? 0;
+        $flexibleAfterMinutes = $company?->flexibleTimeAfterMinutes() ?? 0;
 
         foreach ($rows as $i => $row) {
             $rows[$i] = $this->withStatusAndLateMinutes(
@@ -279,7 +282,8 @@ class AttendancePresentationRebuildService
                 $employeesKeyed,
                 $shiftWorkdayMaps,
                 $flexibleEnabled,
-                $flexibleMinutes
+                $flexibleBeforeMinutes,
+                $flexibleAfterMinutes
             );
             $this->reconcileLatePenalty($rows[$i]);
         }
@@ -404,7 +408,8 @@ class AttendancePresentationRebuildService
         $employeesKeyed,
         array $shiftWorkdayMaps,
         bool $flexibleEnabled = false,
-        int $flexibleMinutes = 0,
+        int $flexibleBeforeMinutes = 0,
+        int $flexibleAfterMinutes = 0,
     ): array {
         $employee = $employeesKeyed->get($row['employee_id']);
         if (! $employee || ! $employee->shift) {
@@ -451,7 +456,8 @@ class AttendancePresentationRebuildService
             $expectedEnd,
             $firstPunch,
             $flexibleEnabled,
-            $flexibleMinutes,
+            $flexibleBeforeMinutes,
+            $flexibleAfterMinutes,
             (int) ($employee->shift->grace_minutes ?? 0),
         );
 

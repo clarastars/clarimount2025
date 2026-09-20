@@ -348,10 +348,11 @@ class AttendanceController extends Controller
 
             // Process each attendance record
             $flexibleEnabled = $company->flexibleTimeEnabled();
-            $flexibleMinutes = $company->flexibleTimeMinutes();
+            $flexibleBeforeMinutes = $company->flexibleTimeBeforeMinutes();
+            $flexibleAfterMinutes = $company->flexibleTimeAfterMinutes();
             $timingService = app(\App\Services\FlexibleAttendanceTimingService::class);
 
-            $allRecords = $allRecords->map(function ($record) use ($employees, $shiftWorkdayMaps, $flexibleEnabled, $flexibleMinutes, $timingService) {
+            $allRecords = $allRecords->map(function ($record) use ($employees, $shiftWorkdayMaps, $flexibleEnabled, $flexibleBeforeMinutes, $flexibleAfterMinutes, $timingService) {
                 $employee = $employees->get($record->employee_id);
                 $date = $record->att_date->format('Y-m-d');
 
@@ -395,7 +396,8 @@ class AttendanceController extends Controller
                     $expectedEnd,
                     $firstPunch,
                     $flexibleEnabled,
-                    $flexibleMinutes,
+                    $flexibleBeforeMinutes,
+                    $flexibleAfterMinutes,
                     (int) ($employee->shift->grace_minutes ?? 0),
                 );
                 $lateMinutes = $timing['late_minutes'];

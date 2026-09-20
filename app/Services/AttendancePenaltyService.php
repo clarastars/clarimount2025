@@ -133,7 +133,8 @@ class AttendancePenaltyService
             $expectedEnd,
             $firstPunch,
             $company?->flexibleTimeEnabled() ?? false,
-            $company?->flexibleTimeMinutes() ?? 0,
+            $company?->flexibleTimeBeforeMinutes() ?? 0,
+            $company?->flexibleTimeAfterMinutes() ?? 0,
             (int) ($employee->shift->grace_minutes ?? 0),
         );
 
@@ -578,7 +579,8 @@ class AttendancePenaltyService
             $expectedEnd,
             $firstPunch,
             $company?->flexibleTimeEnabled() ?? false,
-            $company?->flexibleTimeMinutes() ?? 0,
+            $company?->flexibleTimeBeforeMinutes() ?? 0,
+            $company?->flexibleTimeAfterMinutes() ?? 0,
             (int) ($employee->shift->grace_minutes ?? 0),
         );
 

@@ -20,6 +20,10 @@ class Company extends Model
 
     public const SETTING_FLEXIBLE_TIME_MINUTES = 'attendance.flexible_time_minutes';
 
+    public const SETTING_FLEXIBLE_TIME_BEFORE_MINUTES = 'attendance.flexible_time_before_minutes';
+
+    public const SETTING_FLEXIBLE_TIME_AFTER_MINUTES = 'attendance.flexible_time_after_minutes';
+
     protected $fillable = [
         'name_en',
         'name_ar',
@@ -214,15 +218,47 @@ class Company extends Model
     }
 
     /**
-     * Flexible window in minutes before and after the shift schedule.
-     * Returns 0 when flexible time is disabled or not configured.
+     * Minutes allowed before shift start (early arrival / early checkout offset).
+     * Falls back to legacy single flexible_time_minutes when before/after are unset.
      */
-    public function flexibleTimeMinutes(): int
+    public function flexibleTimeBeforeMinutes(): int
     {
         if (! $this->flexibleTimeEnabled()) {
             return 0;
         }
 
+        $before = $this->getSetting(self::SETTING_FLEXIBLE_TIME_BEFORE_MINUTES, null);
+        if ($before !== null && $before !== '') {
+            return max(0, (int) $before);
+        }
+
         return max(0, (int) $this->getSetting(self::SETTING_FLEXIBLE_TIME_MINUTES, 0));
+    }
+
+    /**
+     * Minutes allowed after shift start (late arrival / late checkout offset).
+     * Falls back to legacy single flexible_time_minutes when before/after are unset.
+     */
+    public function flexibleTimeAfterMinutes(): int
+    {
+        if (! $this->flexibleTimeEnabled()) {
+            return 0;
+        }
+
+        $after = $this->getSetting(self::SETTING_FLEXIBLE_TIME_AFTER_MINUTES, null);
+        if ($after !== null && $after !== '') {
+            return max(0, (int) $after);
+        }
+
+        return max(0, (int) $this->getSetting(self::SETTING_FLEXIBLE_TIME_MINUTES, 0));
+    }
+
+    /**
+     * @deprecated Prefer flexibleTimeBeforeMinutes() / flexibleTimeAfterMinutes().
+     * Legacy helper: returns the "after" window (upper bound).
+     */
+    public function flexibleTimeMinutes(): int
+    {
+        return $this->flexibleTimeAfterMinutes();
     }
 }

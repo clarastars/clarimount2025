@@ -16,7 +16,8 @@ interface CompanyFlexibleRow {
     name_ar: string;
     name_en: string;
     flexible_time_enabled: boolean;
-    flexible_time_minutes: number;
+    flexible_time_before_minutes: number;
+    flexible_time_after_minutes: number;
 }
 
 interface Props {
@@ -38,7 +39,8 @@ const form = useForm({
     companies: props.companies.map((company) => ({
         id: company.id,
         flexible_time_enabled: Boolean(company.flexible_time_enabled),
-        flexible_time_minutes: Number(company.flexible_time_minutes || 30),
+        flexible_time_before_minutes: Number(company.flexible_time_before_minutes ?? 30),
+        flexible_time_after_minutes: Number(company.flexible_time_after_minutes ?? 30),
     })),
 });
 
@@ -51,9 +53,8 @@ const submit = (): void => {
             companies: data.companies.map((row) => ({
                 ...row,
                 flexible_time_enabled: Boolean(row.flexible_time_enabled),
-                flexible_time_minutes: row.flexible_time_enabled
-                    ? Number(row.flexible_time_minutes)
-                    : Number(row.flexible_time_minutes || 30),
+                flexible_time_before_minutes: Number(row.flexible_time_before_minutes ?? 0),
+                flexible_time_after_minutes: Number(row.flexible_time_after_minutes ?? 0),
             })),
         }))
         .put(route('settings.flexible-attendance.update'), {
@@ -91,7 +92,8 @@ const submit = (): void => {
                                 <tr>
                                     <th class="px-4 py-3 font-medium">{{ t('settings.flexible_attendance_company') }}</th>
                                     <th class="px-4 py-3 font-medium">{{ t('settings.flexible_attendance_mode') }}</th>
-                                    <th class="px-4 py-3 font-medium">{{ t('settings.flexible_attendance_minutes') }}</th>
+                                    <th class="px-4 py-3 font-medium">{{ t('settings.flexible_attendance_before_minutes') }}</th>
+                                    <th class="px-4 py-3 font-medium">{{ t('settings.flexible_attendance_after_minutes') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -122,17 +124,38 @@ const submit = (): void => {
                                     </td>
                                     <td class="px-4 py-3 align-top">
                                         <Input
-                                            v-model.number="form.companies[index].flexible_time_minutes"
+                                            v-model.number="form.companies[index].flexible_time_before_minutes"
                                             type="number"
-                                            min="1"
+                                            min="0"
                                             max="180"
                                             step="1"
                                             class="max-w-[8rem]"
                                             :disabled="!form.companies[index].flexible_time_enabled"
                                         />
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('settings.flexible_attendance_before_hint') }}
+                                        </p>
                                         <InputError
                                             class="mt-1"
-                                            :message="form.errors[`companies.${index}.flexible_time_minutes`]"
+                                            :message="form.errors[`companies.${index}.flexible_time_before_minutes`]"
+                                        />
+                                    </td>
+                                    <td class="px-4 py-3 align-top">
+                                        <Input
+                                            v-model.number="form.companies[index].flexible_time_after_minutes"
+                                            type="number"
+                                            min="0"
+                                            max="180"
+                                            step="1"
+                                            class="max-w-[8rem]"
+                                            :disabled="!form.companies[index].flexible_time_enabled"
+                                        />
+                                        <p class="mt-1 text-xs text-muted-foreground">
+                                            {{ t('settings.flexible_attendance_after_hint') }}
+                                        </p>
+                                        <InputError
+                                            class="mt-1"
+                                            :message="form.errors[`companies.${index}.flexible_time_after_minutes`]"
                                         />
                                     </td>
                                 </tr>
