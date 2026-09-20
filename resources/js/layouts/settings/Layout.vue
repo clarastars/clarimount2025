@@ -127,6 +127,10 @@ const sidebarNavItems = computed((): NavItem[] => {
             title: t('settings.leave_days_used_import'),
             href: '/settings/leave-days-used-import',
         });
+        items.push({
+            title: t('settings.fingerprint_day_lookup'),
+            href: '/settings/fingerprint-day-lookup',
+        });
     }
 
     return items;

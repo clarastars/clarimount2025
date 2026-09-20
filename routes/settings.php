@@ -12,6 +12,7 @@ use App\Http\Controllers\Settings\FlexibleAttendanceSettingsController;
 use App\Http\Controllers\Settings\SalaryCertificateFeeSettingsController;
 use App\Http\Controllers\Settings\MissingHireDateExportController;
 use App\Http\Controllers\Settings\LeaveDaysUsedImportController;
+use App\Http\Controllers\Settings\EmployeeFingerprintDayLookupController;
 use App\Http\Controllers\Settings\OperationalMonthSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SalaryRunApprovalStepsController;
@@ -110,5 +111,12 @@ Route::middleware('auth')->group(function () {
             ->name('settings.leave-days-used-import.store');
         Route::post('settings/leave-days-used-import/{import}/undo', [LeaveDaysUsedImportController::class, 'undo'])
             ->name('settings.leave-days-used-import.undo');
+
+        Route::get('settings/fingerprint-day-lookup', [EmployeeFingerprintDayLookupController::class, 'index'])
+            ->name('settings.fingerprint-day-lookup.index');
+        Route::get('settings/fingerprint-day-lookup/search', [EmployeeFingerprintDayLookupController::class, 'search'])
+            ->name('settings.fingerprint-day-lookup.search');
+        Route::get('settings/fingerprint-day-lookup/show', [EmployeeFingerprintDayLookupController::class, 'show'])
+            ->name('settings.fingerprint-day-lookup.show');
     });
 });
