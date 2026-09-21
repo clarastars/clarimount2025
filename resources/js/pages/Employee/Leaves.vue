@@ -76,6 +76,7 @@ interface EmployeeSummary {
     remaining_annual_leave_balance: number | string | null;
     monthly_leave_accrual: number;
     company_name?: string | null;
+    leave_type_rules_exempt?: boolean;
 }
 
 const props = defineProps<{
@@ -197,7 +198,7 @@ function onAttachmentsChange(files: File[]) {
 
 const submit = () => {
     const leaveType = selectedLeaveType.value;
-    if (leaveType && leaveType.min_notice_days > 0 && form.start_date) {
+    if (!props.employee.leave_type_rules_exempt && leaveType && leaveType.min_notice_days > 0 && form.start_date) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -572,6 +573,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             :leave-types="leaveTypes"
                             :current-remaining="employee.remaining_annual_leave_balance"
                             :monthly-accrual="employee.monthly_leave_accrual"
+                            :bypass-leave-type-rules="Boolean(employee.leave_type_rules_exempt)"
                             @attachments-change="onAttachmentsChange"
                         />
 

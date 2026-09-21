@@ -40,6 +40,7 @@ class LeaveController extends Controller
                 'full_name' => $employee->full_name,
                 'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
                 'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
+                'leave_type_rules_exempt' => $this->leaveTypeService->employeeIsExemptFromRules($employee),
             ],
             'leaveTypes' => $this->leaveTypeService->activeOptions(app()->getLocale()),
         ]);

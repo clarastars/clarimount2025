@@ -72,6 +72,9 @@ Route::middleware('auth')->group(function () {
         Route::post('settings/leave-types', [LeaveTypeController::class, 'store'])->name('settings.leave-types.store');
         Route::put('settings/leave-types/{leaveType}', [LeaveTypeController::class, 'update'])->name('settings.leave-types.update');
         Route::delete('settings/leave-types/{leaveType}', [LeaveTypeController::class, 'destroy'])->name('settings.leave-types.destroy');
+        Route::get('settings/leave-types/employees/search', [LeaveTypeController::class, 'searchEmployees'])->name('settings.leave-types.employees.search');
+        Route::post('settings/leave-types/exemptions', [LeaveTypeController::class, 'storeExemption'])->name('settings.leave-types.exemptions.store');
+        Route::delete('settings/leave-types/exemptions/{exemption}', [LeaveTypeController::class, 'destroyExemption'])->name('settings.leave-types.exemptions.destroy');
     });
 
     Route::middleware('role_or_permission:super-admin|settings.access')->group(function () {

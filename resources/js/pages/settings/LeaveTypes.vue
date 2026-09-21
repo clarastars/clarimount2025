@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import axios from 'axios';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -25,9 +26,28 @@ interface LeaveTypeItem {
     is_active: boolean;
 }
 
-const props = defineProps<{
+interface ExemptionItem {
+    id: number;
+    employee_id: number;
+    full_name: string;
+    employee_code: string | null;
+    company_name: string | null;
+    created_at: string | null;
+}
+
+interface EmployeeSearchResult {
+    id: number;
+    full_name: string;
+    employee_id: string | null;
+    company_name: string | null;
+}
+
+const props = withDefaults(defineProps<{
     leaveTypes: LeaveTypeItem[];
-}>();
+    exemptions?: ExemptionItem[];
+}>(), {
+    exemptions: () => [],
+});
 
 const { t } = useI18n();
 
@@ -54,6 +74,42 @@ const editForm = useForm({
     min_notice_days: 0,
     allow_past_dates: false,
     sort_order: 0,
+});
+
+const exemptionForm = useForm({
+    employee_id: null as number | null,
+});
+
+const searchQuery = ref('');
+const searchResults = ref<EmployeeSearchResult[]>([]);
+const searching = ref(false);
+const selectedSearchEmployee = ref<EmployeeSearchResult | null>(null);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(searchQuery, (value) => {
+    if (searchTimer) {
+        clearTimeout(searchTimer);
+    }
+
+    const q = value.trim();
+    if (q.length < 2) {
+        searchResults.value = [];
+        return;
+    }
+
+    searchTimer = setTimeout(async () => {
+        searching.value = true;
+        try {
+            const { data } = await axios.get(route('settings.leave-types.employees.search'), {
+                params: { q },
+            });
+            searchResults.value = data.results ?? [];
+        } catch {
+            searchResults.value = [];
+        } finally {
+            searching.value = false;
+        }
+    }, 300);
 });
 
 function createLeaveType() {
@@ -96,6 +152,39 @@ function deleteLeaveType(item: LeaveTypeItem) {
     }
 
     router.delete(route('settings.leave-types.destroy', item.id), {
+        preserveScroll: true,
+    });
+}
+
+function selectSearchEmployee(employee: EmployeeSearchResult) {
+    selectedSearchEmployee.value = employee;
+    exemptionForm.employee_id = employee.id;
+    searchQuery.value = employee.full_name;
+    searchResults.value = [];
+}
+
+function addExemption() {
+    if (!exemptionForm.employee_id) {
+        return;
+    }
+
+    exemptionForm.post(route('settings.leave-types.exemptions.store'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            exemptionForm.reset();
+            selectedSearchEmployee.value = null;
+            searchQuery.value = '';
+            searchResults.value = [];
+        },
+    });
+}
+
+function removeExemption(item: ExemptionItem) {
+    if (!window.confirm(t('settings.leave_type_exemptions_remove_confirm', { name: item.full_name }))) {
+        return;
+    }
+
+    router.delete(route('settings.leave-types.exemptions.destroy', item.id), {
         preserveScroll: true,
     });
 }
@@ -201,6 +290,91 @@ function deleteLeaveType(item: LeaveTypeItem) {
                                 <Button type="button" variant="outline" @click="editingId = null">{{ t('common.cancel') }}</Button>
                             </div>
                         </form>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{{ t('settings.leave_type_exemptions') }}</CardTitle>
+                        <p class="text-sm text-muted-foreground">
+                            {{ t('settings.leave_type_exemptions_description') }}
+                        </p>
+                    </CardHeader>
+                    <CardContent class="space-y-4">
+                        <form class="flex flex-col gap-3 sm:flex-row sm:items-end" @submit.prevent="addExemption">
+                            <div class="relative min-w-0 flex-1">
+                                <Label for="exemption-employee-search" class="mb-1.5 block">
+                                    {{ t('settings.leave_type_exemptions_search') }}
+                                </Label>
+                                <Input
+                                    id="exemption-employee-search"
+                                    v-model="searchQuery"
+                                    :placeholder="t('settings.leave_type_exemptions_search_placeholder')"
+                                    autocomplete="off"
+                                />
+                                <div
+                                    v-if="searchResults.length > 0"
+                                    class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-background shadow"
+                                >
+                                    <button
+                                        v-for="employee in searchResults"
+                                        :key="employee.id"
+                                        type="button"
+                                        class="block w-full px-3 py-2 text-start text-sm hover:bg-muted"
+                                        @click="selectSearchEmployee(employee)"
+                                    >
+                                        <span class="font-medium">{{ employee.full_name }}</span>
+                                        <span v-if="employee.employee_id" class="text-muted-foreground"> — {{ employee.employee_id }}</span>
+                                        <span v-if="employee.company_name" class="block text-xs text-muted-foreground">
+                                            {{ employee.company_name }}
+                                        </span>
+                                    </button>
+                                </div>
+                                <p v-if="searching" class="mt-1 text-xs text-muted-foreground">…</p>
+                                <InputError class="mt-1" :message="exemptionForm.errors.employee_id" />
+                            </div>
+                            <Button
+                                type="submit"
+                                class="w-full shrink-0 sm:w-auto"
+                                :disabled="exemptionForm.processing || !exemptionForm.employee_id"
+                            >
+                                {{ t('settings.leave_type_exemptions_add') }}
+                            </Button>
+                        </form>
+
+                        <div v-if="props.exemptions.length === 0" class="py-2 text-sm text-muted-foreground">
+                            {{ t('settings.leave_type_exemptions_empty') }}
+                        </div>
+
+                        <div v-else class="overflow-x-auto">
+                            <table class="w-full table-fixed text-sm">
+                                <thead>
+                                    <tr class="border-b text-center">
+                                        <th class="w-[40%] px-3 py-2 font-medium">{{ t('settings.leave_type_exemptions_employee') }}</th>
+                                        <th class="w-[40%] px-3 py-2 font-medium">{{ t('settings.leave_type_exemptions_company') }}</th>
+                                        <th class="w-[20%] px-3 py-2 font-medium">{{ t('common.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in props.exemptions" :key="item.id" class="border-b">
+                                        <td class="px-3 py-3 text-center align-middle">
+                                            <div class="font-medium">{{ item.full_name }}</div>
+                                            <div v-if="item.employee_code" class="text-xs text-muted-foreground">
+                                                {{ item.employee_code }}
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-3 text-center align-middle">
+                                            {{ item.company_name || '—' }}
+                                        </td>
+                                        <td class="px-3 py-3 text-center align-middle">
+                                            <Button size="sm" variant="destructive" @click="removeExemption(item)">
+                                                {{ t('settings.leave_type_exemptions_remove') }}
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </CardContent>
                 </Card>
 

@@ -88,6 +88,8 @@ class CompanyLeaveController extends Controller
 
         $employees = [];
         if ($canCreateLeaves) {
+            $exemptIds = $this->leaveTypeService->exemptEmployeeIds();
+
             $employeeQuery = Employee::query()
                 ->where('company_id', $company->id)
                 ->orderBy('first_name')
@@ -98,7 +100,7 @@ class CompanyLeaveController extends Controller
 
             $employees = $employeeQuery
                 ->get(['id', 'first_name', 'father_name', 'last_name', 'annual_leave_balance', 'leave_accrued_balance', 'leave_days_used'])
-                ->map(function (Employee $employee): array {
+                ->map(function (Employee $employee) use ($exemptIds): array {
                     $employee->append('remaining_annual_leave_balance');
 
                     return [
@@ -106,6 +108,7 @@ class CompanyLeaveController extends Controller
                         'full_name' => $employee->full_name,
                         'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
                         'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
+                        'leave_type_rules_exempt' => in_array((int) $employee->id, $exemptIds, true),
                     ];
                 })
                 ->values()

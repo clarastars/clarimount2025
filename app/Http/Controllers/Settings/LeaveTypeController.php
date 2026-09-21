@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\LeaveType;
+use App\Models\LeaveTypeRuleExemption;
 use App\Services\LeaveTypeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,6 +29,7 @@ class LeaveTypeController extends Controller
 
         return Inertia::render('settings/LeaveTypes', [
             'leaveTypes' => $this->leaveTypeService->allForSettings(),
+            'exemptions' => $this->leaveTypeService->exemptionsForSettings(),
         ]);
     }
 
@@ -75,6 +80,40 @@ class LeaveTypeController extends Controller
         $leaveType->delete();
 
         return back()->with('success', __('messages.settings.leave_types_deleted'));
+    }
+
+    public function searchEmployees(Request $request): JsonResponse
+    {
+        $this->authorizeManagement();
+
+        $query = trim((string) $request->query('q', ''));
+
+        return response()->json([
+            'results' => $this->leaveTypeService->searchEmployeesForExemption($query),
+        ]);
+    }
+
+    public function storeExemption(Request $request): RedirectResponse
+    {
+        $this->authorizeManagement();
+
+        $validated = $request->validate([
+            'employee_id' => ['required', 'integer', 'exists:employees,id'],
+        ]);
+
+        $employee = Employee::query()->findOrFail((int) $validated['employee_id']);
+        $this->leaveTypeService->addExemption($employee, Auth::user());
+
+        return back()->with('success', __('messages.settings.leave_type_exemption_added'));
+    }
+
+    public function destroyExemption(LeaveTypeRuleExemption $exemption): RedirectResponse
+    {
+        $this->authorizeManagement();
+
+        $this->leaveTypeService->removeExemption($exemption);
+
+        return back()->with('success', __('messages.settings.leave_type_exemption_removed'));
     }
 
     /**

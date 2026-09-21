@@ -63,6 +63,7 @@ class EmployeePortalLeaveController extends Controller
                 'remaining_annual_leave_balance' => $employee->remaining_annual_leave_balance,
                 'monthly_leave_accrual' => $employee->monthlyLeaveAccrualDays(),
                 'company_name' => $employee->company?->name_ar ?: $employee->company?->name_en,
+                'leave_type_rules_exempt' => $this->leaveTypeService->employeeIsExemptFromRules($employee),
             ],
             'approvedLeaves' => $approvedLeaves,
             'leaveRequests' => $leaveRequests,

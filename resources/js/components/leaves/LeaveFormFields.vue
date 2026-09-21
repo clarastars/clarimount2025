@@ -30,13 +30,13 @@
                 </option>
             </select>
             <p
-                v-if="selectedLeaveType && selectedLeaveType.min_notice_days > 0"
+                v-if="!bypassLeaveTypeRules && selectedLeaveType && selectedLeaveType.min_notice_days > 0"
                 class="text-xs text-muted-foreground mt-1"
             >
                 {{ t('leaves.min_notice_days_hint_frontend', { days: formattedMinNoticeDays }) }}
             </p>
             <p
-                v-if="selectedLeaveType?.allow_past_dates"
+                v-if="!bypassLeaveTypeRules && selectedLeaveType?.allow_past_dates"
                 class="text-xs text-muted-foreground mt-1"
             >
                 {{ t('leaves.allow_past_dates_hint_frontend') }}
@@ -182,6 +182,7 @@ interface EmployeeOption {
     full_name: string;
     remaining_annual_leave_balance?: number | string | null;
     monthly_leave_accrual?: number | string | null;
+    leave_type_rules_exempt?: boolean;
 }
 
 interface LeaveTypeOption {
@@ -215,11 +216,25 @@ const props = defineProps<{
     leaveTypes: LeaveTypeOption[];
     currentRemaining?: number | string | null;
     monthlyAccrual?: number | string | null;
+    bypassLeaveTypeRules?: boolean;
 }>();
 
 const selectedLeaveType = computed(() => props.leaveTypes.find((item) => item.key === props.form.leave_type) ?? null);
+
+const selectedEmployee = computed(() => {
+    if (!props.showEmployeeSelect || props.form.employee_id === undefined || props.form.employee_id === '') {
+        return null;
+    }
+
+    return (props.employees ?? []).find((item) => String(item.id) === String(props.form.employee_id)) ?? null;
+});
+
+const bypassLeaveTypeRules = computed(() =>
+    Boolean(props.bypassLeaveTypeRules || selectedEmployee.value?.leave_type_rules_exempt),
+);
+
 const startDateMin = computed(() => {
-    if (!selectedLeaveType.value || selectedLeaveType.value.allow_past_dates) {
+    if (bypassLeaveTypeRules.value || !selectedLeaveType.value || selectedLeaveType.value.allow_past_dates) {
         return undefined;
     }
 
@@ -236,14 +251,6 @@ const formattedMinNoticeDays = computed(() => {
     }
 
     return formatDays(selectedLeaveType.value.min_notice_days);
-});
-
-const selectedEmployee = computed(() => {
-    if (!props.showEmployeeSelect || props.form.employee_id === undefined || props.form.employee_id === '') {
-        return null;
-    }
-
-    return (props.employees ?? []).find((item) => String(item.id) === String(props.form.employee_id)) ?? null;
 });
 
 const currentRemainingValue = computed(() => {

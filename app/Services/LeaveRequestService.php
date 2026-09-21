@@ -44,8 +44,8 @@ class LeaveRequestService
             ]);
         }
 
-        $this->leaveTypeService->ensureStartDateAllowed($leaveType, (string) $validated['start_date']);
-        $this->leaveTypeService->ensureMinimumNoticeDays($leaveType, (string) $validated['start_date']);
+        $this->leaveTypeService->ensureStartDateAllowed($leaveType, (string) $validated['start_date'], $employee);
+        $this->leaveTypeService->ensureMinimumNoticeDays($leaveType, (string) $validated['start_date'], $employee);
 
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);

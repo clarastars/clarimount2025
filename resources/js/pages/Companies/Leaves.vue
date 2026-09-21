@@ -35,6 +35,7 @@ interface EmployeeOption {
     full_name: string;
     remaining_annual_leave_balance?: number | null;
     monthly_leave_accrual?: number | null;
+    leave_type_rules_exempt?: boolean;
 }
 
 interface ApprovalStepState {
@@ -258,7 +259,10 @@ function onAttachmentsChange(files: File[]) {
 
 const submit = () => {
     const leaveType = selectedLeaveType.value;
-    if (leaveType && leaveType.min_notice_days > 0 && form.start_date) {
+    const selectedEmployee = props.employees.find((item) => String(item.id) === String(form.employee_id));
+    const isExempt = Boolean(selectedEmployee?.leave_type_rules_exempt);
+
+    if (!isExempt && leaveType && leaveType.min_notice_days > 0 && form.start_date) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
