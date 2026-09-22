@@ -259,6 +259,8 @@ class RedirectIfEmployeePortalUser
                 'employees.entitlement-settlement.edit',
                 'employees.entitlement-settlement.update',
                 'employees.entitlement-settlement.destroy',
+                'employees.entitlement-settlement.print',
+                'employees.entitlement-settlement.attachments.show',
             ]);
         }
 
@@ -268,6 +270,8 @@ class RedirectIfEmployeePortalUser
                 'employees.show',
                 'employees.entitlement-settlement.index',
                 'employees.entitlement-settlement.show',
+                'employees.entitlement-settlement.print',
+                'employees.entitlement-settlement.attachments.show',
                 'employees.entitlement-settlement.approve-step',
                 'employees.entitlement-settlement.reject-step',
                 'api.notifications.index',
