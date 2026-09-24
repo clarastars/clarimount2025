@@ -15,6 +15,10 @@ interface NotificationData {
     salary_run_id?: number;
     leave_request_id?: number;
     salary_certificate_request_id?: number;
+    advance_request_id?: number;
+    amount?: string;
+    monthly_deduction?: string;
+    months_count?: number;
     settlement_id?: number;
     employee_id?: number;
     employee_name?: string;
@@ -54,6 +58,7 @@ const page = usePage();
 const authProps = computed(() => (page.props.auth as {
     can_view_salary_run_notifications?: boolean;
     can_view_leave_request_notifications?: boolean;
+    can_view_advance_notifications?: boolean;
     can_view_entitlement_settlement_notifications?: boolean;
     is_employee?: boolean;
     unread_notifications_count?: number;
@@ -62,6 +67,7 @@ const authProps = computed(() => (page.props.auth as {
 const showBell = computed(() =>
     authProps.value.can_view_salary_run_notifications === true
     || authProps.value.can_view_leave_request_notifications === true
+    || authProps.value.can_view_advance_notifications === true
     || authProps.value.can_view_entitlement_settlement_notifications === true
     || authProps.value.is_employee === true,
 );
@@ -248,6 +254,63 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         const messageKey = keyMap[data.event_type] ?? 'notifications.salary_certificate_request_workflow_your_turn';
 
         return t(messageKey, params);
+    }
+
+    if (data.event_type === 'advance_request_submitted') {
+        return t('notifications.advance_request_submitted', {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            amount: data.amount ?? '',
+            monthly: data.monthly_deduction ?? '',
+            months: data.months_count ?? '',
+        });
+    }
+
+    const advanceWorkflowTypes = [
+        'advance_request_your_turn',
+        'advance_request_step_approved',
+        'advance_request_step_progress',
+        'advance_request_workflow_rejected',
+        'advance_request_finalized',
+        'advance_request_approved',
+        'advance_request_rejected',
+    ];
+
+    if (advanceWorkflowTypes.includes(data.event_type)) {
+        const params = {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            amount: data.amount ?? '',
+            monthly: data.monthly_deduction ?? '',
+            months: data.months_count ?? '',
+            step: data.step_title ?? '',
+            name: data.actor_name ?? '',
+            reason: data.reason ?? '',
+            remaining: data.remaining_steps ?? '',
+        };
+
+        const keyMap: Record<string, string> = {
+            advance_request_your_turn: 'notifications.advance_request_workflow_your_turn',
+            advance_request_step_approved: 'notifications.advance_request_workflow_step_approved',
+            advance_request_step_progress: 'notifications.advance_request_workflow_step_progress',
+            advance_request_workflow_rejected: 'notifications.advance_request_workflow_employee_rejected',
+            advance_request_finalized: 'notifications.advance_request_workflow_finalized',
+            advance_request_approved: 'notifications.advance_request_approved',
+            advance_request_rejected: data.step_title
+                ? 'notifications.advance_request_workflow_rejected'
+                : 'notifications.advance_request_rejected',
+        };
+
+        let message = t(keyMap[data.event_type] ?? 'notifications.advance_request_workflow_your_turn', params);
+
+        if (
+            (data.event_type === 'advance_request_approved' || data.event_type === 'advance_request_rejected')
+            && data.review_notes
+        ) {
+            message += ` ${t('notifications.advance_request_decision_notes', { notes: data.review_notes })}`;
+        }
+
+        return message;
     }
 
     const entitlementSettlementWorkflowTypes = [

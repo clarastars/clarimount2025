@@ -471,7 +471,7 @@ class SalaryRunService
 
         $debtDeductions = $existingItem?->debt_deductions ?? [];
         if ($salaryRun->isDraft()) {
-            $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $debtDeductions);
+            $debtDeductions = $this->mergeAutoDebtDeductions($employee, $debtDeductions);
         }
 
         $debtDeductionsTotal = 0.0;
@@ -818,12 +818,14 @@ class SalaryRunService
     }
 
     /**
-     * Auto-include remaining attested salary-certificate debts in a draft run.
+     * Auto-include debts that must be deducted without manual intervention:
+     * attested salary-certificate fees (full remaining balance) and approved
+     * advances (one monthly installment, capped at the remaining balance).
      *
      * @param  mixed  $existing
      * @return list<array{debt_id: int, debt_type: string|null, amount: float, original_amount: float}>
      */
-    public function mergeCertificateAttestationDebtDeductions(Employee $employee, mixed $existing): array
+    public function mergeAutoDebtDeductions(Employee $employee, mixed $existing): array
     {
         $deductions = $this->syncDebtDeductionsWithCurrentDebts($employee, $existing);
         $existingIds = [];
@@ -836,8 +838,11 @@ class SalaryRunService
 
         $autoDebts = EmployeeDebt::query()
             ->where('employee_id', $employee->id)
-            ->whereNotNull('salary_certificate_request_id')
             ->where('amount', '>', 0)
+            ->where(function ($query): void {
+                $query->whereNotNull('salary_certificate_request_id')
+                    ->orWhereNotNull('advance_request_id');
+            })
             ->orderBy('id')
             ->get();
 
@@ -846,19 +851,50 @@ class SalaryRunService
                 continue;
             }
 
-            $amount = round((float) $debt->amount, 2);
+            $amount = $this->autoDeductionAmountForDebt($debt);
+            if ($amount <= 0) {
+                continue;
+            }
+
             $deductions[] = [
                 'debt_id' => $debt->id,
                 'debt_type' => $debt->debt_type,
                 'amount' => $amount,
-                'original_amount' => $amount,
+                'original_amount' => round((float) $debt->amount, 2),
             ];
         }
 
         return $deductions;
     }
 
+    /**
+     * Advances are repaid one installment per run; other auto debts settle in full.
+     */
+    private function autoDeductionAmountForDebt(EmployeeDebt $debt): float
+    {
+        $remaining = round((float) $debt->amount, 2);
+        $installment = $debt->monthly_installment !== null
+            ? round((float) $debt->monthly_installment, 2)
+            : 0.0;
+
+        if ($debt->advance_request_id !== null && $installment > 0) {
+            return min($installment, $remaining);
+        }
+
+        return $remaining;
+    }
+
     public function includeCertificateAttestationDebtInOpenDraft(EmployeeDebt $debt): void
+    {
+        $this->includeAutoDebtInOpenDraft($debt);
+    }
+
+    public function includeAdvanceDebtInOpenDraft(EmployeeDebt $debt): void
+    {
+        $this->includeAutoDebtInOpenDraft($debt);
+    }
+
+    private function includeAutoDebtInOpenDraft(EmployeeDebt $debt): void
     {
         $debt->loadMissing('employee');
         $employee = $debt->employee;
@@ -886,7 +922,7 @@ class SalaryRunService
             return;
         }
 
-        $debtDeductions = $this->mergeCertificateAttestationDebtDeductions($employee, $item->debt_deductions);
+        $debtDeductions = $this->mergeAutoDebtDeductions($employee, $item->debt_deductions);
         $totalDeduction = 0.0;
 
         foreach ($debtDeductions as $deduction) {

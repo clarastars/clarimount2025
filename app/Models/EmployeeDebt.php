@@ -14,15 +14,22 @@ class EmployeeDebt extends Model
 
     public const TYPE_SALARY_CERTIFICATE_ATTESTATION = 'salary_certificate_attestation';
 
+    public const TYPE_ADVANCE = 'advance';
+
     protected $fillable = [
         'employee_id',
         'amount',
+        'original_amount',
+        'monthly_installment',
         'debt_type',
         'salary_certificate_request_id',
+        'advance_request_id',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'original_amount' => 'decimal:2',
+        'monthly_installment' => 'decimal:2',
     ];
 
     /**
@@ -36,5 +43,28 @@ class EmployeeDebt extends Model
     public function salaryCertificateRequest(): BelongsTo
     {
         return $this->belongsTo(SalaryCertificateRequest::class);
+    }
+
+    public function advanceRequest(): BelongsTo
+    {
+        return $this->belongsTo(AdvanceRequest::class);
+    }
+
+    public function isAdvance(): bool
+    {
+        return $this->debt_type === self::TYPE_ADVANCE || $this->advance_request_id !== null;
+    }
+
+    /**
+     * Total value of the debt when it was created; falls back to the remaining amount for legacy rows.
+     */
+    public function originalAmount(): float
+    {
+        return round((float) ($this->original_amount ?? $this->amount), 2);
+    }
+
+    public function paidAmount(): float
+    {
+        return round(max(0.0, $this->originalAmount() - (float) $this->amount), 2);
     }
 }

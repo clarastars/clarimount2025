@@ -11,6 +11,8 @@ use App\Http\Controllers\BayzatConfigController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyLeaveApprovalStepsController;
 use App\Http\Controllers\CompanyLeaveController;
+use App\Http\Controllers\CompanyAdvanceApprovalStepsController;
+use App\Http\Controllers\CompanyAdvanceController;
 use App\Http\Controllers\CompanySalaryCertificateApprovalStepsController;
 use App\Http\Controllers\CompanySalaryCertificateController;
 use App\Http\Controllers\CompanySalaryRunApprovalStepsController;
@@ -26,6 +28,7 @@ use App\Http\Controllers\CompanyEntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\EmployeePortalLeaveController;
+use App\Http\Controllers\EmployeePortalAdvanceController;
 use App\Http\Controllers\EmployeePortalSalaryCertificateController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
@@ -274,6 +277,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('companies/{company}/salary-certificate-approvals/{salaryCertificateApprovalStep}', [CompanySalaryCertificateApprovalStepsController::class, 'destroy'])->name('companies.salary-certificate-approvals.destroy');
     Route::post('companies/{company}/salary-certificate-approvals/reorder', [CompanySalaryCertificateApprovalStepsController::class, 'reorder'])->name('companies.salary-certificate-approvals.reorder');
 
+    // Advance (loan) approval steps (per company)
+    Route::get('companies/{company}/advance-approvals', [CompanyAdvanceApprovalStepsController::class, 'index'])->name('companies.advance-approvals.index');
+    Route::post('companies/{company}/advance-approvals', [CompanyAdvanceApprovalStepsController::class, 'store'])->name('companies.advance-approvals.store');
+    Route::put('companies/{company}/advance-approvals/{advanceApprovalStep}', [CompanyAdvanceApprovalStepsController::class, 'update'])->name('companies.advance-approvals.update');
+    Route::delete('companies/{company}/advance-approvals/{advanceApprovalStep}', [CompanyAdvanceApprovalStepsController::class, 'destroy'])->name('companies.advance-approvals.destroy');
+    Route::post('companies/{company}/advance-approvals/reorder', [CompanyAdvanceApprovalStepsController::class, 'reorder'])->name('companies.advance-approvals.reorder');
+
     // Entitlement settlement approval steps (per company)
     Route::get('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'index'])->name('companies.entitlement-settlement-approvals.index');
     Route::post('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'store'])->name('companies.entitlement-settlement-approvals.store');
@@ -305,6 +315,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/approval-steps/{salaryCertificateApprovalStep}/reject', [CompanySalaryCertificateController::class, 'rejectWorkflowStep'])->name('companies.salary-certificate-requests.reject-step');
     Route::get('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/preview', [CompanySalaryCertificateController::class, 'preview'])->name('companies.salary-certificate-requests.preview');
     Route::get('companies/{company}/salary-certificate-requests/{salaryCertificateRequest}/download', [CompanySalaryCertificateController::class, 'download'])->name('companies.salary-certificate-requests.download');
+
+    // Employee portal — advance (loan) requests
+    Route::get('my/advances', [EmployeePortalAdvanceController::class, 'index'])->name('employee.advances.index');
+    Route::post('my/advances', [EmployeePortalAdvanceController::class, 'store'])->name('employee.advances.store');
+    Route::delete('my/advances/{advanceRequest}', [EmployeePortalAdvanceController::class, 'destroy'])->name('employee.advances.destroy');
+
+    // Company advance (loan) requests
+    Route::get('companies/{company}/advances', [CompanyAdvanceController::class, 'index'])->name('companies.advances.index');
+    Route::post('companies/{company}/advance-requests/{advanceRequest}/approve', [CompanyAdvanceController::class, 'approve'])->name('companies.advance-requests.approve');
+    Route::post('companies/{company}/advance-requests/{advanceRequest}/reject', [CompanyAdvanceController::class, 'reject'])->name('companies.advance-requests.reject');
+    Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/approve', [CompanyAdvanceController::class, 'approveWorkflowStep'])->name('companies.advance-requests.approve-step');
+    Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/reject', [CompanyAdvanceController::class, 'rejectWorkflowStep'])->name('companies.advance-requests.reject-step');
 
     // Employee Debts routes
     Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {

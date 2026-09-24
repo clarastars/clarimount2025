@@ -134,6 +134,11 @@ class Employee extends Model implements AuditableContract
         return $this->hasMany(SalaryCertificateRequest::class);
     }
 
+    public function advanceRequests(): HasMany
+    {
+        return $this->hasMany(AdvanceRequest::class);
+    }
+
     /**
      * Get the company this employee belongs to.
      */

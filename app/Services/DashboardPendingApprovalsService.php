@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AdvanceRequest;
 use App\Models\Company;
 use App\Models\EmployeeEntitlementSettlement;
 use App\Models\LeaveRequest;
@@ -21,6 +22,7 @@ class DashboardPendingApprovalsService
         private LeaveApprovalService $leaveApprovalService,
         private LeaveTypeService $leaveTypeService,
         private SalaryCertificateApprovalService $salaryCertificateApprovalService,
+        private AdvanceApprovalService $advanceApprovalService,
         private EntitlementSettlementApprovalService $settlementApprovalService,
         private SalaryRunApprovalService $salaryRunApprovalService,
         private EmployeeUserRoleService $roleService,
@@ -30,6 +32,7 @@ class DashboardPendingApprovalsService
      * @return array{
      *     leaves: array<string, mixed>,
      *     salary_certificates: array<string, mixed>,
+     *     advances: array<string, mixed>,
      *     entitlement_settlements: array<string, mixed>,
      *     salary_runs: array<string, mixed>,
      *     total_count: int
@@ -41,16 +44,19 @@ class DashboardPendingApprovalsService
 
         $leaves = $this->pendingLeaves($user, $companyIds);
         $certificates = $this->pendingSalaryCertificates($user, $companyIds);
+        $advances = $this->pendingAdvances($user, $companyIds);
         $settlements = $this->pendingSettlements($user, $companyIds);
         $salaryRuns = $this->pendingSalaryRuns($user, $companyIds);
 
         return [
             'leaves' => $leaves,
             'salary_certificates' => $certificates,
+            'advances' => $advances,
             'entitlement_settlements' => $settlements,
             'salary_runs' => $salaryRuns,
             'total_count' => $leaves['count']
                 + $certificates['count']
+                + $advances['count']
                 + $settlements['count']
                 + $salaryRuns['count'],
         ];
@@ -76,6 +82,9 @@ class DashboardPendingApprovalsService
             'leaves.approve',
             'leaves.company.view',
             'leaves.create',
+            'advances.approve',
+            'advances.company.view',
+            'advances.create',
             'employees.entitlements.approve',
             'employees.entitlements.settle',
             'salary-runs.approve',
@@ -192,6 +201,63 @@ class DashboardPendingApprovalsService
                 'meta' => $company->name_ar ?: $company->name_en,
                 'step_title' => $nextStep?->title,
                 'url' => route('companies.salary-certificates.index', $company),
+                'created_at' => $request->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
+            ];
+        }
+
+        return $this->bucketFromItems($items, $items[0]['url'] ?? null, $user);
+    }
+
+    /**
+     * @param  list<int>  $companyIds
+     * @return array{visible: bool, count: int, preview: list<array<string, mixed>>, view_all_url: string|null}
+     */
+    private function pendingAdvances(User $user, array $companyIds): array
+    {
+        $visible = $this->userCanSeeAdvances($user);
+
+        if (! $visible || $companyIds === []) {
+            return $this->emptyBucket(visible: $visible);
+        }
+
+        $candidates = AdvanceRequest::query()
+            ->where('status', AdvanceRequest::STATUS_PENDING)
+            ->whereHas('employee', fn ($q) => $q->whereIn('company_id', $companyIds))
+            ->with(['employee:id,first_name,father_name,last_name,company_id,department_id', 'employee.company:id,name_ar,name_en'])
+            ->latest('id')
+            ->limit(self::CANDIDATE_LIMIT)
+            ->get();
+
+        $items = [];
+
+        foreach ($candidates as $request) {
+            $employee = $request->employee;
+            $company = $employee?->company;
+            if ($employee === null || $company === null) {
+                continue;
+            }
+
+            if (! $this->userCanActOnAdvance($user, $company, $request)) {
+                continue;
+            }
+
+            $nextStep = $this->advanceApprovalService->hasActiveStepsForCompany($company)
+                ? $this->advanceApprovalService->getNextPendingStep($request)
+                : null;
+
+            $items[] = [
+                'id' => (int) $request->id,
+                'type' => 'advance',
+                'title' => $employee->full_name,
+                'subtitle' => trim(sprintf(
+                    '%s SAR · %s',
+                    number_format((float) $request->amount, 2),
+                    __('messages.dashboard.pending.advance_fallback'),
+                )),
+                'meta' => $company->name_ar ?: $company->name_en,
+                'step_title' => $nextStep?->title,
+                'url' => route('companies.advances.index', $company),
                 'created_at' => $request->created_at?->toIso8601String(),
                 'department_id' => $employee->department_id ? (string) $employee->department_id : null,
             ];
@@ -366,6 +432,38 @@ class DashboardPendingApprovalsService
         return $this->roleService->canAccessEmployeeInCompanyDepartment(
             $user,
             'leaves.create',
+            (int) $company->id,
+            $this->roleService->departmentIdForEmployeeScope($request->employee),
+        );
+    }
+
+    private function userCanSeeAdvances(User $user): bool
+    {
+        return $user->hasRole('super-admin')
+            || $user->ownedCompanies()->exists()
+            || $this->roleService->canInAnyAssignedTeam($user, 'advances.approve')
+            || $this->roleService->canInAnyAssignedTeam($user, 'advances.create');
+    }
+
+    private function userCanActOnAdvance(
+        User $user,
+        Company $company,
+        AdvanceRequest $request,
+    ): bool {
+        if ($this->advanceApprovalService->hasActiveStepsForCompany($company)) {
+            $nextStep = $this->advanceApprovalService->getNextPendingStep($request);
+
+            return $nextStep !== null
+                && $this->advanceApprovalService->canUserApproveStep($user, $company, $request, $nextStep);
+        }
+
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'advances.create',
             (int) $company->id,
             $this->roleService->departmentIdForEmployeeScope($request->employee),
         );

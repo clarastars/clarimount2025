@@ -4,7 +4,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Building, Building2, CalendarDays, Clock, FileBadge, FileText, HardDrive, LayoutGrid, Mail, MapPin, Package, Scale, Users } from 'lucide-vue-next';
+import { Building, Building2, CalendarDays, Clock, FileBadge, FileText, HardDrive, LayoutGrid, Mail, MapPin, Package, Scale, Users, Wallet } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
@@ -46,6 +46,11 @@ const mainNavItems = computed((): NavItem[] => [
         title: t('salary_certificates.my_requests_title'),
         href: '/my/salary-certificates',
         icon: FileBadge,
+    },
+    {
+        title: t('advances.my_requests_title'),
+        href: '/my/advances',
+        icon: Wallet,
     },
     {
         title: t('nav.companies'),
@@ -178,12 +183,14 @@ const settingsNavItems = computed((): NavItem[] => {
                         item.href === '/dashboard'
                         || item.href === '/my/leaves'
                         || item.href === '/my/salary-certificates'
+                        || item.href === '/my/advances'
                         || (item.href === '/companies' && canViewCompanyReadOnly)
                         || (item.href === '/employees' && canViewEmployees)
                         || (item.href === '/departments' && canManageDepartments))
                     : mainNavItems.filter((item) =>
                         item.href !== '/my/leaves'
                         && item.href !== '/my/salary-certificates'
+                        && item.href !== '/my/advances'
                         && (item.href !== '/departments' || canManageDepartments))"
             />
             <NavMain v-if="canAccessAssetInventory" :items="assetInventoryNavItems" :label="t('nav.asset_inventory')" />

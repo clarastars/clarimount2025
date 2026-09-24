@@ -948,7 +948,15 @@
                                     >
                                         <div class="flex-1">
                                             <div class="font-medium text-lg mb-1">{{ formatCurrency(debt.amount) }}</div>
-                                            <div v-if="debt.debt_type" class="text-sm text-gray-500">{{ debt.debt_type }}</div>
+                                            <div v-if="debt.debt_type" class="text-sm text-gray-500">{{ debtTypeLabel(debt) }}</div>
+                                            <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                                <span>{{ t('debts.original_amount') }}: {{ formatCurrency(debtOriginalAmount(debt)) }}</span>
+                                                <span>{{ t('debts.paid_amount') }}: {{ formatCurrency(debtPaidAmount(debt)) }}</span>
+                                                <span>{{ t('debts.remaining_amount') }}: {{ formatCurrency(debt.amount) }}</span>
+                                                <span v-if="debt.monthly_installment">
+                                                    {{ t('debts.monthly_installment') }}: {{ formatCurrency(debt.monthly_installment) }}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div class="flex gap-2">
                                             <Button 
@@ -1286,16 +1294,40 @@ interface Debt {
     id?: number
     amount: number
     debt_type: string
+    original_amount?: number | null
+    monthly_installment?: number | null
 }
 
 const debts = ref<Debt[]>((props.employee.debts || []).map((debt: any) => ({
     id: debt.id,
     amount: parseFloat(debt.amount),
     debt_type: debt.debt_type || '',
+    original_amount: debt.original_amount !== null && debt.original_amount !== undefined
+        ? parseFloat(debt.original_amount)
+        : null,
+    monthly_installment: debt.monthly_installment !== null && debt.monthly_installment !== undefined
+        ? parseFloat(debt.monthly_installment)
+        : null,
 })))
 const editingDebtIndex = ref<number | null>(null)
 const newDebt = ref<Debt>({ amount: 0, debt_type: '' })
 const showAddDebtForm = ref(false)
+
+const debtOriginalAmount = (debt: Debt): number => Number(debt.original_amount ?? debt.amount) || 0
+
+const debtPaidAmount = (debt: Debt): number =>
+    Math.max(0, debtOriginalAmount(debt) - (Number(debt.amount) || 0))
+
+const debtTypeLabel = (debt: Debt): string => {
+    if (!debt.debt_type) {
+        return ''
+    }
+
+    const key = `debts.${debt.debt_type}`
+    const translated = t(key)
+
+    return translated === key ? debt.debt_type : translated
+}
 
 const addDebt = () => {
     if (newDebt.value.amount > 0) {

@@ -28,7 +28,10 @@ class EmployeeDebtController extends Controller
             'debt_type' => 'nullable|string|max:255',
         ]);
 
-        $employee->debts()->create($validated);
+        $employee->debts()->create([
+            ...$validated,
+            'original_amount' => $validated['amount'],
+        ]);
 
         return back()->with('success', __('messages.debts.debt_added_successfully'));
     }
@@ -50,7 +53,11 @@ class EmployeeDebtController extends Controller
             'debt_type' => 'nullable|string|max:255',
         ]);
 
-        $debt->update($validated);
+        // Editing a manual debt restates its total; advances keep the originally approved amount.
+        $debt->update($debt->isAdvance() ? $validated : [
+            ...$validated,
+            'original_amount' => $validated['amount'],
+        ]);
 
         return back()->with('success', __('messages.debts.debt_updated_successfully'));
     }

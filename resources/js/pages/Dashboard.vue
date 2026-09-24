@@ -55,6 +55,7 @@ interface PendingBucket {
 interface PendingApprovals {
     leaves: PendingBucket;
     salary_certificates: PendingBucket;
+    advances: PendingBucket;
     entitlement_settlements: PendingBucket;
     salary_runs: PendingBucket;
     total_count: number;
@@ -89,6 +90,7 @@ const emptyBucket = (): PendingBucket => ({
 const pending = computed((): PendingApprovals => props.pendingApprovals ?? {
     leaves: emptyBucket(),
     salary_certificates: emptyBucket(),
+    advances: emptyBucket(),
     entitlement_settlements: emptyBucket(),
     salary_runs: emptyBucket(),
     total_count: 0,
@@ -108,6 +110,13 @@ const pendingSections = computed(() => [
         icon: FileText,
         bucket: pending.value.salary_certificates,
         tone: 'violet',
+    },
+    {
+        key: 'advances',
+        title: t('dashboard.pending.advances'),
+        icon: Wallet,
+        bucket: pending.value.advances,
+        tone: 'emerald',
     },
     {
         key: 'entitlement_settlements',

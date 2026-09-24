@@ -382,10 +382,20 @@
                         <div
                             v-for="debt in employee.debts"
                             :key="debt.id"
-                            class="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-4 py-3"
+                            class="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 space-y-2"
                         >
-                            <span class="text-sm font-medium">{{ displayValue(debt.debt_type || t('common.optional')) }}</span>
-                            <span class="font-semibold text-amber-800">{{ displayCurrency(debt.amount) }}</span>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium">{{ debtTypeLabel(debt) }}</span>
+                                <span class="font-semibold text-amber-800">{{ displayCurrency(debt.amount) }}</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-4">
+                                <span>{{ t('debts.original_amount') }}: {{ displayCurrency(debtOriginalAmount(debt)) }}</span>
+                                <span>{{ t('debts.paid_amount') }}: {{ displayCurrency(debtPaidAmount(debt)) }}</span>
+                                <span>{{ t('debts.remaining_amount') }}: {{ displayCurrency(debt.amount) }}</span>
+                                <span v-if="debt.monthly_installment">
+                                    {{ t('debts.monthly_installment') }}: {{ displayCurrency(debt.monthly_installment) }}
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <p v-else class="text-sm text-muted-foreground">{{ t('debts.no_debts') }}</p>
@@ -540,6 +550,31 @@ const displayCurrency = (value: unknown): string => {
     }
 
     return `${amount.toFixed(2)} SAR`;
+};
+
+interface DebtRow {
+    id?: number;
+    amount: number | string;
+    original_amount?: number | string | null;
+    monthly_installment?: number | string | null;
+    debt_type?: string | null;
+}
+
+const debtOriginalAmount = (debt: DebtRow): number =>
+    Number(debt.original_amount ?? debt.amount) || 0;
+
+const debtPaidAmount = (debt: DebtRow): number =>
+    Math.max(0, debtOriginalAmount(debt) - (Number(debt.amount) || 0));
+
+const debtTypeLabel = (debt: DebtRow): string => {
+    if (!debt.debt_type) {
+        return t('debts.debt');
+    }
+
+    const key = `debts.${debt.debt_type}`;
+    const translated = t(key);
+
+    return translated === key ? debt.debt_type : translated;
 };
 
 const formatPercent = (value: unknown): string => {

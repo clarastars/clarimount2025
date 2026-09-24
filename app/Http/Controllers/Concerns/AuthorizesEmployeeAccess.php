@@ -476,6 +476,122 @@ trait AuthorizesEmployeeAccess
         );
     }
 
+    protected function canViewCompanyAdvances(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        foreach ($this->advanceWorkflowAccessPermissions() as $permission) {
+            if ($this->roleService()->canInAnyAssignedTeam($user, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function canCreateAdvances(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'advances.create');
+    }
+
+    protected function canApproveAdvances(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'advances.approve')
+            || $this->roleService()->canInAnyAssignedTeam($user, 'advances.create');
+    }
+
+    /**
+     * Permissions that allow seeing/acting on advance requests for an employee.
+     *
+     * @return array<int, string>
+     */
+    protected function advanceWorkflowAccessPermissions(): array
+    {
+        return [
+            'advances.approve',
+            'advances.company.view',
+            'advances.create',
+        ];
+    }
+
+    protected function canAccessEmployeeForAdvanceWorkflow(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAnyAccessEmployeeInCompanyDepartment(
+            $user,
+            $this->advanceWorkflowAccessPermissions(),
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function canAccessCompanyAdvances(User $user, Company $company): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $permissions = $this->advanceWorkflowAccessPermissions();
+
+        if ($this->roleService()->canAnyForCompany($user, $permissions, (int) $company->id)) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessCompanyViaDepartmentScope(
+            $user,
+            (int) $company->id,
+            $permissions,
+        );
+    }
+
+    protected function abortUnlessCanViewCompanyAdvances(User $user): void
+    {
+        abort_unless($this->canViewCompanyAdvances($user), 403);
+    }
+
+    protected function abortUnlessCanCreateAdvances(User $user): void
+    {
+        abort_unless($this->canCreateAdvances($user), 403);
+    }
+
+    protected function abortUnlessCanAccessCompanyAdvances(User $user, Company $company): void
+    {
+        abort_unless($this->canAccessCompanyAdvances($user, $company), 403);
+    }
+
     /**
      * Permissions that allow seeing/acting on leave & salary-certificate requests for an employee.
      *

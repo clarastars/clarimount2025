@@ -97,6 +97,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 href: '/settings/salary-certificate-approvals',
             },
             {
+                title: t('settings.advance_approvals'),
+                href: '/settings/advance-approvals',
+            },
+            {
                 title: t('settings.entitlement_settlement_approvals'),
                 href: '/settings/entitlement-settlement-approvals',
             },

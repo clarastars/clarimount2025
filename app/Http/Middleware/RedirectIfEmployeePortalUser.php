@@ -53,6 +53,9 @@ class RedirectIfEmployeePortalUser
             'employee.salary-certificates.destroy',
             'employee.salary-certificates.preview',
             'employee.salary-certificates.download',
+            'employee.advances.index',
+            'employee.advances.store',
+            'employee.advances.destroy',
             'api.notifications.index',
             'api.notifications.read',
             'api.notifications.read-all',
@@ -227,6 +230,30 @@ class RedirectIfEmployeePortalUser
                 'employees.leaves.create',
                 'employees.leaves.store',
                 'employees.show',
+            ]);
+        }
+
+        if ($can('advances.company.view')) {
+            $allowed = array_merge($allowed, [
+                'companies.advances.index',
+            ]);
+        }
+
+        if ($can('advances.create') || $can('advances.approve')) {
+            $allowed = array_merge($allowed, [
+                'companies.advances.index',
+                'companies.advance-requests.approve-step',
+                'companies.advance-requests.reject-step',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($can('advances.create')) {
+            $allowed = array_merge($allowed, [
+                'companies.advance-requests.approve',
+                'companies.advance-requests.reject',
             ]);
         }
 

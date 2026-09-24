@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\AdvanceApprovalService;
 use App\Services\CompanyTeamRoleOverviewService;
 use App\Services\EntitlementSettlementApprovalService;
 use App\Services\LeaveApprovalService;
@@ -64,6 +65,7 @@ class CompanyController extends Controller
      *     can_view_employees_readonly: bool,
      *     can_manage_employees: bool,
      *     can_view_company_leaves: bool,
+     *     can_view_company_advances: bool,
      *     can_view_attendance_readonly: bool,
      *     can_manage_attendance_adjustments: bool,
      *     can_view_salary_runs_readonly: bool,
@@ -79,6 +81,7 @@ class CompanyController extends Controller
                 'can_view_employees_readonly' => false,
                 'can_manage_employees' => false,
                 'can_view_company_leaves' => false,
+                'can_view_company_advances' => false,
                 'can_view_attendance_readonly' => false,
                 'can_manage_attendance_adjustments' => false,
                 'can_view_salary_runs_readonly' => false,
@@ -92,6 +95,7 @@ class CompanyController extends Controller
                 'can_view_employees_readonly' => true,
                 'can_manage_employees' => true,
                 'can_view_company_leaves' => true,
+                'can_view_company_advances' => true,
                 'can_view_attendance_readonly' => true,
                 'can_manage_attendance_adjustments' => true,
                 'can_view_salary_runs_readonly' => true,
@@ -111,6 +115,11 @@ class CompanyController extends Controller
             ),
             'can_manage_employees' => $roleService->canForCompany($user, 'employees.manage', $companyId),
             'can_view_company_leaves' => $roleService->canForCompany($user, 'leaves.company.view', $companyId),
+            'can_view_company_advances' => $roleService->canAnyForCompany(
+                $user,
+                ['advances.company.view', 'advances.create', 'advances.approve'],
+                $companyId
+            ),
             'can_view_attendance_readonly' => $roleService->canForCompany($user, 'attendance.readonly', $companyId),
             'can_manage_attendance_adjustments' => $roleService->canForCompany($user, 'attendance.adjustments.manage', $companyId),
             'can_view_salary_runs_readonly' => $roleService->canAnyForCompany(
@@ -257,6 +266,7 @@ class CompanyController extends Controller
         app(LeaveApprovalService::class)->seedDefaultStepsForCompany($company);
         app(SalaryCertificateApprovalService::class)->seedDefaultStepsForCompany($company);
         app(EntitlementSettlementApprovalService::class)->seedDefaultStepsForCompany($company);
+        app(AdvanceApprovalService::class)->seedDefaultStepsForCompany($company);
 
         return redirect()->route('companies.show', $company)
             ->with('success', 'Company created successfully.');
