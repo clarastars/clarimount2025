@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Settings\AdvanceApprovalStepsController;
+use App\Http\Controllers\Settings\AdvanceEntitlementTiersController;
 use App\Http\Controllers\Settings\EntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveTypeController;
@@ -97,6 +98,11 @@ Route::middleware('auth')->group(function () {
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
         Route::get('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'edit'])->name('settings.salary-certificate-fee.edit');
         Route::put('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'update'])->name('settings.salary-certificate-fee.update');
+
+        Route::get('settings/advance-entitlement-tiers', [AdvanceEntitlementTiersController::class, 'index'])->name('settings.advance-entitlement-tiers.index');
+        Route::post('settings/advance-entitlement-tiers', [AdvanceEntitlementTiersController::class, 'store'])->name('settings.advance-entitlement-tiers.store');
+        Route::put('settings/advance-entitlement-tiers/{advanceEntitlementTier}', [AdvanceEntitlementTiersController::class, 'update'])->name('settings.advance-entitlement-tiers.update');
+        Route::delete('settings/advance-entitlement-tiers/{advanceEntitlementTier}', [AdvanceEntitlementTiersController::class, 'destroy'])->name('settings.advance-entitlement-tiers.destroy');
 
         Route::get('settings/user-login', [UserLoginSettingsController::class, 'index'])->name('settings.user-login.index');
         Route::put('settings/user-login/{user}', [UserLoginSettingsController::class, 'update'])->name('settings.user-login.update');

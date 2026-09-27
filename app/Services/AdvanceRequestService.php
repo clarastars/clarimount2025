@@ -16,6 +16,7 @@ class AdvanceRequestService
 {
     public function __construct(
         private AdvanceAmountService $amountService,
+        private AdvanceEntitlementService $entitlementService,
         private AdvanceApprovalService $approvalService,
         private AdvanceRequestNotificationService $notificationService,
         private AdvanceApprovalNotificationService $approvalNotificationService,
@@ -24,43 +25,71 @@ class AdvanceRequestService
 
     public function submitForEmployee(Employee $employee, Request $request): AdvanceRequest
     {
-        $gross = $this->amountService->grossMonthlyFor($employee);
-        $monthlyOptions = $this->amountService->optionsForGross($gross);
+        $entitlement = $this->entitlementService->entitlementFor($employee);
 
-        if ($monthlyOptions === []) {
+        if (! $entitlement['has_hire_date']) {
             throw ValidationException::withMessages([
-                'monthly_deduction' => [__('messages.advances.no_amounts_available')],
+                'amount' => [__('messages.advances.missing_hire_date')],
             ]);
         }
 
+        if ($entitlement['block_reason'] === 'no_matching_tier') {
+            throw ValidationException::withMessages([
+                'amount' => [__('messages.advances.no_matching_tier')],
+            ]);
+        }
+
+        if (! $entitlement['can_request'] || $entitlement['remaining_amount'] <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => [__('messages.advances.no_remaining_entitlement')],
+            ]);
+        }
+
+        $gross = $this->amountService->grossMonthlyFor($employee);
+
         $validated = $request->validate([
-            'amount' => ['required', 'numeric'],
-            'monthly_deduction' => ['required', 'numeric'],
+            'amount' => ['required', 'numeric', 'min:1'],
+            'installments' => ['required', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:2000'],
         ], [
             'amount.required' => __('messages.validation.required'),
-            'monthly_deduction.required' => __('messages.validation.required'),
+            'installments.required' => __('messages.validation.required'),
             'reason.required' => __('messages.advances.reason_required'),
         ]);
 
         $amount = round((float) $validated['amount'], 2);
-        $monthly = round((float) $validated['monthly_deduction'], 2);
+        $installments = (int) $validated['installments'];
+        $maxInstallments = (int) $entitlement['max_installments'];
+        $remaining = (float) $entitlement['remaining_amount'];
 
-        if (! $this->amountService->isAllowedAmount($amount) || abs($amount - (int) $amount) > 0.001) {
+        if ($amount > $remaining + 0.001) {
             throw ValidationException::withMessages([
-                'amount' => [__('messages.advances.amount_not_allowed')],
+                'amount' => [__('messages.advances.amount_exceeds_entitlement', [
+                    'max' => number_format($remaining, 2),
+                ])],
             ]);
         }
 
-        if (! in_array((int) $monthly, $monthlyOptions, true) || abs($monthly - (int) $monthly) > 0.001) {
+        if ($installments < 1 || $installments > $maxInstallments) {
             throw ValidationException::withMessages([
-                'monthly_deduction' => [__('messages.advances.monthly_not_allowed')],
+                'installments' => [__('messages.advances.installments_not_allowed', [
+                    'max' => $maxInstallments,
+                ])],
             ]);
         }
 
-        if ($monthly > $amount) {
+        $plan = $this->amountService->buildRepaymentScheduleForInstallments($amount, $installments);
+        $monthly = (float) ($plan['monthly_deduction'] ?? 0);
+
+        if ($plan['months_count'] < 1 || $monthly <= 0) {
             throw ValidationException::withMessages([
-                'monthly_deduction' => [__('messages.advances.monthly_exceeds_amount')],
+                'installments' => [__('messages.advances.invalid_repayment_plan')],
+            ]);
+        }
+
+        if ($gross <= 0 || $monthly >= $gross) {
+            throw ValidationException::withMessages([
+                'installments' => [__('messages.advances.monthly_exceeds_gross')],
             ]);
         }
 
@@ -69,8 +98,6 @@ class AdvanceRequestService
                 'amount' => [__('messages.advances.pending_request_exists')],
             ]);
         }
-
-        $plan = $this->amountService->buildRepaymentSchedule($amount, $monthly);
 
         $advanceRequest = AdvanceRequest::query()->create([
             'employee_id' => $employee->id,

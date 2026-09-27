@@ -209,8 +209,8 @@ class LeaveAccrualService
 
     /**
      * Date through which live/settlement accrued balance is calculated.
-     * Includes the as-of day itself (today or settlement date). Still capped at
-     * departure when earlier.
+     * Uses elapsed hire-anniversary time to this calendar date (Asia/Riyadh startOfDay),
+     * still capped at departure when earlier.
      */
     public function resolveLiveAccruedThroughDate(Employee $employee, ?Carbon $date = null): Carbon
     {
@@ -256,8 +256,9 @@ class LeaveAccrualService
     }
 
     /**
-     * Days earned from hire through a specific date (inclusive of that day).
-     * Used by entitlement settlement and daily live balance sync.
+     * Days earned from hire through a specific date.
+     * Uses hire-anniversary months with a fixed 30-day month for leftover days:
+     * (complete_months + leftover_days / 30) × monthly_accrual.
      */
     public function projectedAccruedBalanceThroughDate(Employee $employee, Carbon $asOf): float
     {
@@ -274,29 +275,7 @@ class LeaveAccrualService
             return $this->projectAccruedWithoutHireDateThrough($employee, $through);
         }
 
-        if ($hireDate->gt($through)) {
-            return 0.0;
-        }
-
-        $total = 0.0;
-
-        foreach ($this->eligibleAccrualPeriods($hireDate, $through) as $period) {
-            $daysForPeriod = $this->accrualDaysForPeriod(
-                $employee,
-                $period,
-                $hireDate,
-                $through,
-                prorateToAsOf: true,
-            );
-
-            if ($daysForPeriod <= 0) {
-                continue;
-            }
-
-            $total = round($total + $daysForPeriod, 2);
-        }
-
-        return $total;
+        return $this->accruedDaysFromHireThrough($hireDate, $through, $monthlyDays);
     }
 
     /**
@@ -361,11 +340,15 @@ class LeaveAccrualService
             ];
         }
 
+        // Prefer the continuous total so month-log rounding never drifts from live balance.
+        $runningBalance = $this->accruedDaysFromHireThrough($hireDate, $asOf, $monthlyDays);
+
         return $this->persistAccruedBalance($employee, $runningBalance, $logRows, $replaceExistingLogs);
     }
 
     /**
-     * Accrued days for a calendar month, pro-rated when the hire or departure date falls mid-month.
+     * Accrued days for a calendar month as the continuous hire-based balance delta
+     * across that month (fixed 30-day leftover-day divisor).
      */
     public function accrualDaysForPeriod(
         Employee $employee,
@@ -386,7 +369,6 @@ class LeaveAccrualService
 
         $periodStart = Carbon::createFromFormat('Y-m-d', $period.'-01', self::TZ)->startOfDay();
         $periodEnd = $periodStart->copy()->endOfMonth()->startOfDay();
-        $daysInMonth = $periodStart->daysInMonth;
 
         $hireDate ??= $this->resolveHireDate($employee);
         if ($hireDate === null) {
@@ -415,13 +397,31 @@ class LeaveAccrualService
             return 0.0;
         }
 
-        $daysInRange = (int) round($rangeStart->diffInDays($rangeEnd, false)) + 1;
+        $throughEnd = $this->accruedDaysFromHireThrough($hireDate, $rangeEnd, $monthlyDays);
+        $dayBeforeStart = $rangeStart->copy()->subDay()->startOfDay();
 
-        if ($daysInRange >= $daysInMonth) {
-            return $monthlyDays;
+        $throughBefore = $dayBeforeStart->lt($hireDate)
+            ? 0.0
+            : $this->accruedDaysFromHireThrough($hireDate, $dayBeforeStart, $monthlyDays);
+
+        return max(0.0, round($throughEnd - $throughBefore, 2));
+    }
+
+    /**
+     * Continuous accrual from hire date to through date:
+     * (complete anniversary months + leftover days / 30) × monthly accrual.
+     */
+    public function accruedDaysFromHireThrough(Carbon $hireDate, Carbon $through, float $monthlyDays): float
+    {
+        if ($monthlyDays <= 0 || $hireDate->gt($through)) {
+            return 0.0;
         }
 
-        return round(($daysInRange / $daysInMonth) * $monthlyDays, 2);
+        $interval = $hireDate->copy()->startOfDay()->diff($through->copy()->startOfDay());
+        $months = ((int) $interval->y * 12) + (int) $interval->m;
+        $days = (int) $interval->d;
+
+        return round(($months + ($days / 30)) * $monthlyDays, 2);
     }
 
     public function isEmployeeEligibleForAccrualPeriod(

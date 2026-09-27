@@ -85,7 +85,7 @@ class AdvanceAmountService
     /**
      * Equal installments of the monthly deduction, with the remainder paid in the final month.
      *
-     * @return array{months_count: int, schedule: list<array{month_index: int, amount: float}>}
+     * @return array{months_count: int, schedule: list<array{month_index: int, amount: float}>, monthly_deduction: float}
      */
     public function buildRepaymentSchedule(float $amount, float $monthly): array
     {
@@ -93,7 +93,7 @@ class AdvanceAmountService
         $monthly = round($monthly, 2);
 
         if ($amount <= 0 || $monthly <= 0) {
-            return ['months_count' => 0, 'schedule' => []];
+            return ['months_count' => 0, 'schedule' => [], 'monthly_deduction' => 0.0];
         }
 
         $monthly = min($monthly, $amount);
@@ -115,6 +115,57 @@ class AdvanceAmountService
         return [
             'months_count' => count($schedule),
             'schedule' => $schedule,
+            'monthly_deduction' => $monthly,
+        ];
+    }
+
+    /**
+     * Split an advance into a fixed number of installments (remainder in the final month).
+     *
+     * @return array{months_count: int, schedule: list<array{month_index: int, amount: float}>, monthly_deduction: float}
+     */
+    public function buildRepaymentScheduleForInstallments(float $amount, int $installments): array
+    {
+        $amount = round($amount, 2);
+        $installments = max(1, $installments);
+
+        if ($amount <= 0) {
+            return ['months_count' => 0, 'schedule' => [], 'monthly_deduction' => 0.0];
+        }
+
+        $baseMonthly = round($amount / $installments, 2);
+
+        if ($baseMonthly <= 0) {
+            return ['months_count' => 0, 'schedule' => [], 'monthly_deduction' => 0.0];
+        }
+
+        $schedule = [];
+        $allocated = 0.0;
+
+        for ($index = 1; $index <= $installments; $index++) {
+            if ($index === $installments) {
+                $installment = round($amount - $allocated, 2);
+            } else {
+                $installment = $baseMonthly;
+                $allocated = round($allocated + $installment, 2);
+            }
+
+            if ($installment <= 0) {
+                continue;
+            }
+
+            $schedule[] = [
+                'month_index' => count($schedule) + 1,
+                'amount' => $installment,
+            ];
+        }
+
+        $monthlyDeduction = $schedule[0]['amount'] ?? 0.0;
+
+        return [
+            'months_count' => count($schedule),
+            'schedule' => $schedule,
+            'monthly_deduction' => $monthlyDeduction,
         ];
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\AdvanceAmountService;
 use App\Services\AdvanceApprovalService;
+use App\Services\AdvanceEntitlementService;
 use App\Services\AdvanceRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class EmployeePortalAdvanceController extends Controller
         private AdvanceRequestService $requestService,
         private AdvanceApprovalService $approvalService,
         private AdvanceAmountService $amountService,
+        private AdvanceEntitlementService $entitlementService,
     ) {}
 
     public function index(): Response|RedirectResponse
@@ -42,6 +44,7 @@ class EmployeePortalAdvanceController extends Controller
             ->all();
 
         $gross = $this->amountService->grossMonthlyFor($employee);
+        $entitlement = $this->entitlementService->entitlementFor($employee);
 
         return Inertia::render('Employee/Advances', [
             'employee' => [
@@ -51,8 +54,7 @@ class EmployeePortalAdvanceController extends Controller
                 'gross_monthly' => $gross,
             ],
             'requests' => $requests,
-            'amountOptions' => $this->amountService->allAmountOptions(),
-            'monthlyDeductionOptions' => $this->amountService->optionsForGross($gross),
+            'entitlement' => $entitlement,
             'hasPendingRequest' => $employee->advanceRequests()
                 ->where('status', AdvanceRequest::STATUS_PENDING)
                 ->exists(),

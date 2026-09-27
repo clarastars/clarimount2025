@@ -101,6 +101,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 href: '/settings/advance-approvals',
             },
             {
+                title: t('settings.advance_entitlement_tiers'),
+                href: '/settings/advance-entitlement-tiers',
+            },
+            {
                 title: t('settings.entitlement_settlement_approvals'),
                 href: '/settings/entitlement-settlement-approvals',
             },

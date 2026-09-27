@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CheckCircle2, Circle, Clock, Wallet } from 'lucide-vue-next';
 
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { BreadcrumbItem } from '@/types';
 
@@ -62,11 +63,24 @@ interface EmployeeSummary {
     gross_monthly: number;
 }
 
+interface EntitlementSummary {
+    has_hire_date: boolean;
+    hire_date: string | null;
+    months_of_service: number | null;
+    can_request: boolean;
+    block_reason: string | null;
+    annual_max_amount: number;
+    used_amount: number;
+    remaining_amount: number;
+    max_installments: number;
+    period_start: string | null;
+    period_end: string | null;
+}
+
 const props = defineProps<{
     employee: EmployeeSummary;
     requests: AdvanceRequestRow[];
-    amountOptions: number[];
-    monthlyDeductionOptions?: number[];
+    entitlement: EntitlementSummary;
     hasPendingRequest: boolean;
 }>();
 
@@ -84,26 +98,49 @@ const expandedApprovalRequestIds = ref<number[]>([]);
 
 const form = useForm({
     amount: '' as string | number,
-    monthly_deduction: '' as string | number,
+    installments: '' as string | number,
     reason: '',
 });
 
 const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
 
-const amountOptions = computed(() => props.amountOptions ?? []);
-
 const selectedAmount = computed(() => Number(form.amount) || 0);
+const selectedInstallments = computed(() => Number(form.installments) || 0);
 
-const monthlyOptions = computed(() => {
-    const cappedByGross = props.monthlyDeductionOptions ?? amountOptions.value;
-
-    return cappedByGross.filter((option) => selectedAmount.value === 0 || option <= selectedAmount.value);
+const installmentOptions = computed(() => {
+    const max = props.entitlement.max_installments || 0;
+    return Array.from({ length: max }, (_, index) => index + 1);
 });
 
-watch(selectedAmount, (amount) => {
-    if (amount > 0 && Number(form.monthly_deduction) > amount) {
-        form.monthly_deduction = '';
+const canOpenRequest = computed(() =>
+    props.entitlement.can_request
+    && props.entitlement.remaining_amount > 0
+    && !props.hasPendingRequest
+    && props.employee.gross_monthly > 0,
+);
+
+const blockMessage = computed(() => {
+    if (!props.entitlement.has_hire_date) {
+        return t('advances.missing_hire_date');
     }
+
+    if (props.hasPendingRequest) {
+        return t('advances.pending_request_exists');
+    }
+
+    if (props.entitlement.block_reason === 'no_matching_tier') {
+        return t('advances.no_matching_tier');
+    }
+
+    if (props.entitlement.block_reason === 'no_remaining_entitlement') {
+        return t('advances.no_remaining_entitlement');
+    }
+
+    if (props.employee.gross_monthly <= 0) {
+        return t('advances.no_amounts_available');
+    }
+
+    return null;
 });
 
 const formatCurrency = (amount: number) => `${Number(amount).toLocaleString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
@@ -111,26 +148,43 @@ const formatCurrency = (amount: number) => `${Number(amount).toLocaleString(loca
     maximumFractionDigits: 2,
 })} SAR`;
 
-const previewPlan = computed((): { months: number; schedule: ScheduleRow[] } | null => {
+const previewPlan = computed((): { months: number; schedule: ScheduleRow[]; monthly: number } | null => {
     const amount = selectedAmount.value;
-    const monthly = Number(form.monthly_deduction) || 0;
+    const installments = selectedInstallments.value;
 
-    if (amount <= 0 || monthly <= 0 || monthly > amount) {
+    if (amount <= 0 || installments < 1) {
         return null;
     }
 
+    const baseMonthly = Math.round((amount / installments) * 100) / 100;
     const schedule: ScheduleRow[] = [];
-    let remaining = amount;
-    let index = 0;
+    let allocated = 0;
 
-    while (remaining > 0.001 && index < 240) {
-        index += 1;
-        const installment = Math.min(monthly, remaining);
-        schedule.push({ month_index: index, amount: Math.round(installment * 100) / 100 });
-        remaining = Math.round((remaining - installment) * 100) / 100;
+    for (let index = 1; index <= installments; index += 1) {
+        const installment = index === installments
+            ? Math.round((amount - allocated) * 100) / 100
+            : baseMonthly;
+
+        if (installment <= 0) {
+            continue;
+        }
+
+        if (index < installments) {
+            allocated = Math.round((allocated + installment) * 100) / 100;
+        }
+
+        schedule.push({ month_index: schedule.length + 1, amount: installment });
     }
 
-    return { months: schedule.length, schedule };
+    if (schedule.length === 0) {
+        return null;
+    }
+
+    return {
+        months: schedule.length,
+        schedule,
+        monthly: schedule[0].amount,
+    };
 });
 
 const statusLabel = (status: string) => {
@@ -204,6 +258,22 @@ const formatShortDate = (iso: string | null | undefined): string => {
     }
 };
 
+const formatDateOnly = (value: string | null | undefined): string => {
+    if (!value) {
+        return '—';
+    }
+
+    try {
+        return new Date(`${value}T00:00:00`).toLocaleDateString(locale.value === 'ar' ? 'ar-SA' : 'en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    } catch {
+        return value;
+    }
+};
+
 const stepStatusLabel = (step: ApprovalProgressStep): string => {
     if (step.status === 'approved' && step.approver_name) {
         return t('leaves.approval_step_approved_by', { name: step.approver_name });
@@ -233,7 +303,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                         <span v-if="employee.company_name"> — {{ employee.company_name }}</span>
                     </p>
                 </div>
-                <Button :disabled="amountOptions.length === 0 || monthlyOptions.length === 0 || hasPendingRequest" @click="openCreateForm">
+                <Button :disabled="!canOpenRequest" @click="openCreateForm">
                     <Wallet class="mr-2 h-4 w-4" />
                     {{ t('advances.request_new') }}
                 </Button>
@@ -243,11 +313,52 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                 {{ flashSuccess }}
             </div>
 
-            <p v-if="monthlyOptions.length === 0" class="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                {{ t('advances.no_amounts_available') }}
-            </p>
-            <p v-else-if="hasPendingRequest" class="rounded-md border px-4 py-3 text-sm text-muted-foreground">
-                {{ t('advances.pending_request_exists') }}
+            <Card>
+                <CardHeader>
+                    <CardTitle>{{ t('advances.entitlement_title') }}</CardTitle>
+                    <CardDescription>{{ t('advances.entitlement_description') }}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="!entitlement.has_hire_date" class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        {{ t('advances.missing_hire_date') }}
+                    </div>
+                    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.hire_date') }}</p>
+                            <p class="font-medium">{{ formatDateOnly(entitlement.hire_date) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.months_of_service') }}</p>
+                            <p class="font-medium">{{ entitlement.months_of_service ?? 0 }}</p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.entitlement_period') }}</p>
+                            <p class="font-medium">
+                                {{ formatDateOnly(entitlement.period_start) }} — {{ formatDateOnly(entitlement.period_end) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.annual_max_amount') }}</p>
+                            <p class="font-medium">{{ formatCurrency(entitlement.annual_max_amount) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.used_amount') }}</p>
+                            <p class="font-medium">{{ formatCurrency(entitlement.used_amount) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.remaining_amount') }}</p>
+                            <p class="font-medium">{{ formatCurrency(entitlement.remaining_amount) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-muted-foreground">{{ t('advances.max_installments') }}</p>
+                            <p class="font-medium">{{ entitlement.max_installments || '—' }}</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <p v-if="blockMessage" class="rounded-md border px-4 py-3 text-sm text-muted-foreground">
+                {{ blockMessage }}
             </p>
 
             <Card>
@@ -256,9 +367,9 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                     <CardDescription>{{ t('advances.my_requests_description') }}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div v-if="requests.length === 0" class="text-sm text-muted-foreground py-6 text-center">
+                    <p v-if="requests.length === 0" class="text-sm text-muted-foreground py-6 text-center">
                         {{ t('advances.no_requests_yet') }}
-                    </div>
+                    </p>
                     <div v-else class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead>
@@ -273,41 +384,32 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             </thead>
                             <tbody>
                                 <template v-for="request in requests" :key="request.id">
-                                    <tr class="border-b last:border-0">
-                                        <td class="py-3 px-2 font-medium">{{ formatCurrency(request.amount) }}</td>
+                                    <tr class="border-b last:border-0 align-top">
+                                        <td class="py-3 px-2">{{ formatCurrency(request.amount) }}</td>
                                         <td class="py-3 px-2">{{ formatCurrency(request.monthly_deduction) }}</td>
                                         <td class="py-3 px-2">{{ request.months_count }}</td>
-                                        <td class="py-3 px-2 max-w-xs whitespace-pre-wrap">{{ request.reason }}</td>
+                                        <td class="py-3 px-2 max-w-[220px]">
+                                            <span class="line-clamp-2">{{ request.reason }}</span>
+                                        </td>
                                         <td class="py-3 px-2">
-                                            <Badge :variant="statusVariant(request.status)">
-                                                {{ statusLabel(request.status) }}
-                                            </Badge>
-                                            <p v-if="request.review_notes" class="text-xs text-muted-foreground mt-1">{{ request.review_notes }}</p>
-                                            <p
-                                                v-if="request.approval_progress"
-                                                class="text-xs text-muted-foreground mt-1.5"
-                                            >
-                                                {{ t('leaves.approval_progress_summary', {
-                                                    approved: request.approval_progress.approved_count,
-                                                    total: request.approval_progress.total_steps,
-                                                    remaining: request.approval_progress.remaining_steps,
-                                                }) }}
-                                            </p>
+                                            <Badge :variant="statusVariant(request.status)">{{ statusLabel(request.status) }}</Badge>
                                         </td>
                                         <td class="py-3 px-2">
                                             <div class="flex flex-wrap gap-2">
                                                 <Button
-                                                    size="sm"
+                                                    v-if="request.approval_progress && request.approval_progress.total_steps > 0"
+                                                    type="button"
                                                     variant="outline"
+                                                    size="sm"
                                                     @click="toggleApprovalDetails(request.id)"
                                                 >
                                                     {{ isApprovalDetailsOpen(request.id) ? t('common.close') : t('advances.request_details') }}
                                                 </Button>
                                                 <Button
                                                     v-if="request.status === 'pending'"
-                                                    size="sm"
+                                                    type="button"
                                                     variant="outline"
-                                                    class="text-destructive hover:text-destructive"
+                                                    size="sm"
                                                     :disabled="cancellingRequestId === request.id"
                                                     @click="cancelRequest(request.id)"
                                                 >
@@ -316,15 +418,12 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr
-                                        v-if="isApprovalDetailsOpen(request.id)"
-                                        class="border-b last:border-0 bg-muted/20"
-                                    >
-                                        <td colspan="6" class="px-2 pb-4 pt-1">
-                                            <div class="rounded-lg border bg-background p-3 space-y-4">
-                                                <div>
+                                    <tr v-if="isApprovalDetailsOpen(request.id) && request.approval_progress" :key="`${request.id}-details`">
+                                        <td colspan="6" class="bg-muted/30 px-4 py-4">
+                                            <div class="space-y-4">
+                                                <div v-if="request.repayment_schedule?.length" class="rounded-md border bg-background px-3 py-3 space-y-2">
                                                     <p class="text-sm font-medium mb-2">{{ t('advances.repayment_plan') }}</p>
-                                                    <p class="text-xs text-muted-foreground mb-2">
+                                                    <p class="text-sm text-muted-foreground">
                                                         {{ t('advances.repayment_plan_summary', {
                                                             amount: formatCurrency(request.amount),
                                                             months: request.months_count,
@@ -334,69 +433,30 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                                     <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                                         <li
                                                             v-for="row in request.repayment_schedule"
-                                                            :key="row.month_index"
+                                                            :key="`req-${request.id}-${row.month_index}`"
                                                             class="rounded-md border px-3 py-2 text-xs"
                                                         >
-                                                            <span class="text-muted-foreground">
-                                                                {{ t('advances.repayment_month', { index: row.month_index }) }}
-                                                            </span>
+                                                            {{ t('advances.repayment_month', { index: row.month_index }) }}
                                                             <span class="block font-medium">{{ formatCurrency(row.amount) }}</span>
                                                         </li>
                                                     </ul>
                                                 </div>
 
-                                                <div v-if="request.approval_progress" class="space-y-3 border-t pt-3">
-                                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                                        <p class="text-sm font-medium">{{ t('leaves.approval_workflow_title') }}</p>
-                                                        <p
-                                                            v-if="request.approval_progress.current_step_title"
-                                                            class="text-xs text-amber-700 dark:text-amber-400"
-                                                        >
-                                                            {{ t('leaves.approval_progress_current_step', {
-                                                                step: request.approval_progress.current_step_title,
-                                                            }) }}
-                                                        </p>
-                                                    </div>
-
-                                                    <p
-                                                        v-if="request.approval_progress.latest_rejection"
-                                                        class="text-xs text-red-700 dark:text-red-400 rounded-md border border-red-200 bg-red-50/80 px-3 py-2 dark:border-red-900 dark:bg-red-950/30"
-                                                    >
-                                                        {{ t('leaves.approval_rejection_short', {
-                                                            step: request.approval_progress.latest_rejection.step_title ?? '—',
-                                                            reason: request.approval_progress.latest_rejection.reason,
-                                                        }) }}
-                                                    </p>
-
-                                                    <ol class="space-y-2">
+                                                <div v-if="request.approval_progress">
+                                                    <ol class="space-y-3">
                                                         <li
                                                             v-for="(step, index) in request.approval_progress.steps"
                                                             :key="step.id"
-                                                            class="flex items-start gap-2 text-sm"
+                                                            class="flex gap-3"
                                                         >
-                                                            <CheckCircle2
-                                                                v-if="step.status === 'approved'"
-                                                                class="h-4 w-4 shrink-0 text-green-600 mt-0.5"
-                                                            />
-                                                            <Clock
-                                                                v-else-if="step.status === 'current'"
-                                                                class="h-4 w-4 shrink-0 text-amber-600 mt-0.5"
-                                                            />
-                                                            <Circle
-                                                                v-else
-                                                                class="h-4 w-4 shrink-0 text-muted-foreground mt-0.5"
-                                                            />
-
-                                                            <div class="min-w-0 flex-1">
-                                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                                                    <span
-                                                                        class="font-medium"
-                                                                        :class="{
-                                                                            'text-green-700 dark:text-green-400': step.status === 'approved',
-                                                                            'text-amber-700 dark:text-amber-400': step.status === 'current',
-                                                                            'text-muted-foreground': step.status === 'waiting',
-                                                                        }"
-                                                                    >
+                                                            <div class="mt-0.5">
+                                                                <CheckCircle2 v-if="step.status === 'approved'" class="h-4 w-4 text-green-600" />
+                                                                <Clock v-else-if="step.status === 'current'" class="h-4 w-4 text-amber-600" />
+                                                                <Circle v-else class="h-4 w-4 text-muted-foreground" />
+                                                            </div>
+                                                            <div>
+                                                                <div class="flex flex-wrap items-center gap-1 text-sm">
+                                                                    <span class="font-medium">
                                                                         {{ index + 1 }}. {{ step.title }}
                                                                     </span>
                                                                     <span v-if="step.team_name" class="text-xs text-muted-foreground">
@@ -423,44 +483,50 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                 </CardContent>
             </Card>
 
-            <Dialog :open="createFormOpen" @update:open="(open: boolean) => (open ? openCreateForm() : closeCreateForm())">
+            <Dialog :open="createFormOpen" @update:open="(open) => (open ? openCreateForm() : closeCreateForm())">
                 <DialogContent class="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{{ t('advances.request_new') }}</DialogTitle>
-                        <DialogDescription>{{ t('advances.request_description') }}</DialogDescription>
+                        <DialogDescription>
+                            {{ t('advances.request_description_entitlement', {
+                                max: formatCurrency(entitlement.remaining_amount),
+                                installments: entitlement.max_installments,
+                            }) }}
+                        </DialogDescription>
                     </DialogHeader>
 
                     <form class="space-y-4" @submit.prevent="submit">
                         <div class="space-y-2">
                             <Label for="amount">{{ t('advances.amount') }}</Label>
-                            <select
+                            <Input
                                 id="amount"
                                 v-model="form.amount"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                type="number"
+                                min="1"
+                                step="0.01"
+                                :max="entitlement.remaining_amount"
                                 required
-                            >
-                                <option value="" disabled>{{ t('advances.select_amount') }}</option>
-                                <option v-for="option in amountOptions" :key="`amount-${option}`" :value="option">
-                                    {{ formatCurrency(option) }}
-                                </option>
-                            </select>
+                            />
+                            <p class="text-xs text-muted-foreground">
+                                {{ t('advances.amount_max_hint', { max: formatCurrency(entitlement.remaining_amount) }) }}
+                            </p>
                             <p v-if="form.errors.amount" class="text-sm text-red-600">{{ form.errors.amount }}</p>
                         </div>
 
                         <div class="space-y-2">
-                            <Label for="monthly_deduction">{{ t('advances.monthly_deduction') }}</Label>
+                            <Label for="installments">{{ t('advances.installments') }}</Label>
                             <select
-                                id="monthly_deduction"
-                                v-model="form.monthly_deduction"
+                                id="installments"
+                                v-model="form.installments"
                                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 required
                             >
-                                <option value="" disabled>{{ t('advances.select_monthly_deduction') }}</option>
-                                <option v-for="option in monthlyOptions" :key="`monthly-${option}`" :value="option">
-                                    {{ formatCurrency(option) }}
+                                <option value="" disabled>{{ t('advances.select_installments') }}</option>
+                                <option v-for="option in installmentOptions" :key="`installment-${option}`" :value="option">
+                                    {{ option }}
                                 </option>
                             </select>
-                            <p v-if="form.errors.monthly_deduction" class="text-sm text-red-600">{{ form.errors.monthly_deduction }}</p>
+                            <p v-if="form.errors.installments" class="text-sm text-red-600">{{ form.errors.installments }}</p>
                         </div>
 
                         <div v-if="previewPlan" class="rounded-md border bg-muted/40 px-3 py-3 space-y-2">
@@ -469,7 +535,7 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                 {{ t('advances.repayment_plan_summary', {
                                     amount: formatCurrency(selectedAmount),
                                     months: previewPlan.months,
-                                    monthly: formatCurrency(Number(form.monthly_deduction)),
+                                    monthly: formatCurrency(previewPlan.monthly),
                                 }) }}
                             </p>
                             <ul class="grid grid-cols-2 gap-2 sm:grid-cols-3">
