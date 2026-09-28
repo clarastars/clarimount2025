@@ -11,18 +11,29 @@ import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 
+interface CompanyOption {
+    id: number;
+    name: string;
+    name_ar?: string | null;
+    name_en?: string | null;
+}
+
 interface Props {
     settings: {
         enabled: boolean;
         scope: string;
         days_ahead: number;
+        company_filter_mode: string;
+        company_ids: number[];
     };
     scopes: string[];
+    companyFilterModes: string[];
+    companies: CompanyOption[];
     status?: string | null;
 }
 
 const props = defineProps<Props>();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const breadcrumbItems = computed((): BreadcrumbItem[] => [
     {
@@ -35,12 +46,49 @@ const form = useForm({
     enabled: props.settings.enabled,
     scope: props.settings.scope,
     days_ahead: props.settings.days_ahead,
+    company_filter_mode: props.settings.company_filter_mode || 'all',
+    company_ids: [...(props.settings.company_ids || [])],
 });
+
+const needsCompanySelection = computed(
+    () => form.company_filter_mode === 'include' || form.company_filter_mode === 'exclude',
+);
 
 const scopeLabel = (scope: string): string => {
     const key = `settings.birthday_widget_scope_${scope}`;
     const translated = t(key);
     return translated === key ? scope : translated;
+};
+
+const filterModeLabel = (mode: string): string => {
+    const key = `settings.birthday_widget_company_filter_${mode}`;
+    const translated = t(key);
+    return translated === key ? mode : translated;
+};
+
+const companyLabel = (company: CompanyOption): string => {
+    if (locale.value === 'ar') {
+        return company.name_ar || company.name_en || company.name;
+    }
+
+    return company.name_en || company.name_ar || company.name;
+};
+
+const toggleCompany = (companyId: number): void => {
+    const index = form.company_ids.indexOf(companyId);
+    if (index === -1) {
+        form.company_ids.push(companyId);
+    } else {
+        form.company_ids.splice(index, 1);
+    }
+};
+
+const selectAllCompanies = (): void => {
+    form.company_ids = props.companies.map((company) => company.id);
+};
+
+const clearCompanies = (): void => {
+    form.company_ids = [];
 };
 
 const submit = (): void => {
@@ -49,6 +97,7 @@ const submit = (): void => {
             ...data,
             enabled: Boolean(data.enabled),
             days_ahead: Number(data.days_ahead),
+            company_ids: data.company_filter_mode === 'all' ? [] : data.company_ids.map(Number),
         }))
         .put(route('settings.birthday-widget.update'));
 };
@@ -101,6 +150,84 @@ const submit = (): void => {
                             {{ t('settings.birthday_widget_scope_hint') }}
                         </p>
                         <p v-if="form.errors.scope" class="text-sm text-red-600">{{ form.errors.scope }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="company_filter_mode">{{ t('settings.birthday_widget_company_filter') }}</Label>
+                        <select
+                            id="company_filter_mode"
+                            v-model="form.company_filter_mode"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            :disabled="!form.enabled"
+                            @change="form.company_filter_mode === 'all' ? clearCompanies() : undefined"
+                        >
+                            <option v-for="mode in companyFilterModes" :key="mode" :value="mode">
+                                {{ filterModeLabel(mode) }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t('settings.birthday_widget_company_filter_hint') }}
+                        </p>
+                        <p v-if="form.errors.company_filter_mode" class="text-sm text-red-600">
+                            {{ form.errors.company_filter_mode }}
+                        </p>
+                    </div>
+
+                    <div v-if="needsCompanySelection" class="space-y-3 rounded-md border p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <Label>{{ t('settings.birthday_widget_companies') }}</Label>
+                            <div class="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="!form.enabled"
+                                    @click="selectAllCompanies"
+                                >
+                                    {{ t('settings.birthday_widget_companies_select_all') }}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    :disabled="!form.enabled"
+                                    @click="clearCompanies"
+                                >
+                                    {{ t('settings.birthday_widget_companies_clear') }}
+                                </Button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            {{
+                                form.company_filter_mode === 'include'
+                                    ? t('settings.birthday_widget_companies_include_hint')
+                                    : t('settings.birthday_widget_companies_exclude_hint')
+                            }}
+                        </p>
+
+                        <div v-if="companies.length === 0" class="text-sm text-muted-foreground">
+                            {{ t('settings.birthday_widget_companies_empty') }}
+                        </div>
+                        <div v-else class="max-h-64 space-y-2 overflow-y-auto rounded-md border p-2">
+                            <label
+                                v-for="company in companies"
+                                :key="company.id"
+                                class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/50"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300"
+                                    :checked="form.company_ids.includes(company.id)"
+                                    :disabled="!form.enabled"
+                                    @change="toggleCompany(company.id)"
+                                >
+                                <span>{{ companyLabel(company) }}</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                            {{ t('settings.birthday_widget_companies_selected', { count: form.company_ids.length }) }}
+                        </p>
+                        <p v-if="form.errors.company_ids" class="text-sm text-red-600">{{ form.errors.company_ids }}</p>
                     </div>
 
                     <div class="space-y-2">

@@ -45,14 +45,22 @@ class UpcomingBirthdaysService
             ->where('employment_status', 'active')
             ->whereNotNull('birth_date');
 
+        $this->applyCompanyFilter($query, $settings);
+
         if ($scope === BirthdaySettingsService::SCOPE_COMPANY) {
             if ($viewer === null || $viewer->company_id === null) {
                 return $this->maybeOnlySelfReminder($viewer, $asOf, $daysAhead);
+            }
+            if (! $this->settingsService->allowsCompanyId((int) $viewer->company_id)) {
+                return [];
             }
             $query->where('company_id', $viewer->company_id);
         } elseif ($scope === BirthdaySettingsService::SCOPE_DEPARTMENT) {
             if ($viewer === null || $viewer->company_id === null || $viewer->department_id === null) {
                 return $this->maybeOnlySelfReminder($viewer, $asOf, $daysAhead);
+            }
+            if (! $this->settingsService->allowsCompanyId((int) $viewer->company_id)) {
+                return [];
             }
             $query->where('company_id', $viewer->company_id)
                 ->where('department_id', $viewer->department_id);
@@ -109,10 +117,39 @@ class UpcomingBirthdaysService
             return [];
         }
 
+        if (! $this->settingsService->allowsCompanyId($viewer->company_id !== null ? (int) $viewer->company_id : null)) {
+            return [];
+        }
+
         $viewer->loadMissing(['company:id,name_ar,name_en', 'department:id,name']);
         $row = $this->buildRow($viewer, $asOf, $daysAhead, true);
 
         return $row !== null ? [$row] : [];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Employee>  $query
+     * @param  array{company_filter_mode: string, company_ids: list<int>}  $settings
+     */
+    private function applyCompanyFilter($query, array $settings): void
+    {
+        $mode = (string) ($settings['company_filter_mode'] ?? BirthdaySettingsService::COMPANY_FILTER_ALL);
+        /** @var list<int> $companyIds */
+        $companyIds = $settings['company_ids'] ?? [];
+
+        if ($mode === BirthdaySettingsService::COMPANY_FILTER_ALL || $companyIds === []) {
+            return;
+        }
+
+        if ($mode === BirthdaySettingsService::COMPANY_FILTER_INCLUDE) {
+            $query->whereIn('company_id', $companyIds);
+
+            return;
+        }
+
+        if ($mode === BirthdaySettingsService::COMPANY_FILTER_EXCLUDE) {
+            $query->whereNotIn('company_id', $companyIds);
+        }
     }
 
     /**

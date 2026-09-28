@@ -22,10 +22,28 @@ class BirthdaySettingsService
         self::SCOPE_DEPARTMENT,
     ];
 
+    public const COMPANY_FILTER_ALL = 'all';
+
+    public const COMPANY_FILTER_INCLUDE = 'include';
+
+    public const COMPANY_FILTER_EXCLUDE = 'exclude';
+
+    public const COMPANY_FILTERS = [
+        self::COMPANY_FILTER_ALL,
+        self::COMPANY_FILTER_INCLUDE,
+        self::COMPANY_FILTER_EXCLUDE,
+    ];
+
     public const DEFAULT_DAYS_AHEAD = 5;
 
     /**
-     * @return array{enabled: bool, scope: string, days_ahead: int}
+     * @return array{
+     *     enabled: bool,
+     *     scope: string,
+     *     days_ahead: int,
+     *     company_filter_mode: string,
+     *     company_ids: list<int>
+     * }
      */
     public function settings(): array
     {
@@ -46,10 +64,22 @@ class BirthdaySettingsService
         $daysAhead = (int) ($decoded['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD);
         $daysAhead = max(0, min(365, $daysAhead));
 
+        $companyFilterMode = (string) ($decoded['company_filter_mode'] ?? self::COMPANY_FILTER_ALL);
+        if (! in_array($companyFilterMode, self::COMPANY_FILTERS, true)) {
+            $companyFilterMode = self::COMPANY_FILTER_ALL;
+        }
+
+        $companyIds = $this->normalizeCompanyIds($decoded['company_ids'] ?? []);
+        if ($companyFilterMode === self::COMPANY_FILTER_ALL) {
+            $companyIds = [];
+        }
+
         return [
             'enabled' => $this->toBool($decoded['enabled'] ?? false),
             'scope' => $scope,
             'days_ahead' => $daysAhead,
+            'company_filter_mode' => $companyFilterMode,
+            'company_ids' => $companyIds,
         ];
     }
 
@@ -59,7 +89,42 @@ class BirthdaySettingsService
     }
 
     /**
-     * @param  array{enabled?: bool, scope?: string, days_ahead?: int}  $payload
+     * Whether a company id is allowed by the global company filter.
+     */
+    public function allowsCompanyId(?int $companyId): bool
+    {
+        if ($companyId === null) {
+            return false;
+        }
+
+        $settings = $this->settings();
+        $mode = (string) $settings['company_filter_mode'];
+        /** @var list<int> $companyIds */
+        $companyIds = $settings['company_ids'];
+
+        if ($mode === self::COMPANY_FILTER_ALL || $companyIds === []) {
+            return true;
+        }
+
+        if ($mode === self::COMPANY_FILTER_INCLUDE) {
+            return in_array($companyId, $companyIds, true);
+        }
+
+        if ($mode === self::COMPANY_FILTER_EXCLUDE) {
+            return ! in_array($companyId, $companyIds, true);
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array{
+     *     enabled?: bool,
+     *     scope?: string,
+     *     days_ahead?: int,
+     *     company_filter_mode?: string,
+     *     company_ids?: list<int|string>
+     * }  $payload
      */
     public function update(array $payload): void
     {
@@ -73,6 +138,19 @@ class BirthdaySettingsService
         $daysAhead = (int) ($payload['days_ahead'] ?? $current['days_ahead']);
         $daysAhead = max(0, min(365, $daysAhead));
 
+        $companyFilterMode = (string) ($payload['company_filter_mode'] ?? $current['company_filter_mode']);
+        if (! in_array($companyFilterMode, self::COMPANY_FILTERS, true)) {
+            $companyFilterMode = self::COMPANY_FILTER_ALL;
+        }
+
+        $companyIds = array_key_exists('company_ids', $payload)
+            ? $this->normalizeCompanyIds($payload['company_ids'])
+            : $current['company_ids'];
+
+        if ($companyFilterMode === self::COMPANY_FILTER_ALL) {
+            $companyIds = [];
+        }
+
         SystemSetting::query()->updateOrCreate(
             ['key' => self::SETTING_KEY],
             [
@@ -80,9 +158,35 @@ class BirthdaySettingsService
                     'enabled' => (bool) ($payload['enabled'] ?? $current['enabled']),
                     'scope' => $scope,
                     'days_ahead' => $daysAhead,
+                    'company_filter_mode' => $companyFilterMode,
+                    'company_ids' => $companyIds,
                 ], JSON_THROW_ON_ERROR),
             ],
         );
+    }
+
+    /**
+     * @param  mixed  $value
+     * @return list<int>
+     */
+    private function normalizeCompanyIds(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($value as $id) {
+            $intId = (int) $id;
+            if ($intId > 0) {
+                $ids[] = $intId;
+            }
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
     }
 
     private function toBool(mixed $value): bool
