@@ -97,6 +97,7 @@ it('uses stored snapshots for finalized excel rows without employee allowance dr
             'food' => 0.0,
             'personal_car' => 0.0,
             'additional_allowances' => 100.0,
+            'advances' => 500.0,
             'unpaid_leave' => 0.0,
             'debts' => 0.0,
             'traffic_violations' => 0.0,
@@ -113,5 +114,38 @@ it('uses stored snapshots for finalized excel rows without employee allowance dr
 
     expect($row[0])->toBe('Locked Name')
         ->and($row[2])->toBe(1500.0)
-        ->and($row[16])->toBe(8850.0);
+        ->and($row[9])->toBe(500.0)
+        ->and($row[17])->toBe(8850.0);
+});
+
+it('puts advance payouts in the dedicated advances excel column', function (): void {
+    $employee = new Employee([
+        'first_name' => 'Omar',
+        'last_name' => 'Saleh',
+    ]);
+
+    $item = new SalaryRunItem([
+        'basic_salary' => 5000,
+        'allowances' => 1000,
+        'unpaid_leave_total' => 0,
+        'social_insurance_deduction_total' => 0,
+        'net_salary' => 8000,
+        'breakdown' => [
+            [
+                'source' => 'advance_payout',
+                'amount' => 2000,
+                'action_text' => 'Approved advance payout',
+            ],
+            [
+                'source' => 'manual_addition',
+                'amount' => 100,
+            ],
+        ],
+        'debt_deductions' => [],
+    ]);
+
+    $snapshot = $this->builder->buildFrozenSnapshotFromItem($item, $employee);
+
+    expect($snapshot['advances'])->toBe(2000.0)
+        ->and($snapshot['additional_allowances'])->toBe(1100.0);
 });

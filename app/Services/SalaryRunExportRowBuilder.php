@@ -44,6 +44,7 @@ class SalaryRunExportRowBuilder
         $detailedSum = $housing + $transport + $other + $food + $personalCar;
         $additionalAllowances = $itemAllowances > $detailedSum ? round($itemAllowances - $detailedSum, 2) : 0.0;
         $additionalAllowances = round($additionalAllowances + $this->sumManualAdditions($item), 2);
+        $advances = $this->sumAdvancePayouts($item);
 
         [
             $penalties,
@@ -61,6 +62,7 @@ class SalaryRunExportRowBuilder
             $food,
             $personalCar,
             $additionalAllowances,
+            $advances,
             $penalties,
             $trafficViolations,
             $absences,
@@ -80,6 +82,7 @@ class SalaryRunExportRowBuilder
             ($item->allowances !== null ? (float) $item->allowances : 0.0) + $this->sumManualAdditions($item),
             2,
         );
+        $advances = $this->sumAdvancePayouts($item);
 
         [
             $penalties,
@@ -97,6 +100,7 @@ class SalaryRunExportRowBuilder
             0.0,
             0.0,
             $additionalAllowances,
+            $advances,
             $penalties,
             $trafficViolations,
             $absences,
@@ -120,6 +124,7 @@ class SalaryRunExportRowBuilder
             $this->formatAmount($snapshot['food'] ?? null),
             $this->formatAmount($snapshot['personal_car'] ?? null),
             $this->formatAmount($snapshot['additional_allowances'] ?? null),
+            $this->formatAmount($snapshot['advances'] ?? null),
             $this->formatAmount($snapshot['unpaid_leave'] ?? null),
             $this->formatAmount($snapshot['debts'] ?? null),
             $this->formatAmount($snapshot['traffic_violations'] ?? null),
@@ -143,6 +148,7 @@ class SalaryRunExportRowBuilder
         float $food,
         float $personalCar,
         float $additionalAllowances,
+        float $advances,
         float $penalties,
         float $trafficViolations,
         float $absences,
@@ -165,6 +171,7 @@ class SalaryRunExportRowBuilder
             'food' => $food,
             'personal_car' => $personalCar,
             'additional_allowances' => $additionalAllowances,
+            'advances' => $advances,
             'unpaid_leave' => $item->unpaid_leave_total !== null ? (float) $item->unpaid_leave_total : 0.0,
             'debts' => round($debtTotal, 2),
             'traffic_violations' => $trafficViolations,
@@ -209,7 +216,8 @@ class SalaryRunExportRowBuilder
                 continue;
             }
 
-            if (($line['source'] ?? null) === 'manual_addition') {
+            if (($line['source'] ?? null) === 'manual_addition'
+                || ($line['source'] ?? null) === 'advance_payout') {
                 continue;
             }
 
@@ -267,6 +275,25 @@ class SalaryRunExportRowBuilder
 
         foreach ($breakdown as $line) {
             if (! is_array($line) || ($line['source'] ?? null) !== 'manual_addition') {
+                continue;
+            }
+
+            $amount = (float) ($line['amount'] ?? 0);
+            if ($amount > 0) {
+                $total += $amount;
+            }
+        }
+
+        return round($total, 2);
+    }
+
+    private function sumAdvancePayouts(SalaryRunItem $item): float
+    {
+        $total = 0.0;
+        $breakdown = is_array($item->breakdown) ? $item->breakdown : [];
+
+        foreach ($breakdown as $line) {
+            if (! is_array($line) || ($line['source'] ?? null) !== 'advance_payout') {
                 continue;
             }
 

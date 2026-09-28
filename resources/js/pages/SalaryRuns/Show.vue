@@ -410,6 +410,9 @@
                 <div v-if="penalty.source === 'manual_addition'" class="text-xs text-green-700 dark:text-green-400 mb-0.5">
                   {{ manualAdditionTypeLabel(penalty) }}
                 </div>
+                <div v-if="penalty.source === 'advance_payout'" class="text-xs text-emerald-700 dark:text-emerald-400 mb-0.5">
+                  {{ t('advances.salary_run_payout_label') }}
+                </div>
                 <div v-if="penalty.source === 'unpaid_leave'" class="text-xs text-purple-600 dark:text-purple-400 mb-0.5">
                   {{ t('salary_runs.unpaid_leave_label') }}
                 </div>
@@ -418,7 +421,12 @@
                   {{ t('attendance.late_minutes_deduction') }}: {{ formatCurrency(Number(penalty.late_minutes_deduction_amount)) }}
                 </div>
               </div>
-              <div class="text-sm font-medium text-orange-600 dark:text-orange-400 shrink-0">
+              <div
+                class="text-sm font-medium shrink-0"
+                :class="penalty.source === 'manual_addition' || penalty.source === 'advance_payout'
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-orange-600 dark:text-orange-400'"
+              >
                 {{ formatCurrency(penalty.amount) }}
               </div>
             </div>
@@ -652,7 +660,7 @@ interface Props {
         employee_deduction_id?: number;
         employee_addition_id?: number;
         leave_id?: number;
-        source?: 'penalty' | 'manual_deduction' | 'manual_addition' | 'unpaid_leave';
+        source?: 'penalty' | 'manual_deduction' | 'manual_addition' | 'advance_payout' | 'unpaid_leave';
       }>;
     }>;
   };

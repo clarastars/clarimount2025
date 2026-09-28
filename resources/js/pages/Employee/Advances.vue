@@ -75,14 +75,34 @@ interface EntitlementSummary {
     max_installments: number;
     period_start: string | null;
     period_end: string | null;
+    tier?: {
+        id: number;
+        min_months: number;
+        max_months: number | null;
+        max_amount: number;
+        max_installments: number;
+    } | null;
 }
 
-const props = defineProps<{
+interface EntitlementRule {
+    id: number;
+    min_months: number;
+    max_months: number | null;
+    max_amount: number;
+    max_installments: number;
+    sort_order: number;
+    is_active: boolean;
+}
+
+const props = withDefaults(defineProps<{
     employee: EmployeeSummary;
     requests: AdvanceRequestRow[];
     entitlement: EntitlementSummary;
+    rules?: EntitlementRule[];
     hasPendingRequest: boolean;
-}>();
+}>(), {
+    rules: () => [],
+});
 
 const { t, locale } = useI18n();
 const page = usePage();
@@ -118,6 +138,22 @@ const canOpenRequest = computed(() =>
     && !props.hasPendingRequest
     && props.employee.gross_monthly > 0,
 );
+
+const currentTierId = computed(() => props.entitlement.tier?.id ?? null);
+
+const tenureLabel = (rule: EntitlementRule): string => {
+    if (rule.max_months === null) {
+        return t('settings.advance_entitlement_tenure_open', { min: rule.min_months });
+    }
+
+    return t('settings.advance_entitlement_tenure_range', {
+        min: rule.min_months,
+        max: rule.max_months,
+    });
+};
+
+const isCurrentRule = (rule: EntitlementRule): boolean =>
+    currentTierId.value !== null && rule.id === currentTierId.value;
 
 const blockMessage = computed(() => {
     if (!props.entitlement.has_hire_date) {
@@ -354,6 +390,53 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                             <p class="font-medium">{{ entitlement.max_installments || '—' }}</p>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{{ t('advances.rules_title') }}</CardTitle>
+                    <CardDescription>{{ t('advances.rules_description') }}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p v-if="rules.length === 0" class="text-sm text-muted-foreground">
+                        {{ t('advances.rules_empty') }}
+                    </p>
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b text-muted-foreground">
+                                    <th class="py-2 px-2 text-start font-medium">{{ t('settings.advance_entitlement_tenure') }}</th>
+                                    <th class="py-2 px-2 text-start font-medium">{{ t('settings.advance_entitlement_max_amount') }}</th>
+                                    <th class="py-2 px-2 text-start font-medium">{{ t('settings.advance_entitlement_max_installments') }}</th>
+                                    <th class="py-2 px-2 text-start font-medium">{{ t('common.status') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="rule in rules"
+                                    :key="rule.id"
+                                    class="border-b last:border-0"
+                                    :class="isCurrentRule(rule) ? 'bg-amber-50/80' : ''"
+                                >
+                                    <td class="py-3 px-2 font-medium">
+                                        {{ tenureLabel(rule) }}
+                                    </td>
+                                    <td class="py-3 px-2">{{ formatCurrency(rule.max_amount) }}</td>
+                                    <td class="py-3 px-2">{{ rule.max_installments }}</td>
+                                    <td class="py-3 px-2">
+                                        <Badge v-if="isCurrentRule(rule)" variant="default">
+                                            {{ t('advances.rules_current_tier') }}
+                                        </Badge>
+                                        <span v-else class="text-muted-foreground">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3 text-xs text-muted-foreground">
+                        {{ t('advances.rules_reset_note') }}
+                    </p>
                 </CardContent>
             </Card>
 

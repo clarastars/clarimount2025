@@ -45,6 +45,7 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
             'بدل طعام',
             'بدل استخدام سيارة شخصية',
             'بدلات إضافية / مستحقات شهرية',
+            'سلفة',
             'انقطاع ساعات عمل',
             'ذمم',
             'مخالفات مرورية تحمل حادث',
@@ -113,14 +114,14 @@ class SalaryRunExcelExport implements FromCollection, ShouldAutoSize, WithEvents
             $totalRow = $highestRow + 1;
             $sheet->setCellValue('A'.$totalRow, 'الإجمالي');
 
-            foreach (range('B', 'Q') as $column) {
+            foreach (range('B', 'R') as $column) {
                 $sheet->setCellValue(
                     $column.$totalRow,
                     sprintf('=SUM(%s2:%s%d)', $column, $column, $highestRow)
                 );
             }
 
-            $totalRange = 'A'.$totalRow.':Q'.$totalRow;
+            $totalRange = 'A'.$totalRow.':R'.$totalRow;
             $sheet->getStyle($totalRange)->applyFromArray([
                 'font' => ['bold' => true],
                 'fill' => [

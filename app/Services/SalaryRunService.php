@@ -469,9 +469,33 @@ class SalaryRunService
             ];
         }
 
+        if ($salaryRun->isDraft()) {
+            $this->reclaimOrphanedAdvanceDisbursements($employee);
+            $this->claimPendingAdvanceDisbursements($employee, $salaryRun);
+        }
+
+        foreach ($this->advancePayoutDebtsForRun($employee, $salaryRun) as $advanceDebt) {
+            $amount = $advanceDebt->originalAmount();
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $additionsTotal += $amount;
+            $breakdown[] = [
+                'date' => sprintf('%04d-%02d-01', (int) $salaryRun->year, (int) $salaryRun->month),
+                'action_type' => 'advance_payout',
+                'action_value' => null,
+                'action_text' => __('messages.advances.salary_run_payout'),
+                'amount' => $amount,
+                'debt_id' => $advanceDebt->id,
+                'advance_request_id' => $advanceDebt->advance_request_id,
+                'source' => 'advance_payout',
+            ];
+        }
+
         $debtDeductions = $existingItem?->debt_deductions ?? [];
         if ($salaryRun->isDraft()) {
-            $debtDeductions = $this->mergeAutoDebtDeductions($employee, $debtDeductions);
+            $debtDeductions = $this->mergeAutoDebtDeductions($employee, $debtDeductions, $salaryRun);
         }
 
         $debtDeductionsTotal = 0.0;
@@ -821,13 +845,33 @@ class SalaryRunService
      * Auto-include debts that must be deducted without manual intervention:
      * attested salary-certificate fees (full remaining balance) and approved
      * advances (one monthly installment, capped at the remaining balance).
+     * Advance installments that pay out via salary run start only after the
+     * disbursement salary run's calendar month.
      *
      * @param  mixed  $existing
      * @return list<array{debt_id: int, debt_type: string|null, amount: float, original_amount: float}>
      */
-    public function mergeAutoDebtDeductions(Employee $employee, mixed $existing): array
+    public function mergeAutoDebtDeductions(Employee $employee, mixed $existing, ?SalaryRun $salaryRun = null): array
     {
         $deductions = $this->syncDebtDeductionsWithCurrentDebts($employee, $existing);
+
+        $deductions = array_values(array_filter(
+            $deductions,
+            function (array $deduction) use ($salaryRun): bool {
+                $debtId = (int) ($deduction['debt_id'] ?? 0);
+                if ($debtId <= 0) {
+                    return true;
+                }
+
+                $debt = EmployeeDebt::query()->find($debtId);
+                if ($debt === null || ! $debt->isAdvance() || ! $debt->paysOutViaSalaryRun()) {
+                    return true;
+                }
+
+                return $this->advanceInstallmentEligibleForRun($debt, $salaryRun);
+            }
+        ));
+
         $existingIds = [];
 
         foreach ($deductions as $deduction) {
@@ -848,6 +892,11 @@ class SalaryRunService
 
         foreach ($autoDebts as $debt) {
             if (in_array((int) $debt->id, $existingIds, true)) {
+                continue;
+            }
+
+            if ($debt->isAdvance() && $debt->paysOutViaSalaryRun()
+                && ! $this->advanceInstallmentEligibleForRun($debt, $salaryRun)) {
                 continue;
             }
 
@@ -889,9 +938,60 @@ class SalaryRunService
         $this->includeAutoDebtInOpenDraft($debt);
     }
 
+    /**
+     * Schedule the advance payout on the company's open draft salary run.
+     * Installment deductions begin only on later salary runs.
+     */
+    public function includeAdvancePayoutInOpenDraft(EmployeeDebt $debt): void
+    {
+        $debt->loadMissing('employee');
+        $employee = $debt->employee;
+        if ($employee === null || $employee->company_id === null) {
+            return;
+        }
+
+        $salaryRun = $this->resolveOpenDraftSalaryRunForAdvance((int) $employee->company_id);
+
+        if ($salaryRun === null) {
+            return;
+        }
+
+        if ($debt->advance_disbursement_salary_run_id === null) {
+            $debt->update([
+                'advance_disbursement_salary_run_id' => $salaryRun->id,
+                'pays_out_via_salary_run' => true,
+            ]);
+        }
+
+        $item = SalaryRunItem::query()
+            ->where('salary_run_id', $salaryRun->id)
+            ->where('employee_id', $employee->id)
+            ->first();
+
+        if ($item === null) {
+            return;
+        }
+
+        $operationalRange = $this->operationalMonthService->resolveRangeForPayrollMonth(
+            (int) $salaryRun->year,
+            (int) $salaryRun->month,
+        );
+        $calendarRange = $this->resolveCalendarMonthRange((int) $salaryRun->year, (int) $salaryRun->month);
+
+        $this->upsertEmployeeSalaryRunItem(
+            $salaryRun,
+            $employee->fresh() ?? $employee,
+            $operationalRange['start'],
+            $operationalRange['end'],
+            $calendarRange['start'],
+            $calendarRange['end'],
+        );
+    }
+
+    /** @deprecated Use includeAdvancePayoutInOpenDraft() */
     public function includeAdvanceDebtInOpenDraft(EmployeeDebt $debt): void
     {
-        $this->includeAutoDebtInOpenDraft($debt);
+        $this->includeAdvancePayoutInOpenDraft($debt);
     }
 
     private function includeAutoDebtInOpenDraft(EmployeeDebt $debt): void
@@ -922,7 +1022,7 @@ class SalaryRunService
             return;
         }
 
-        $debtDeductions = $this->mergeAutoDebtDeductions($employee, $item->debt_deductions);
+        $debtDeductions = $this->mergeAutoDebtDeductions($employee, $item->debt_deductions, $salaryRun);
         $totalDeduction = 0.0;
 
         foreach ($debtDeductions as $deduction) {
@@ -940,6 +1040,128 @@ class SalaryRunService
             'debt_deductions' => $debtDeductions,
             'net_salary' => round($netSalary, 2),
         ]);
+    }
+
+    /**
+     * Prefer an open draft for a month that is not already finalized.
+     * Avoids attaching advance payouts to stale duplicate drafts.
+     */
+    private function resolveOpenDraftSalaryRunForAdvance(int $companyId): ?SalaryRun
+    {
+        $drafts = SalaryRun::query()
+            ->where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->orderBy('id')
+            ->get();
+
+        if ($drafts->isEmpty()) {
+            return null;
+        }
+
+        foreach ($drafts as $draft) {
+            $hasFinalizedSameMonth = SalaryRun::query()
+                ->where('company_id', $companyId)
+                ->where('year', $draft->year)
+                ->where('month', $draft->month)
+                ->where('status', 'finalized')
+                ->exists();
+
+            if (! $hasFinalizedSameMonth) {
+                return $draft;
+            }
+        }
+
+        return $drafts->last();
+    }
+
+    /**
+     * Assign undisbursed salary-run advances to this draft so they appear as a payout.
+     */
+    private function claimPendingAdvanceDisbursements(Employee $employee, SalaryRun $salaryRun): void
+    {
+        if (! $salaryRun->isDraft()) {
+            return;
+        }
+
+        EmployeeDebt::query()
+            ->where('employee_id', $employee->id)
+            ->where('pays_out_via_salary_run', true)
+            ->whereNotNull('advance_request_id')
+            ->whereNull('advance_disbursement_salary_run_id')
+            ->update([
+                'advance_disbursement_salary_run_id' => $salaryRun->id,
+            ]);
+    }
+
+    /**
+     * If the payout run was deleted before finalization, free the advance so the next
+     * open draft can disburse it (and delay installments until after that payout).
+     */
+    private function reclaimOrphanedAdvanceDisbursements(Employee $employee): void
+    {
+        $debts = EmployeeDebt::query()
+            ->where('employee_id', $employee->id)
+            ->where('pays_out_via_salary_run', true)
+            ->whereNotNull('advance_request_id')
+            ->whereNotNull('advance_disbursement_salary_run_id')
+            ->get();
+
+        foreach ($debts as $debt) {
+            $runId = (int) $debt->advance_disbursement_salary_run_id;
+            $run = SalaryRun::query()->find($runId);
+
+            if ($run !== null) {
+                continue;
+            }
+
+            $debt->update([
+                'advance_disbursement_salary_run_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, EmployeeDebt>
+     */
+    private function advancePayoutDebtsForRun(Employee $employee, SalaryRun $salaryRun)
+    {
+        return EmployeeDebt::query()
+            ->where('employee_id', $employee->id)
+            ->where('pays_out_via_salary_run', true)
+            ->where('advance_disbursement_salary_run_id', $salaryRun->id)
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function advanceInstallmentEligibleForRun(EmployeeDebt $debt, ?SalaryRun $salaryRun): bool
+    {
+        if ($salaryRun === null) {
+            return false;
+        }
+
+        $disbursementRunId = $debt->advance_disbursement_salary_run_id;
+        if ($disbursementRunId === null) {
+            // Approved but not yet assigned to a payout run — do not deduct yet.
+            return false;
+        }
+
+        if ((int) $disbursementRunId === (int) $salaryRun->id) {
+            return false;
+        }
+
+        // Soft-deleted / missing payout runs are not valid disbursements.
+        $disbursementRun = SalaryRun::query()->find($disbursementRunId);
+        if ($disbursementRun === null) {
+            return false;
+        }
+
+        return ((int) $salaryRun->year > (int) $disbursementRun->year)
+            || (
+                (int) $salaryRun->year === (int) $disbursementRun->year
+                && (int) $salaryRun->month > (int) $disbursementRun->month
+            );
     }
 
     /**

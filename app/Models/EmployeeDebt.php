@@ -24,12 +24,15 @@ class EmployeeDebt extends Model
         'debt_type',
         'salary_certificate_request_id',
         'advance_request_id',
+        'pays_out_via_salary_run',
+        'advance_disbursement_salary_run_id',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'original_amount' => 'decimal:2',
         'monthly_installment' => 'decimal:2',
+        'pays_out_via_salary_run' => 'boolean',
     ];
 
     /**
@@ -50,9 +53,19 @@ class EmployeeDebt extends Model
         return $this->belongsTo(AdvanceRequest::class);
     }
 
+    public function advanceDisbursementSalaryRun(): BelongsTo
+    {
+        return $this->belongsTo(SalaryRun::class, 'advance_disbursement_salary_run_id');
+    }
+
     public function isAdvance(): bool
     {
         return $this->debt_type === self::TYPE_ADVANCE || $this->advance_request_id !== null;
+    }
+
+    public function paysOutViaSalaryRun(): bool
+    {
+        return (bool) $this->pays_out_via_salary_run;
     }
 
     /**

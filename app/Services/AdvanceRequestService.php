@@ -149,8 +149,13 @@ class AdvanceRequestService
                     'original_amount' => $amount,
                     'monthly_installment' => round((float) $advanceRequest->monthly_deduction, 2),
                     'debt_type' => EmployeeDebt::TYPE_ADVANCE,
+                    'pays_out_via_salary_run' => true,
                 ],
             );
+
+            if (! $debt->pays_out_via_salary_run) {
+                $debt->update(['pays_out_via_salary_run' => true]);
+            }
 
             $advanceRequest->update([
                 'status' => AdvanceRequest::STATUS_APPROVED,
@@ -163,7 +168,7 @@ class AdvanceRequestService
             return $debt;
         });
 
-        $this->salaryRunService->includeAdvanceDebtInOpenDraft($debt);
+        $this->salaryRunService->includeAdvancePayoutInOpenDraft($debt);
 
         $fresh = $advanceRequest->fresh() ?? $advanceRequest;
 

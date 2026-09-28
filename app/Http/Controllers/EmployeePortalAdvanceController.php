@@ -55,6 +55,7 @@ class EmployeePortalAdvanceController extends Controller
             ],
             'requests' => $requests,
             'entitlement' => $entitlement,
+            'rules' => $this->entitlementService->activeTiersPayload(),
             'hasPendingRequest' => $employee->advanceRequests()
                 ->where('status', AdvanceRequest::STATUS_PENDING)
                 ->exists(),
