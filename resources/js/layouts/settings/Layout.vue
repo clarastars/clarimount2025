@@ -79,6 +79,13 @@ const sidebarNavItems = computed((): NavItem[] => {
     });
 
     if (canAccessSettings.value) {
+        items.push({
+            title: t('settings.birthday_widget'),
+            href: '/settings/birthday-widget',
+        });
+    }
+
+    if (canAccessSettings.value) {
         items.push(
             {
                 title: t('settings.permissions_teams'),

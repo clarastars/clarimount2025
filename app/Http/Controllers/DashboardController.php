@@ -9,6 +9,7 @@ use App\Services\DashboardPendingApprovalsService;
 use App\Services\EmployeeExpiryService;
 use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
+use App\Services\UpcomingBirthdaysService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,7 @@ class DashboardController extends Controller
         Request $request,
         EmployeeExpiryService $employeeExpiryService,
         DashboardPendingApprovalsService $pendingApprovalsService,
+        UpcomingBirthdaysService $upcomingBirthdaysService,
     ): Response|RedirectResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
@@ -72,6 +74,7 @@ class DashboardController extends Controller
             return Inertia::render('DashboardEmployee', [
                 'employee' => $employee->only(['id', 'first_name', 'last_name', 'full_name']),
                 'dashboardSubtitle' => $dashboardSubtitle,
+                'upcomingBirthdays' => $upcomingBirthdaysService->forViewer($employee),
             ]);
         }
 
@@ -101,6 +104,9 @@ class DashboardController extends Controller
 
         $pendingApprovals = $pendingApprovalsService->forUser($user);
 
+        $viewerEmployee = $user->employee
+            ?? app(EmployeePortalUserService::class)->ensureLinkedEmployee($user);
+
         return Inertia::render('Dashboard', [
             'canViewExpiryDocuments' => $canViewExpiryDocuments,
             'expiringEmployeesPreview' => $expiringRows->take(5)->values(),
@@ -109,6 +115,7 @@ class DashboardController extends Controller
             'expiredEmployeesCount' => $expiredRows->count(),
             'expiryDaysThreshold' => EmployeeExpiryService::DEFAULT_DAYS_THRESHOLD,
             'pendingApprovals' => $pendingApprovals,
+            'upcomingBirthdays' => $upcomingBirthdaysService->forViewer($viewerEmployee),
         ]);
     }
 

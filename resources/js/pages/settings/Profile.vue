@@ -17,9 +17,14 @@ import { type BreadcrumbItem, type User } from '@/types';
 interface Props {
     mustVerifyEmail: boolean;
     status?: string;
+    canManageBirthdayPrivacy?: boolean;
+    hideBirthday?: boolean;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    canManageBirthdayPrivacy: false,
+    hideBirthday: false,
+});
 
 const { t } = useI18n();
 
@@ -40,6 +45,7 @@ const form = useForm({
     name: user.name,
     email: user.email,
     language: user.language || 'en',
+    hide_birthday: props.hideBirthday,
 });
 
 // Track the original language to detect changes
@@ -47,16 +53,30 @@ const originalLanguage = ref(user.language || 'en');
 
 const submit = () => {
     const languageChanged = form.language !== originalLanguage.value;
-    
-    form.patch(route('profile.update'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            // If language was changed, do a hard refresh to load new translations
-            if (languageChanged) {
-                window.location.reload();
+
+    form
+        .transform((data) => {
+            const payload: Record<string, unknown> = {
+                name: data.name,
+                email: data.email,
+                language: data.language,
+            };
+
+            if (props.canManageBirthdayPrivacy) {
+                payload.hide_birthday = Boolean(data.hide_birthday);
             }
-        },
-    });
+
+            return payload;
+        })
+        .patch(route('profile.update'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                // If language was changed, do a hard refresh to load new translations
+                if (languageChanged) {
+                    window.location.reload();
+                }
+            },
+        });
 };
 </script>
 
@@ -108,6 +128,23 @@ const submit = () => {
                         </Select>
                         <p class="text-sm text-muted-foreground">{{ t('profile.languageDescription') }}</p>
                         <InputError class="mt-2" :message="form.errors.language" />
+                    </div>
+
+                    <div v-if="canManageBirthdayPrivacy" class="grid gap-2">
+                        <label class="inline-flex cursor-pointer items-start gap-2 text-sm">
+                            <input
+                                v-model="form.hide_birthday"
+                                type="checkbox"
+                                class="mt-0.5 h-4 w-4 rounded border-gray-300"
+                            >
+                            <span>
+                                <span class="font-medium">{{ t('profile.hide_birthday') }}</span>
+                                <span class="mt-0.5 block text-xs text-muted-foreground">
+                                    {{ t('profile.hide_birthday_hint') }}
+                                </span>
+                            </span>
+                        </label>
+                        <InputError class="mt-2" :message="form.errors.hide_birthday" />
                     </div>
 
                     <div v-if="mustVerifyEmail && !user.email_verified_at">

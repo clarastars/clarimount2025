@@ -36,6 +36,7 @@ use App\Http\Controllers\LeaveAttachmentController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\BirthdayWishController;
 use App\Http\Controllers\PrintJobController;
 use App\Http\Controllers\SalaryRunController;
 use App\Http\Controllers\ShiftController;
@@ -433,6 +434,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/notifications', [NotificationController::class, 'index'])->name('api.notifications.index');
     Route::post('api/notifications/{notificationId}/read', [NotificationController::class, 'markAsRead'])->name('api.notifications.read');
     Route::post('api/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('api.notifications.read-all');
+    Route::post('api/birthday-wishes', [BirthdayWishController::class, 'store'])->name('api.birthday-wishes.store');
+    Route::post('api/birthday-privacy/hide', [BirthdayWishController::class, 'hideOwnBirthday'])->name('api.birthday-privacy.hide');
 });
 
 require __DIR__.'/auth.php';

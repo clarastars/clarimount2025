@@ -21,6 +21,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from 'lucide-vue-next';
+import UpcomingBirthdaysNotice from '@/components/UpcomingBirthdaysNotice.vue';
 
 const { t } = useI18n();
 
@@ -32,6 +33,17 @@ interface ExpiringEmployeeRow {
     expiry_label_key: string;
     expiry_date: string;
     days_remaining: number;
+}
+
+interface UpcomingBirthday {
+    id: number;
+    full_name: string;
+    company_name?: string | null;
+    department_name?: string | null;
+    birth_date: string;
+    birthday_month_day: string;
+    days_until: number;
+    is_today: boolean;
 }
 
 interface PendingItem {
@@ -69,11 +81,13 @@ interface Props {
     expiredEmployeesCount: number;
     expiryDaysThreshold: number;
     pendingApprovals?: PendingApprovals | null;
+    upcomingBirthdays?: UpcomingBirthday[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
     canViewExpiryDocuments: false,
     pendingApprovals: null,
+    upcomingBirthdays: () => [],
 });
 
 const breadcrumbs = computed((): BreadcrumbItem[] => []);
@@ -213,6 +227,8 @@ const formatRemainingText = (daysRemaining: number) => {
                 </Button>
             </template>
         </PageHeader>
+
+        <UpcomingBirthdaysNotice :items="upcomingBirthdays" link-employees />
 
         <!-- Pending approvals summary + lists -->
         <div v-if="hasPendingSections" class="mb-6 space-y-6">

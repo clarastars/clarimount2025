@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\AdvanceApprovalStepsController;
 use App\Http\Controllers\Settings\AdvanceEntitlementTiersController;
+use App\Http\Controllers\Settings\BirthdaySettingsController;
 use App\Http\Controllers\Settings\EntitlementSettlementApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveTypeController;
@@ -96,6 +97,8 @@ Route::middleware('auth')->group(function () {
         Route::put('settings/flexible-attendance', [FlexibleAttendanceSettingsController::class, 'update'])->name('settings.flexible-attendance.update');
         Route::get('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'edit'])->name('settings.employee-global-search.edit');
         Route::put('settings/employee-global-search', [EmployeeGlobalSearchSettingsController::class, 'update'])->name('settings.employee-global-search.update');
+        Route::get('settings/birthday-widget', [BirthdaySettingsController::class, 'edit'])->name('settings.birthday-widget.edit');
+        Route::put('settings/birthday-widget', [BirthdaySettingsController::class, 'update'])->name('settings.birthday-widget.update');
         Route::get('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'edit'])->name('settings.salary-certificate-fee.edit');
         Route::put('settings/salary-certificate-fee', [SalaryCertificateFeeSettingsController::class, 'update'])->name('settings.salary-certificate-fee.update');
 

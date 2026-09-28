@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
+import UpcomingBirthdaysNotice from '@/components/UpcomingBirthdaysNotice.vue';
 import { Head } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
@@ -9,6 +10,17 @@ import { Handshake } from 'lucide-vue-next';
 
 const { t } = useI18n();
 
+interface UpcomingBirthday {
+    id: number;
+    full_name: string;
+    company_name?: string | null;
+    department_name?: string | null;
+    birth_date: string;
+    birthday_month_day: string;
+    days_until: number;
+    is_today: boolean;
+}
+
 interface Props {
     employee: {
         id: number;
@@ -17,9 +29,12 @@ interface Props {
         full_name: string;
     };
     dashboardSubtitle?: string;
+    upcomingBirthdays?: UpcomingBirthday[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    upcomingBirthdays: () => [],
+});
 
 const breadcrumbs = computed((): BreadcrumbItem[] => []);
 </script>
@@ -28,7 +43,11 @@ const breadcrumbs = computed((): BreadcrumbItem[] => []);
     <Head :title="t('nav.dashboard')" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 items-center justify-center p-6 pt-0">
+        <div class="flex h-full flex-1 flex-col items-center gap-6 p-6 pt-4">
+            <div class="w-full max-w-2xl">
+                <UpcomingBirthdaysNotice :items="upcomingBirthdays" />
+            </div>
+
             <Card class="w-full max-w-2xl border-border/60 shadow-xl bg-gradient-to-b from-background to-muted/30">
                 <CardContent class="flex flex-col items-center gap-4 py-12 text-center">
                     <div class="rounded-full bg-primary/10 p-4 text-primary">

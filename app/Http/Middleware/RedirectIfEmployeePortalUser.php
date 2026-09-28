@@ -59,6 +59,8 @@ class RedirectIfEmployeePortalUser
             'api.notifications.index',
             'api.notifications.read',
             'api.notifications.read-all',
+            'api.birthday-wishes.store',
+            'api.birthday-privacy.hide',
         ];
 
         // Allow employees to access only the sections explicitly granted by team permissions.

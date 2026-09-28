@@ -37,6 +37,10 @@ interface NotificationData {
     month?: number;
     step_title?: string;
     actor_name?: string;
+    from_name?: string;
+    emoji?: string;
+    emoji_key?: string;
+    message?: string | null;
     reason?: string;
     after_rejection?: boolean;
     review_notes?: string;
@@ -114,6 +118,19 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         const leaveType = t(leaveTypeKey);
         return leaveType === leaveTypeKey ? (data.leave_type ?? '') : leaveType;
     })();
+
+    if (data.event_type === 'birthday_wish') {
+        const base = t('notifications.birthday_wish', {
+            emoji: data.emoji ?? '🎉',
+            name: data.from_name ?? data.actor_name ?? '',
+        });
+
+        if (data.message && String(data.message).trim() !== '') {
+            return `${base} — «${String(data.message).trim()}»`;
+        }
+
+        return base;
+    }
 
     if (data.event_type === 'leave_request_submitted') {
         return t('notifications.leave_request_submitted', {

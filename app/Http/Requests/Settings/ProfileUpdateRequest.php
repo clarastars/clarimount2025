@@ -15,7 +15,7 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
                 'required',
@@ -27,5 +27,11 @@ class ProfileUpdateRequest extends FormRequest
             ],
             'language' => ['required', 'string', 'in:en,ar'],
         ];
+
+        if ($this->user()?->employee !== null) {
+            $rules['hide_birthday'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 }

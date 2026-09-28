@@ -325,4 +325,16 @@ class Employee extends Model implements AuditableContract
     {
         return $query->where('excluded_from_salary', false);
     }
+
+    public function hidesBirthday(): bool
+    {
+        return (bool) data_get($this->settings, 'hide_birthday', false);
+    }
+
+    public function setHideBirthday(bool $hide): void
+    {
+        $settings = is_array($this->settings) ? $this->settings : [];
+        $settings['hide_birthday'] = $hide;
+        $this->settings = $settings;
+    }
 }

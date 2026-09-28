@@ -19,9 +19,14 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+        $employee = $user?->employee;
+
         return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'canManageBirthdayPrivacy' => $employee !== null,
+            'hideBirthday' => $employee?->hidesBirthday() ?? false,
         ]);
     }
 
@@ -30,13 +35,26 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $validated = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $user->fill([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'language' => $validated['language'],
+        ]);
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
+
+        $employee = $user->employee;
+        if ($employee !== null && array_key_exists('hide_birthday', $validated)) {
+            $employee->setHideBirthday((bool) $validated['hide_birthday']);
+            $employee->save();
+        }
 
         return to_route('profile.edit');
     }
