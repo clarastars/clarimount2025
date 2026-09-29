@@ -401,7 +401,9 @@ class EmployeeEntitlementSettlementService
 
     /**
      * Pay out remaining annual leave through the settlement date (inclusive).
-     * Accrued days are stored for balance adjustments; the payable amount nets out used leave.
+     * Accrued days are stored for balance adjustments; the payable amount nets out
+     * all balance-committed used leave (legacy + approved deduct-from-balance leaves),
+     * matching the employee profile remaining balance.
      *
      * @return array{
      *     days: float,
@@ -416,7 +418,7 @@ class EmployeeEntitlementSettlementService
         $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceThroughDate($employee, $settlementDate);
         $previouslyPaid = $this->previouslySettledLeaveDays($employee);
         $accruedDays = max(0.0, round($accruedAsOf - $previouslyPaid, 2));
-        $usedDays = $this->calculateUsedAnnualLeaveDeduction($employee, $settlementDate)['days'];
+        $usedDays = $this->calculateBalanceCommittedLeaveDays($employee);
         $payableDays = max(0.0, round($accruedDays - $usedDays, 2));
         $amount = $this->amountService->fromLeavePayDays($employee, $payableDays) ?? 0.0;
 
@@ -442,8 +444,28 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
+     * Leave days already committed against accrued balance (same basis as the employee profile).
+     * Includes legacy leave_days_used plus all approved leaves marked deduct_from_balance,
+     * including future approved leave that has reserved balance.
+     */
+    public function calculateBalanceCommittedLeaveDays(Employee $employee): float
+    {
+        $legacyUsed = round((float) ($employee->leave_days_used ?? 0), 2);
+
+        if ($employee->getKey() === null) {
+            return $legacyUsed;
+        }
+
+        $fromRecords = round((float) $employee->leaves()
+            ->where('deduct_from_balance', true)
+            ->sum('days'), 2);
+
+        return round($legacyUsed + $fromRecords, 2);
+    }
+
+    /**
      * Deduct leave days that were actually consumed on or before the settlement date.
-     * Approved future leave is excluded — it is paid via annual leave dues, not deducted.
+     * Approved future leave is excluded from this elapsed-only helper.
      *
      * @return array{days: float, amount: float}
      */
@@ -518,13 +540,12 @@ class EmployeeEntitlementSettlementService
                     'leave_days_used' => 0,
                 ]);
 
-                if ($settlementDate !== null) {
-                    Leave::query()
-                        ->where('employee_id', $employee->id)
-                        ->where('deduct_from_balance', true)
-                        ->whereDate('start_date', '<=', $settlementDate->toDateString())
-                        ->update(['deduct_from_balance' => false]);
-                }
+                // Clear all balance reservations, including future approved leave already
+                // netted out of the payable annual-leave amount.
+                Leave::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('deduct_from_balance', true)
+                    ->update(['deduct_from_balance' => false]);
             }
 
             if ($includeAdvances) {

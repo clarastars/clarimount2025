@@ -136,7 +136,7 @@ it('nets used leave out of annual leave dues payable amount', function (): void 
     );
 });
 
-it('does not deduct approved future leave from annual leave settlement', function (): void {
+it('does not count future leave as elapsed used deduction', function (): void {
     $futureLeave = new \App\Models\Leave([
         'leave_type' => \App\Models\Leave::TYPE_ANNUAL,
         'start_date' => '2026-09-20',
@@ -164,6 +164,44 @@ it('does not deduct approved future leave from annual leave settlement', functio
 
     expect($used['days'])->toBe(0.0);
     expect($used['amount'])->toBe(0.0);
+});
+
+it('nets future approved leave into annual leave payable days like the profile remaining', function (): void {
+    $employee = makeSettlementEmployee([
+        'hire_date' => '2021-06-14',
+        'basic_salary' => 4000,
+        'allowances' => 1400,
+        'annual_leave_balance' => 30,
+        'leave_accrued_balance' => 158.75,
+        'leave_days_used' => 83.42,
+    ]);
+
+    $amount = app(ManualDeductionAmountService::class);
+    $accrual = Mockery::mock(LeaveAccrualService::class);
+    $accrual->shouldReceive('projectedAccruedBalanceThroughDate')->andReturn(158.75);
+
+    $service = new class($amount, $accrual) extends EmployeeEntitlementSettlementService
+    {
+        public function previouslySettledLeaveDays(Employee $employee): float
+        {
+            return 0.0;
+        }
+
+        public function calculateBalanceCommittedLeaveDays(Employee $employee): float
+        {
+            return 115.42;
+        }
+    };
+
+    $dues = $service->calculateAnnualLeaveDues(
+        $employee,
+        Carbon::parse('2026-09-29', 'Asia/Riyadh'),
+    );
+
+    expect($dues['accrued_days'])->toBe(158.75);
+    expect($dues['used_days'])->toBe(115.42);
+    expect($dues['payable_days'])->toBe(43.33);
+    expect($dues['amount'])->toBe($amount->fromLeavePayDays($employee, 43.33));
 });
 
 it('counts only elapsed days for leave spanning the settlement date', function (): void {
