@@ -174,12 +174,26 @@
                             v-for="row in duesRows"
                             :key="row.label"
                             class="flex items-start justify-between gap-3"
+                            :class="row.excluded ? 'opacity-45' : ''"
                         >
                             <div class="min-w-0">
-                                <p class="text-sm font-medium">{{ row.label }}</p>
+                                <p class="text-sm font-medium">
+                                    {{ row.label }}
+                                    <span
+                                        v-if="row.excluded"
+                                        class="ms-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
+                                    >
+                                        {{ t('entitlement_settlement.line_excluded') }}
+                                    </span>
+                                </p>
                                 <p v-if="row.hint" class="text-xs text-muted-foreground">{{ row.hint }}</p>
                             </div>
-                            <p class="shrink-0 font-semibold tabular-nums">{{ formatCurrency(row.value) }}</p>
+                            <p
+                                class="shrink-0 font-semibold tabular-nums"
+                                :class="row.excluded ? 'line-through' : ''"
+                            >
+                                {{ formatCurrency(row.value) }}
+                            </p>
                         </div>
                         <div class="flex items-center justify-between border-t pt-3 font-semibold">
                             <span>{{ t('entitlement_settlement.total_dues') }}</span>
@@ -197,12 +211,26 @@
                             v-for="row in deductionRows"
                             :key="row.label"
                             class="flex items-start justify-between gap-3"
+                            :class="row.excluded ? 'opacity-45' : ''"
                         >
                             <div class="min-w-0">
-                                <p class="text-sm font-medium">{{ row.label }}</p>
+                                <p class="text-sm font-medium">
+                                    {{ row.label }}
+                                    <span
+                                        v-if="row.excluded"
+                                        class="ms-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-600"
+                                    >
+                                        {{ t('entitlement_settlement.line_excluded') }}
+                                    </span>
+                                </p>
                                 <p v-if="row.hint" class="text-xs text-muted-foreground">{{ row.hint }}</p>
                             </div>
-                            <p class="shrink-0 font-semibold tabular-nums">{{ formatCurrency(row.value) }}</p>
+                            <p
+                                class="shrink-0 font-semibold tabular-nums"
+                                :class="row.excluded ? 'line-through' : ''"
+                            >
+                                {{ formatCurrency(row.value) }}
+                            </p>
                         </div>
                         <div class="flex items-center justify-between border-t pt-3 font-semibold">
                             <span>{{ t('entitlement_settlement.total_deductions') }}</span>
@@ -305,6 +333,7 @@ type SettlementDetail = {
     total_deductions: number;
     net_due: number;
     notes?: string | null;
+    line_exclusions?: string[];
     created_by_name?: string | null;
     review_notes?: string | null;
     attachments?: Array<{ path: string; url: string; name: string }>;
@@ -339,33 +368,76 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
     },
 ]);
 
+const lineExclusions = computed(() => props.settlement.line_exclusions ?? []);
+
+const isLineExcluded = (key: string) => lineExclusions.value.includes(key);
+
 const duesRows = computed(() => [
-    { label: t('entitlement_settlement.end_of_service_bonus'), value: props.settlement.end_of_service_bonus },
-    { label: t('entitlement_settlement.travel_tickets'), value: props.settlement.travel_tickets },
-    { label: t('entitlement_settlement.due_commissions'), value: props.settlement.due_commissions },
+    {
+        label: t('entitlement_settlement.end_of_service_bonus'),
+        value: props.settlement.end_of_service_bonus,
+        excluded: isLineExcluded('end_of_service_bonus'),
+    },
+    {
+        label: t('entitlement_settlement.travel_tickets'),
+        value: props.settlement.travel_tickets,
+        excluded: isLineExcluded('travel_tickets'),
+    },
+    {
+        label: t('entitlement_settlement.due_commissions'),
+        value: props.settlement.due_commissions,
+        excluded: isLineExcluded('due_commissions'),
+    },
     {
         label: t('entitlement_settlement.salary_dues'),
         value: props.settlement.salary_dues,
         hint: `${formatNumber(props.settlement.salary_unpaid_days)} ${t('leaves.days')}`,
+        excluded: isLineExcluded('salary_dues'),
     },
     {
         label: t('entitlement_settlement.annual_leave_dues'),
         value: props.settlement.annual_leave_dues,
         hint: `${formatNumber(props.settlement.remaining_leave_days)} ${t('leaves.days')}`,
+        excluded: isLineExcluded('annual_leave_dues'),
     },
-    { label: t('entitlement_settlement.other_dues'), value: props.settlement.other_dues },
+    {
+        label: t('entitlement_settlement.other_dues'),
+        value: props.settlement.other_dues,
+        excluded: isLineExcluded('other_dues'),
+    },
 ]);
 
 const deductionRows = computed(() => [
-    { label: t('entitlement_settlement.advances'), value: props.settlement.advances_deduction },
-    { label: t('entitlement_settlement.custody'), value: props.settlement.custody_deduction },
-    { label: t('entitlement_settlement.excess_leave'), value: props.settlement.excess_leave_deduction },
-    { label: t('entitlement_settlement.social_insurance'), value: props.settlement.social_insurance_deduction },
-    { label: t('entitlement_settlement.penalties'), value: props.settlement.penalties_deduction },
+    {
+        label: t('entitlement_settlement.advances'),
+        value: props.settlement.advances_deduction,
+        excluded: isLineExcluded('advances_deduction'),
+    },
+    {
+        label: t('entitlement_settlement.custody'),
+        value: props.settlement.custody_deduction,
+        excluded: isLineExcluded('custody_deduction'),
+    },
+    {
+        label: t('entitlement_settlement.excess_leave'),
+        value: props.settlement.excess_leave_deduction,
+        excluded: isLineExcluded('excess_leave_deduction'),
+    },
+    {
+        label: t('entitlement_settlement.social_insurance'),
+        value: props.settlement.social_insurance_deduction,
+        excluded: isLineExcluded('social_insurance_deduction'),
+    },
+    {
+        label: t('entitlement_settlement.penalties'),
+        value: props.settlement.penalties_deduction,
+        excluded: isLineExcluded('penalties_deduction'),
+    },
     {
         label: t('entitlement_settlement.used_annual_leave'),
         value: props.settlement.used_annual_leave_deduction,
         hint: `${formatNumber(props.settlement.used_annual_leave_days)} ${t('leaves.days')}`,
+        excluded: isLineExcluded('used_annual_leave_deduction'),
     },
 ]);
 

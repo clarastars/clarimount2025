@@ -2742,6 +2742,8 @@ return [
         'employee_code' => 'Employee ID',
         'auto_field' => 'Automatic',
         'manual_field' => 'Manual entry',
+        'line_inclusion_hint' => 'All lines are included by default. Uncheck a line to exclude it from the totals.',
+        'line_excluded' => 'Excluded',
         'save' => 'Save settlement',
         'saved_success' => 'Entitlements settlement saved successfully.',
         'saved_pending_approval' => 'Settlement saved and is pending approval through the workflow.',

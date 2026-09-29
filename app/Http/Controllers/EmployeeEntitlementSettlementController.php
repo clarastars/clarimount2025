@@ -15,6 +15,7 @@ use App\Services\EmployeeEntitlementSettlementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -150,17 +151,20 @@ class EmployeeEntitlementSettlementController extends Controller
         $this->abortUnlessCanSettleEmployeeEntitlementsForEmployee($user, $employee);
 
         $settlementDate = $request->query('settlement_date', now('Asia/Riyadh')->toDateString());
-        $preview = $this->settlementService->buildPreview($employee, (string) $settlementDate, $request->only([
-            'end_of_service_bonus',
-            'travel_tickets',
-            'due_commissions',
-            'other_dues',
-            'custody_deduction',
-            'excess_leave_deduction',
-            'social_insurance_deduction',
-            'penalties_deduction',
-            'notes',
-        ]));
+        $preview = $this->settlementService->buildPreview($employee, (string) $settlementDate, array_merge(
+            $request->only([
+                'end_of_service_bonus',
+                'travel_tickets',
+                'due_commissions',
+                'other_dues',
+                'custody_deduction',
+                'excess_leave_deduction',
+                'social_insurance_deduction',
+                'penalties_deduction',
+                'notes',
+            ]),
+            ['line_exclusions' => $request->input('line_exclusions', [])],
+        ));
 
         $previousSettlementsCount = $employee->entitlementSettlements()->count();
         $employee->loadMissing('company');
@@ -179,6 +183,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'defaults' => [
                 'settlement_date' => (string) $settlementDate,
                 'reason' => (string) $request->query('reason', ''),
+                'line_exclusions' => $preview['line_exclusions'],
             ],
         ]);
     }
@@ -202,7 +207,13 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'line_exclusions' => ['nullable', 'array'],
+            'line_exclusions.*' => ['string', Rule::in(EmployeeEntitlementSettlement::excludableLineKeys())],
         ], $this->attachmentService->validationRules()));
+
+        $validated['line_exclusions'] = $this->settlementService->normalizeLineExclusions(
+            $validated['line_exclusions'] ?? [],
+        );
 
         $employee->loadMissing('company');
         $company = $employee->company;
@@ -265,6 +276,9 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => $request->query('social_insurance_deduction', $entitlementSettlement->social_insurance_deduction),
             'penalties_deduction' => $request->query('penalties_deduction', $entitlementSettlement->penalties_deduction),
             'notes' => $request->query('notes', $entitlementSettlement->notes),
+            'line_exclusions' => $request->has('line_exclusions')
+                ? $request->input('line_exclusions', [])
+                : ($entitlementSettlement->line_exclusions ?? []),
         ];
 
         $preview = $this->settlementService->buildPreview($employee, (string) $settlementDate, $manualInput);
@@ -295,6 +309,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 'social_insurance_deduction' => (float) $manualInput['social_insurance_deduction'],
                 'penalties_deduction' => (float) $manualInput['penalties_deduction'],
                 'notes' => (string) ($manualInput['notes'] ?? ''),
+                'line_exclusions' => $preview['line_exclusions'],
             ],
             'existing_attachments' => $this->attachmentService->publicAttachmentPayload(
                 $this->attachmentService->normalizeStoredPaths($entitlementSettlement->attachment_paths),
@@ -333,7 +348,13 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'line_exclusions' => ['nullable', 'array'],
+            'line_exclusions.*' => ['string', Rule::in(EmployeeEntitlementSettlement::excludableLineKeys())],
         ], $this->attachmentService->validationRules()));
+
+        $validated['line_exclusions'] = $this->settlementService->normalizeLineExclusions(
+            $validated['line_exclusions'] ?? [],
+        );
 
         $newPaths = $this->attachmentService->storeFromRequest($request, (int) $employee->id);
         $removePaths = $this->attachmentService->normalizeStoredPaths(
@@ -567,6 +588,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'penalties_deduction' => (float) $settlement->penalties_deduction,
             'used_annual_leave_deduction' => (float) $settlement->used_annual_leave_deduction,
             'notes' => $settlement->notes,
+            'line_exclusions' => is_array($settlement->line_exclusions) ? array_values($settlement->line_exclusions) : [],
             'reviewed_by_name' => $settlement->reviewer?->name,
             'reviewed_at' => $settlement->reviewed_at?->toIso8601String(),
             'review_notes' => $settlement->review_notes,

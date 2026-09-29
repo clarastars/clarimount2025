@@ -32,6 +32,7 @@ class EmployeeEntitlementSettlementService
      *     social_insurance_deduction?: float|int|string|null,
      *     penalties_deduction?: float|int|string|null,
      *     notes?: string|null,
+     *     line_exclusions?: list<string>|null,
      * }  $manualInput
      * @return array<string, mixed>
      */
@@ -50,26 +51,28 @@ class EmployeeEntitlementSettlementService
         $advances = $this->calculateAdvancesTotal($employee);
 
         $manual = $this->normalizeManualInput($manualInput);
+        $lineExclusions = $this->normalizeLineExclusions($manualInput['line_exclusions'] ?? []);
 
-        $totalDues = round(
-            $manual['end_of_service_bonus']
-            + $manual['travel_tickets']
-            + $manual['due_commissions']
-            + $salaryDues['amount']
-            + $annualLeave['amount']
-            + $manual['other_dues'],
-            2
-        );
+        $duesAmounts = [
+            'end_of_service_bonus' => $manual['end_of_service_bonus'],
+            'travel_tickets' => $manual['travel_tickets'],
+            'due_commissions' => $manual['due_commissions'],
+            'salary_dues' => $salaryDues['amount'],
+            'annual_leave_dues' => $annualLeave['amount'],
+            'other_dues' => $manual['other_dues'],
+        ];
 
-        $totalDeductions = round(
-            $advances
-            + $manual['custody_deduction']
-            + $manual['excess_leave_deduction']
-            + $manual['social_insurance_deduction']
-            + $manual['penalties_deduction']
-            + $usedLeave['amount'],
-            2
-        );
+        $deductionAmounts = [
+            'advances_deduction' => $advances,
+            'custody_deduction' => $manual['custody_deduction'],
+            'excess_leave_deduction' => $manual['excess_leave_deduction'],
+            'social_insurance_deduction' => $manual['social_insurance_deduction'],
+            'penalties_deduction' => $manual['penalties_deduction'],
+            'used_annual_leave_deduction' => $usedLeave['amount'],
+        ];
+
+        $totalDues = $this->sumIncludedAmounts($duesAmounts, $lineExclusions);
+        $totalDeductions = $this->sumIncludedAmounts($deductionAmounts, $lineExclusions);
 
         $departmentLabel = $employee->department instanceof \App\Models\Department
             ? $employee->department->name
@@ -123,6 +126,7 @@ class EmployeeEntitlementSettlementService
                 'used_annual_leave_deduction' => $usedLeave['amount'],
                 'total_deductions' => $totalDeductions,
             ],
+            'line_exclusions' => $lineExclusions,
             'net_due' => round($totalDues - $totalDeductions, 2),
             'notes' => $manual['notes'],
         ];
@@ -168,6 +172,7 @@ class EmployeeEntitlementSettlementService
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
+            'line_exclusions' => $preview['line_exclusions'] === [] ? null : $preview['line_exclusions'],
             'attachment_paths' => $payload['attachment_paths'] ?? null,
             'status' => $payload['status'] ?? EmployeeEntitlementSettlement::STATUS_PENDING,
             'reviewed_by' => $payload['reviewed_by'] ?? null,
@@ -221,6 +226,7 @@ class EmployeeEntitlementSettlementService
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
+            'line_exclusions' => $preview['line_exclusions'] === [] ? null : $preview['line_exclusions'],
             'attachment_paths' => array_key_exists('attachment_paths', $payload)
                 ? $payload['attachment_paths']
                 : $settlement->attachment_paths,
@@ -274,8 +280,12 @@ class EmployeeEntitlementSettlementService
             ->lockForUpdate()
             ->findOrFail($settlement->employee_id);
 
-        $paidLeaveDays = max(0.0, round((float) $settlement->remaining_leave_days, 2));
-        $usedLeaveDays = max(0.0, round((float) $settlement->used_annual_leave_days, 2));
+        $paidLeaveDays = $settlement->isLineExcluded('annual_leave_dues')
+            ? 0.0
+            : max(0.0, round((float) $settlement->remaining_leave_days, 2));
+        $usedLeaveDays = $settlement->isLineExcluded('used_annual_leave_deduction')
+            ? 0.0
+            : max(0.0, round((float) $settlement->used_annual_leave_days, 2));
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
         $currentUsed = round((float) ($employee->leave_days_used ?? 0), 2);
 
@@ -478,16 +488,27 @@ class EmployeeEntitlementSettlementService
             $settlementDate = $this->parseDate($lockedSettlement->settlement_date)?->endOfDay();
             $settlementCreatedAt = $lockedSettlement->created_at?->copy();
 
-            $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
-            $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
-            $remainingAccrued = max(0.0, round($currentAccrued - $paidLeaveDays, 2));
+            $includeAnnualLeaveDues = ! $lockedSettlement->isLineExcluded('annual_leave_dues');
+            $includeUsedLeaveDeduction = ! $lockedSettlement->isLineExcluded('used_annual_leave_deduction');
+            $includeAdvances = ! $lockedSettlement->isLineExcluded('advances_deduction');
 
-            $employee->update([
-                'leave_accrued_balance' => $remainingAccrued,
-                'leave_days_used' => 0,
-            ]);
+            $employeeUpdates = [];
 
-            if ($settlementDate !== null) {
+            if ($includeAnnualLeaveDues) {
+                $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
+                $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
+                $employeeUpdates['leave_accrued_balance'] = max(0.0, round($currentAccrued - $paidLeaveDays, 2));
+            }
+
+            if ($includeUsedLeaveDeduction) {
+                $employeeUpdates['leave_days_used'] = 0;
+            }
+
+            if ($employeeUpdates !== []) {
+                $employee->update($employeeUpdates);
+            }
+
+            if ($includeUsedLeaveDeduction && $settlementDate !== null) {
                 Leave::query()
                     ->where('employee_id', $employee->id)
                     ->where('deduct_from_balance', true)
@@ -495,14 +516,16 @@ class EmployeeEntitlementSettlementService
                     ->update(['deduct_from_balance' => false]);
             }
 
-            $debtQuery = EmployeeDebt::query()
-                ->where('employee_id', $employee->id);
+            if ($includeAdvances) {
+                $debtQuery = EmployeeDebt::query()
+                    ->where('employee_id', $employee->id);
 
-            if ($settlementCreatedAt !== null) {
-                $debtQuery->where('created_at', '<=', $settlementCreatedAt);
+                if ($settlementCreatedAt !== null) {
+                    $debtQuery->where('created_at', '<=', $settlementCreatedAt);
+                }
+
+                $debtQuery->delete();
             }
-
-            $debtQuery->delete();
         });
     }
 
@@ -601,6 +624,54 @@ class EmployeeEntitlementSettlementService
                 ? trim((string) $manualInput['notes'])
                 : null,
         ];
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<string>
+     */
+    public function normalizeLineExclusions(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $allowed = EmployeeEntitlementSettlement::excludableLineKeys();
+        $normalized = [];
+
+        foreach ($raw as $key) {
+            if (! is_string($key) && ! is_int($key)) {
+                continue;
+            }
+
+            $value = (string) $key;
+            if (in_array($value, $allowed, true) && ! in_array($value, $normalized, true)) {
+                $normalized[] = $value;
+            }
+        }
+
+        sort($normalized);
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, float>  $amounts
+     * @param  list<string>  $exclusions
+     */
+    private function sumIncludedAmounts(array $amounts, array $exclusions): float
+    {
+        $total = 0.0;
+
+        foreach ($amounts as $key => $amount) {
+            if (in_array($key, $exclusions, true)) {
+                continue;
+            }
+
+            $total += $amount;
+        }
+
+        return round($total, 2);
     }
 
     private function normalizeMoney(mixed $value): float

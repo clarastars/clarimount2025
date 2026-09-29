@@ -45,6 +45,7 @@ class EmployeeEntitlementSettlement extends Model
         'total_deductions',
         'net_due',
         'notes',
+        'line_exclusions',
         'attachment_paths',
         'status',
         'reviewed_by',
@@ -78,8 +79,39 @@ class EmployeeEntitlementSettlement extends Model
         'total_deductions' => 'decimal:2',
         'net_due' => 'decimal:2',
         'attachment_paths' => 'array',
+        'line_exclusions' => 'array',
         'reviewed_at' => 'datetime',
     ];
+
+    /**
+     * Settlement money-line keys that can be excluded from totals.
+     *
+     * @return list<string>
+     */
+    public static function excludableLineKeys(): array
+    {
+        return [
+            'end_of_service_bonus',
+            'travel_tickets',
+            'due_commissions',
+            'salary_dues',
+            'annual_leave_dues',
+            'other_dues',
+            'advances_deduction',
+            'custody_deduction',
+            'excess_leave_deduction',
+            'social_insurance_deduction',
+            'penalties_deduction',
+            'used_annual_leave_deduction',
+        ];
+    }
+
+    public function isLineExcluded(string $key): bool
+    {
+        $exclusions = is_array($this->line_exclusions) ? $this->line_exclusions : [];
+
+        return in_array($key, $exclusions, true);
+    }
 
     public function employee(): BelongsTo
     {

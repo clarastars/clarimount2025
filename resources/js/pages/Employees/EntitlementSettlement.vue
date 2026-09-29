@@ -147,11 +147,34 @@
                     <Card>
                         <CardHeader>
                             <CardTitle class="text-emerald-700">{{ t('entitlement_settlement.dues') }}</CardTitle>
+                            <p class="text-xs text-muted-foreground">{{ t('entitlement_settlement.line_inclusion_hint') }}</p>
                         </CardHeader>
                         <CardContent class="space-y-4">
-                            <div v-for="field in manualDuesFields" :key="field.key" class="space-y-1">
+                            <div
+                                v-for="field in manualDuesFields"
+                                :key="field.key"
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded(field.key) ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-medium">{{ field.label }}</p>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded(field.key)"
+                                            @change="setLineIncluded(field.key, ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded(field.key)
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <span class="text-sm font-medium">{{ field.label }}</span>
+                                    </label>
                                     <span class="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800">
                                         {{ t('entitlement_settlement.manual_field') }}
                                     </span>
@@ -162,15 +185,36 @@
                                     min="0"
                                     step="0.01"
                                     class="tabular-nums"
+                                    :disabled="!isLineIncluded(field.key)"
                                 />
                             </div>
 
-                            <div class="space-y-1">
+                            <div
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded('salary_dues') ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <div>
-                                        <p class="text-sm font-medium">{{ t('entitlement_settlement.salary_dues') }}</p>
-                                        <p v-if="salaryDuesHint" class="text-xs text-muted-foreground">{{ salaryDuesHint }}</p>
-                                    </div>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded('salary_dues')"
+                                            @change="setLineIncluded('salary_dues', ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded('salary_dues')
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <div>
+                                            <p class="text-sm font-medium">{{ t('entitlement_settlement.salary_dues') }}</p>
+                                            <p v-if="salaryDuesHint" class="text-xs text-muted-foreground">{{ salaryDuesHint }}</p>
+                                        </div>
+                                    </label>
                                     <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {{ t('entitlement_settlement.auto_field') }}
                                     </span>
@@ -178,12 +222,32 @@
                                 <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(preview.dues.salary_dues) }}</p>
                             </div>
 
-                            <div class="space-y-1">
+                            <div
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded('annual_leave_dues') ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <div>
-                                        <p class="text-sm font-medium">{{ t('entitlement_settlement.annual_leave_dues') }}</p>
-                                        <p class="text-xs text-muted-foreground">{{ annualLeaveHint }}</p>
-                                    </div>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded('annual_leave_dues')"
+                                            @change="setLineIncluded('annual_leave_dues', ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded('annual_leave_dues')
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <div>
+                                            <p class="text-sm font-medium">{{ t('entitlement_settlement.annual_leave_dues') }}</p>
+                                            <p class="text-xs text-muted-foreground">{{ annualLeaveHint }}</p>
+                                        </div>
+                                    </label>
                                     <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {{ t('entitlement_settlement.auto_field') }}
                                     </span>
@@ -201,11 +265,32 @@
                     <Card>
                         <CardHeader>
                             <CardTitle class="text-red-700">{{ t('entitlement_settlement.deductions') }}</CardTitle>
+                            <p class="text-xs text-muted-foreground">{{ t('entitlement_settlement.line_inclusion_hint') }}</p>
                         </CardHeader>
                         <CardContent class="space-y-4">
-                            <div class="space-y-1">
+                            <div
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded('advances_deduction') ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-medium">{{ t('entitlement_settlement.advances') }}</p>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded('advances_deduction')"
+                                            @change="setLineIncluded('advances_deduction', ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded('advances_deduction')
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <span class="text-sm font-medium">{{ t('entitlement_settlement.advances') }}</span>
+                                    </label>
                                     <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {{ t('entitlement_settlement.auto_field') }}
                                     </span>
@@ -213,9 +298,31 @@
                                 <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(preview.deductions.advances) }}</p>
                             </div>
 
-                            <div v-for="field in manualDeductionFields" :key="field.key" class="space-y-1">
+                            <div
+                                v-for="field in manualDeductionFields"
+                                :key="field.key"
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded(field.key) ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <p class="text-sm font-medium">{{ field.label }}</p>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded(field.key)"
+                                            @change="setLineIncluded(field.key, ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded(field.key)
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <span class="text-sm font-medium">{{ field.label }}</span>
+                                    </label>
                                     <span class="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800">
                                         {{ t('entitlement_settlement.manual_field') }}
                                     </span>
@@ -226,15 +333,36 @@
                                     min="0"
                                     step="0.01"
                                     class="tabular-nums"
+                                    :disabled="!isLineIncluded(field.key)"
                                 />
                             </div>
 
-                            <div class="space-y-1">
+                            <div
+                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
+                                :class="isLineIncluded('used_annual_leave_deduction') ? '' : 'opacity-45'"
+                            >
                                 <div class="flex items-center justify-between gap-2">
-                                    <div>
-                                        <p class="text-sm font-medium">{{ t('entitlement_settlement.used_annual_leave') }}</p>
-                                        <p class="text-xs text-muted-foreground">{{ usedLeaveHint }}</p>
-                                    </div>
+                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
+                                        <input
+                                            type="checkbox"
+                                            class="peer sr-only"
+                                            :checked="isLineIncluded('used_annual_leave_deduction')"
+                                            @change="setLineIncluded('used_annual_leave_deduction', ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span
+                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
+                                            :class="isLineIncluded('used_annual_leave_deduction')
+                                                ? 'border-blue-600 bg-blue-600 text-white'
+                                                : 'border-slate-300 bg-white text-transparent'"
+                                            aria-hidden="true"
+                                        >
+                                            <Check class="size-3.5 stroke-[3]" />
+                                        </span>
+                                        <div>
+                                            <p class="text-sm font-medium">{{ t('entitlement_settlement.used_annual_leave') }}</p>
+                                            <p class="text-xs text-muted-foreground">{{ usedLeaveHint }}</p>
+                                        </div>
+                                    </label>
                                     <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {{ t('entitlement_settlement.auto_field') }}
                                     </span>
@@ -358,7 +486,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Check } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
+
+type SettlementLineKey =
+    | 'end_of_service_bonus'
+    | 'travel_tickets'
+    | 'due_commissions'
+    | 'salary_dues'
+    | 'annual_leave_dues'
+    | 'other_dues'
+    | 'advances_deduction'
+    | 'custody_deduction'
+    | 'excess_leave_deduction'
+    | 'social_insurance_deduction'
+    | 'penalties_deduction'
+    | 'used_annual_leave_deduction';
 
 type Preview = {
     settlement_date: string;
@@ -392,6 +535,7 @@ type Preview = {
         used_annual_leave_deduction: number;
         used_annual_leave_days: number;
     };
+    line_exclusions?: string[];
     notes?: string | null;
 };
 
@@ -410,6 +554,7 @@ const props = defineProps<{
         social_insurance_deduction?: number;
         penalties_deduction?: number;
         notes?: string;
+        line_exclusions?: string[];
     };
     previous_settlements_count?: number;
     has_approval_workflow?: boolean;
@@ -448,6 +593,7 @@ const form = useForm({
     social_insurance_deduction: props.defaults.social_insurance_deduction ?? 0,
     penalties_deduction: props.defaults.penalties_deduction ?? 0,
     notes: props.defaults.notes ?? props.preview.notes ?? '',
+    line_exclusions: [...(props.defaults.line_exclusions ?? props.preview.line_exclusions ?? [])] as SettlementLineKey[],
     attachments: [] as File[],
     remove_attachment_paths: [] as string[],
 });
@@ -478,6 +624,23 @@ function markAttachmentForRemoval(path: string) {
         form.remove_attachment_paths = [...form.remove_attachment_paths, path];
     }
 }
+
+function isLineIncluded(key: SettlementLineKey): boolean {
+    return !form.line_exclusions.includes(key);
+}
+
+function setLineIncluded(key: SettlementLineKey, included: boolean) {
+    if (included) {
+        form.line_exclusions = form.line_exclusions.filter((item) => item !== key);
+        return;
+    }
+
+    if (!form.line_exclusions.includes(key)) {
+        form.line_exclusions = [...form.line_exclusions, key];
+    }
+}
+
+const includedAmount = (key: SettlementLineKey, amount: number) => (isLineIncluded(key) ? amount : 0);
 
 const preview = computed(() => props.preview);
 
@@ -522,23 +685,23 @@ const parseAmount = (value: unknown) => {
 
 const totalDues = computed(() =>
     roundMoney(
-        parseAmount(form.end_of_service_bonus)
-            + parseAmount(form.travel_tickets)
-            + parseAmount(form.due_commissions)
-            + preview.value.dues.salary_dues
-            + preview.value.dues.annual_leave_dues
-            + parseAmount(form.other_dues),
+        includedAmount('end_of_service_bonus', parseAmount(form.end_of_service_bonus))
+            + includedAmount('travel_tickets', parseAmount(form.travel_tickets))
+            + includedAmount('due_commissions', parseAmount(form.due_commissions))
+            + includedAmount('salary_dues', preview.value.dues.salary_dues)
+            + includedAmount('annual_leave_dues', preview.value.dues.annual_leave_dues)
+            + includedAmount('other_dues', parseAmount(form.other_dues)),
     ),
 );
 
 const totalDeductions = computed(() =>
     roundMoney(
-        preview.value.deductions.advances
-            + parseAmount(form.custody_deduction)
-            + parseAmount(form.excess_leave_deduction)
-            + parseAmount(form.social_insurance_deduction)
-            + parseAmount(form.penalties_deduction)
-            + preview.value.deductions.used_annual_leave_deduction,
+        includedAmount('advances_deduction', preview.value.deductions.advances)
+            + includedAmount('custody_deduction', parseAmount(form.custody_deduction))
+            + includedAmount('excess_leave_deduction', parseAmount(form.excess_leave_deduction))
+            + includedAmount('social_insurance_deduction', parseAmount(form.social_insurance_deduction))
+            + includedAmount('penalties_deduction', parseAmount(form.penalties_deduction))
+            + includedAmount('used_annual_leave_deduction', preview.value.deductions.used_annual_leave_deduction),
     ),
 );
 
@@ -615,6 +778,7 @@ function refreshPreview(settlementDate = form.settlement_date) {
             social_insurance_deduction: form.social_insurance_deduction,
             penalties_deduction: form.penalties_deduction,
             notes: form.notes,
+            line_exclusions: form.line_exclusions,
         },
         {
             preserveState: true,
