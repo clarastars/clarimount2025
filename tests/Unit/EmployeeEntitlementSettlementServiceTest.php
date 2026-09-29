@@ -201,7 +201,50 @@ it('nets future approved leave into annual leave payable days like the profile r
     expect($dues['accrued_days'])->toBe(158.75);
     expect($dues['used_days'])->toBe(115.42);
     expect($dues['payable_days'])->toBe(43.33);
+    expect($dues['settle_days'])->toBe(43.33);
     expect($dues['amount'])->toBe($amount->fromLeavePayDays($employee, 43.33));
+});
+
+it('allows settling only part of the available annual leave days', function (): void {
+    $employee = makeSettlementEmployee([
+        'leave_accrued_balance' => 21,
+        'leave_days_used' => 0,
+    ]);
+
+    $amount = app(ManualDeductionAmountService::class);
+    $accrual = Mockery::mock(LeaveAccrualService::class);
+    $accrual->shouldReceive('projectedAccruedBalanceThroughDate')->andReturn(43.33);
+
+    $service = new class($amount, $accrual) extends EmployeeEntitlementSettlementService
+    {
+        public function previouslySettledLeaveDays(Employee $employee): float
+        {
+            return 0.0;
+        }
+
+        public function calculateBalanceCommittedLeaveDays(Employee $employee): float
+        {
+            return 0.0;
+        }
+    };
+
+    $dues = $service->calculateAnnualLeaveDues(
+        $employee,
+        Carbon::parse('2026-09-29', 'Asia/Riyadh'),
+        19,
+    );
+
+    expect($dues['payable_days'])->toBe(43.33);
+    expect($dues['settle_days'])->toBe(19.0);
+    expect($dues['amount'])->toBe($amount->fromLeavePayDays($employee, 19));
+});
+
+it('clamps settle days above the available payable balance', function (): void {
+    $service = app(EmployeeEntitlementSettlementService::class);
+
+    expect($service->normalizeSettleLeaveDays(50, 43.33))->toBe(43.33);
+    expect($service->normalizeSettleLeaveDays(null, 43.33))->toBe(43.33);
+    expect($service->normalizeSettleLeaveDays(-5, 43.33))->toBe(0.0);
 });
 
 it('counts only elapsed days for leave spanning the settlement date', function (): void {

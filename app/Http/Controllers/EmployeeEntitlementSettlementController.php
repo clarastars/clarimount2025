@@ -162,6 +162,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 'social_insurance_deduction',
                 'penalties_deduction',
                 'notes',
+                'annual_leave_settle_days',
             ]),
             ['line_exclusions' => $request->input('line_exclusions', [])],
         ));
@@ -183,6 +184,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'defaults' => [
                 'settlement_date' => (string) $settlementDate,
                 'reason' => (string) $request->query('reason', ''),
+                'annual_leave_settle_days' => (float) $preview['dues']['settle_leave_days'],
                 'line_exclusions' => $preview['line_exclusions'],
             ],
         ]);
@@ -206,6 +208,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'excess_leave_deduction' => ['nullable', 'numeric', 'min:0'],
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
+            'annual_leave_settle_days' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'line_exclusions' => ['nullable', 'array'],
             'line_exclusions.*' => ['string', Rule::in(EmployeeEntitlementSettlement::excludableLineKeys())],
@@ -276,6 +279,10 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => $request->query('social_insurance_deduction', $entitlementSettlement->social_insurance_deduction),
             'penalties_deduction' => $request->query('penalties_deduction', $entitlementSettlement->penalties_deduction),
             'notes' => $request->query('notes', $entitlementSettlement->notes),
+            'annual_leave_settle_days' => $request->query(
+                'annual_leave_settle_days',
+                $entitlementSettlement->remaining_leave_days,
+            ),
             'line_exclusions' => $request->has('line_exclusions')
                 ? $request->input('line_exclusions', [])
                 : ($entitlementSettlement->line_exclusions ?? []),
@@ -308,6 +315,7 @@ class EmployeeEntitlementSettlementController extends Controller
                 'excess_leave_deduction' => (float) $manualInput['excess_leave_deduction'],
                 'social_insurance_deduction' => (float) $manualInput['social_insurance_deduction'],
                 'penalties_deduction' => (float) $manualInput['penalties_deduction'],
+                'annual_leave_settle_days' => (float) $preview['dues']['settle_leave_days'],
                 'notes' => (string) ($manualInput['notes'] ?? ''),
                 'line_exclusions' => $preview['line_exclusions'],
             ],
@@ -347,6 +355,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'excess_leave_deduction' => ['nullable', 'numeric', 'min:0'],
             'social_insurance_deduction' => ['nullable', 'numeric', 'min:0'],
             'penalties_deduction' => ['nullable', 'numeric', 'min:0'],
+            'annual_leave_settle_days' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'line_exclusions' => ['nullable', 'array'],
             'line_exclusions.*' => ['string', Rule::in(EmployeeEntitlementSettlement::excludableLineKeys())],
@@ -587,13 +596,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => (float) $settlement->social_insurance_deduction,
             'penalties_deduction' => (float) $settlement->penalties_deduction,
             'used_annual_leave_deduction' => (float) $settlement->used_annual_leave_deduction,
-            'payable_leave_days' => max(
-                0.0,
-                round(
-                    (float) $settlement->remaining_leave_days - (float) $settlement->used_annual_leave_days,
-                    2
-                )
-            ),
+            'payable_leave_days' => (float) $settlement->remaining_leave_days,
             'display_annual_leave_dues' => round(
                 max(
                     0.0,

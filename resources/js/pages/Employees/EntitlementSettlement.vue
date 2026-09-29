@@ -243,16 +243,31 @@
                                         >
                                             <Check class="size-3.5 stroke-[3]" />
                                         </span>
-                                        <div>
+                                        <div class="min-w-0">
                                             <p class="text-sm font-medium">{{ t('entitlement_settlement.annual_leave_dues') }}</p>
-                                            <p class="text-xs text-muted-foreground">{{ annualLeaveHint }}</p>
+                                            <p class="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                                                <input
+                                                    v-model="form.annual_leave_settle_days"
+                                                    type="number"
+                                                    min="0"
+                                                    :max="availableAnnualLeaveDays"
+                                                    step="0.01"
+                                                    class="h-6 w-16 rounded border border-transparent bg-transparent px-1 text-xs tabular-nums text-muted-foreground outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-blue-400 focus:bg-white focus:text-foreground"
+                                                    :disabled="!isLineIncluded('annual_leave_dues')"
+                                                    :title="t('entitlement_settlement.annual_leave_settle_days')"
+                                                    @blur="clampAnnualLeaveSettleDays"
+                                                    @click.stop
+                                                />
+                                                <span>{{ t('leaves.days') }}</span>
+                                                <span v-if="annualLeaveBreakdownHint">({{ annualLeaveBreakdownHint }})</span>
+                                            </p>
                                         </div>
                                     </label>
                                     <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
                                         {{ t('entitlement_settlement.auto_field') }}
                                     </span>
                                 </div>
-                                <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(preview.dues.annual_leave_dues) }}</p>
+                                <p class="text-lg font-semibold tabular-nums">{{ formatCurrency(annualLeaveDuesAmount) }}</p>
                             </div>
 
                             <div class="flex items-center justify-between border-t pt-4 font-semibold">
@@ -485,6 +500,7 @@ type Preview = {
         allowance_personal_car: number;
         gross_salary: number;
         gross_daily_wage?: number | null;
+        leave_pay_daily_wage?: number | null;
     };
     dues: {
         salary_dues: number;
@@ -494,6 +510,7 @@ type Preview = {
         annual_leave_dues: number;
         remaining_leave_days: number;
         payable_leave_days?: number;
+        settle_leave_days?: number;
         accrued_leave_days?: number;
     };
     deductions: {
@@ -518,6 +535,7 @@ const props = defineProps<{
         excess_leave_deduction?: number;
         social_insurance_deduction?: number;
         penalties_deduction?: number;
+        annual_leave_settle_days?: number;
         notes?: string;
         line_exclusions?: string[];
     };
@@ -557,6 +575,11 @@ const form = useForm({
     excess_leave_deduction: props.defaults.excess_leave_deduction ?? 0,
     social_insurance_deduction: props.defaults.social_insurance_deduction ?? 0,
     penalties_deduction: props.defaults.penalties_deduction ?? 0,
+    annual_leave_settle_days:
+        props.defaults.annual_leave_settle_days
+        ?? props.preview.dues.settle_leave_days
+        ?? props.preview.dues.payable_leave_days
+        ?? 0,
     notes: props.defaults.notes ?? props.preview.notes ?? '',
     line_exclusions: [...(props.defaults.line_exclusions ?? props.preview.line_exclusions ?? [])] as SettlementLineKey[],
     attachments: [] as File[],
@@ -648,13 +671,44 @@ const parseAmount = (value: unknown) => {
     return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const roundMoney = (value: number) => Math.round(value * 100) / 100;
+
+const availableAnnualLeaveDays = computed(() =>
+    Number(preview.value.dues.payable_leave_days ?? preview.value.dues.remaining_leave_days ?? 0),
+);
+
+const clampedAnnualLeaveSettleDays = computed(() => {
+    const requested = parseAmount(form.annual_leave_settle_days);
+    const maxDays = availableAnnualLeaveDays.value;
+
+    return Math.max(0, Math.min(maxDays, roundMoney(requested)));
+});
+
+const annualLeaveDuesAmount = computed(() => {
+    const daily = Number(preview.value.salary_breakdown.leave_pay_daily_wage ?? 0);
+    if (daily > 0) {
+        return roundMoney(clampedAnnualLeaveSettleDays.value * daily);
+    }
+
+    const payable = availableAnnualLeaveDays.value;
+    if (payable <= 0) {
+        return 0;
+    }
+
+    return roundMoney((preview.value.dues.annual_leave_dues / payable) * clampedAnnualLeaveSettleDays.value);
+});
+
+function clampAnnualLeaveSettleDays() {
+    form.annual_leave_settle_days = clampedAnnualLeaveSettleDays.value;
+}
+
 const totalDues = computed(() =>
     roundMoney(
         includedAmount('end_of_service_bonus', parseAmount(form.end_of_service_bonus))
             + includedAmount('travel_tickets', parseAmount(form.travel_tickets))
             + includedAmount('due_commissions', parseAmount(form.due_commissions))
             + includedAmount('salary_dues', preview.value.dues.salary_dues)
-            + includedAmount('annual_leave_dues', preview.value.dues.annual_leave_dues)
+            + includedAmount('annual_leave_dues', annualLeaveDuesAmount.value)
             + includedAmount('other_dues', parseAmount(form.other_dues)),
     ),
 );
@@ -680,26 +734,41 @@ const salaryDuesHint = computed(() => {
     return `${formatNumber(salary_unpaid_days)} ${t('leaves.days')} (${formatDate(salary_unpaid_from)} → ${formatDate(salary_unpaid_to)})`;
 });
 
-const annualLeaveHint = computed(() => {
-    const payable =
-        preview.value.dues.payable_leave_days
-        ?? Math.max(
-            0,
-            Number(preview.value.dues.remaining_leave_days ?? 0) - Number(preview.value.deductions.used_annual_leave_days ?? 0),
-        );
+const annualLeaveBreakdownHint = computed(() => {
+    const available = availableAnnualLeaveDays.value;
+    const settle = clampedAnnualLeaveSettleDays.value;
     const accrued = preview.value.dues.accrued_leave_days ?? preview.value.dues.remaining_leave_days;
     const used = preview.value.deductions.used_annual_leave_days ?? 0;
 
     if (used > 0) {
-        return t('entitlement_settlement.annual_leave_net_hint', {
-            payable: formatNumber(payable),
+        return t('entitlement_settlement.annual_leave_available_breakdown', {
+            available: formatNumber(available),
             accrued: formatNumber(accrued),
             used: formatNumber(used),
         });
     }
 
-    return `${formatNumber(payable)} ${t('leaves.days')}`;
+    if (settle < available) {
+        return t('entitlement_settlement.annual_leave_partial_of_available', {
+            available: formatNumber(available),
+        });
+    }
+
+    return '';
 });
+
+watch(
+    () => preview.value.dues.payable_leave_days,
+    (payable, previousPayable) => {
+        const maxDays = Number(payable ?? 0);
+        const current = parseAmount(form.annual_leave_settle_days);
+        const previousMax = Number(previousPayable ?? maxDays);
+
+        if (!Number.isFinite(current) || current <= 0 || current === previousMax || current > maxDays) {
+            form.annual_leave_settle_days = maxDays;
+        }
+    },
+);
 
 const formatCurrency = (amount: number) => `${Number(amount).toFixed(2)} SAR`;
 
@@ -727,8 +796,6 @@ const formatDate = (value?: string | null) => {
     );
 };
 
-const roundMoney = (value: number) => Math.round(value * 100) / 100;
-
 function refreshPreview(settlementDate = form.settlement_date) {
     if (!settlementDate) {
         return;
@@ -754,6 +821,7 @@ function refreshPreview(settlementDate = form.settlement_date) {
             excess_leave_deduction: form.excess_leave_deduction,
             social_insurance_deduction: form.social_insurance_deduction,
             penalties_deduction: form.penalties_deduction,
+            annual_leave_settle_days: form.annual_leave_settle_days,
             notes: form.notes,
             line_exclusions: form.line_exclusions,
         },
@@ -770,6 +838,8 @@ function refreshPreview(settlementDate = form.settlement_date) {
 }
 
 function submit() {
+    clampAnnualLeaveSettleDays();
+
     if (isEditing.value && props.settlement_id != null) {
         form
             .transform((data) => ({

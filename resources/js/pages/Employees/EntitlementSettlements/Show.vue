@@ -375,20 +375,17 @@ const lineExclusions = computed(() => props.settlement.line_exclusions ?? []);
 const isLineExcluded = (key: string) => lineExclusions.value.includes(key);
 
 const annualLeaveDisplayHint = computed(() => {
-    const payable =
-        props.settlement.payable_leave_days
-        ?? Math.max(0, Number(props.settlement.remaining_leave_days) - Number(props.settlement.used_annual_leave_days));
+    const settle = Number(props.settlement.payable_leave_days ?? props.settlement.remaining_leave_days ?? 0);
     const used = Number(props.settlement.used_annual_leave_days ?? 0);
 
     if (used > 0) {
-        return t('entitlement_settlement.annual_leave_net_hint', {
-            payable: formatNumber(payable),
-            accrued: formatNumber(props.settlement.remaining_leave_days),
-            used: formatNumber(used),
+        return t('entitlement_settlement.annual_leave_settle_hint_simple', {
+            settle: formatNumber(settle),
+            available: formatNumber(settle),
         });
     }
 
-    return `${formatNumber(payable)} ${t('leaves.days')}`;
+    return `${formatNumber(settle)} ${t('leaves.days')}`;
 });
 
 const duesRows = computed(() => [

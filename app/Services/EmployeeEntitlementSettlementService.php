@@ -7,7 +7,6 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\EmployeeDebt;
 use App\Models\EmployeeEntitlementSettlement;
-use App\Models\Leave;
 use App\Models\SalaryRunItem;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +32,7 @@ class EmployeeEntitlementSettlementService
      *     penalties_deduction?: float|int|string|null,
      *     notes?: string|null,
      *     line_exclusions?: list<string>|null,
+     *     annual_leave_settle_days?: float|int|string|null,
      * }  $manualInput
      * @return array<string, mixed>
      */
@@ -46,7 +46,11 @@ class EmployeeEntitlementSettlementService
         $lastSettlementDate = $this->resolveLastSettlementDate($employee);
         $serviceDays = $this->calculateServiceDays($hireDate, $settlementDate);
         $salaryDues = $this->calculateSalaryDues($employee, $settlementDate);
-        $annualLeave = $this->calculateAnnualLeaveDues($employee, $settlementDate);
+        $annualLeave = $this->calculateAnnualLeaveDues(
+            $employee,
+            $settlementDate,
+            $manualInput['annual_leave_settle_days'] ?? null,
+        );
         $advances = $this->calculateAdvancesTotal($employee);
 
         $manual = $this->normalizeManualInput($manualInput);
@@ -100,6 +104,7 @@ class EmployeeEntitlementSettlementService
                 'allowances' => round((float) ($employee->allowances ?? 0), 2),
                 'gross_salary' => round($this->amountService->grossMonthly($employee), 2),
                 'gross_daily_wage' => $this->amountService->grossDailyWage($employee),
+                'leave_pay_daily_wage' => $this->amountService->leavePayDailyWage($employee),
             ],
             'dues' => [
                 'end_of_service_bonus' => $manual['end_of_service_bonus'],
@@ -110,8 +115,9 @@ class EmployeeEntitlementSettlementService
                 'salary_unpaid_from' => $salaryDues['from'],
                 'salary_unpaid_to' => $salaryDues['to'],
                 'annual_leave_dues' => $annualLeave['amount'],
-                'remaining_leave_days' => $annualLeave['days'],
+                'remaining_leave_days' => $annualLeave['settle_days'],
                 'payable_leave_days' => $annualLeave['payable_days'],
+                'settle_leave_days' => $annualLeave['settle_days'],
                 'accrued_leave_days' => $annualLeave['accrued_days'],
                 'other_dues' => $manual['other_dues'],
                 'total_dues' => $totalDues,
@@ -280,20 +286,16 @@ class EmployeeEntitlementSettlementService
             ->lockForUpdate()
             ->findOrFail($settlement->employee_id);
 
-        // Annual leave dues now include used days netted into the payable amount,
-        // so reversing that line restores both accrued and used leave side effects.
+        // Restore only the leave days that were paid out by this settlement.
         if ($settlement->isLineExcluded('annual_leave_dues')) {
             return;
         }
 
         $paidLeaveDays = max(0.0, round((float) $settlement->remaining_leave_days, 2));
-        $usedLeaveDays = max(0.0, round((float) $settlement->used_annual_leave_days, 2));
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
-        $currentUsed = round((float) ($employee->leave_days_used ?? 0), 2);
 
         $employee->update([
             'leave_accrued_balance' => round($currentAccrued + $paidLeaveDays, 2),
-            'leave_days_used' => round($currentUsed + $usedLeaveDays, 2),
         ]);
     }
 
@@ -401,34 +403,57 @@ class EmployeeEntitlementSettlementService
 
     /**
      * Pay out remaining annual leave through the settlement date (inclusive).
-     * Accrued days are stored for balance adjustments; the payable amount nets out
-     * all balance-committed used leave (legacy + approved deduct-from-balance leaves),
-     * matching the employee profile remaining balance.
+     * Payable days match the employee profile remaining balance. An optional
+     * settle-days override can pay only part of that remaining balance.
      *
      * @return array{
      *     days: float,
      *     accrued_days: float,
      *     used_days: float,
      *     payable_days: float,
+     *     settle_days: float,
      *     amount: float
      * }
      */
-    public function calculateAnnualLeaveDues(Employee $employee, Carbon $settlementDate): array
-    {
+    public function calculateAnnualLeaveDues(
+        Employee $employee,
+        Carbon $settlementDate,
+        mixed $settleDaysOverride = null,
+    ): array {
         $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceThroughDate($employee, $settlementDate);
         $previouslyPaid = $this->previouslySettledLeaveDays($employee);
         $accruedDays = max(0.0, round($accruedAsOf - $previouslyPaid, 2));
         $usedDays = $this->calculateBalanceCommittedLeaveDays($employee);
         $payableDays = max(0.0, round($accruedDays - $usedDays, 2));
-        $amount = $this->amountService->fromLeavePayDays($employee, $payableDays) ?? 0.0;
+        $settleDays = $this->normalizeSettleLeaveDays($settleDaysOverride, $payableDays);
+        $amount = $this->amountService->fromLeavePayDays($employee, $settleDays) ?? 0.0;
 
         return [
-            'days' => $accruedDays,
+            'days' => $settleDays,
             'accrued_days' => $accruedDays,
             'used_days' => $usedDays,
             'payable_days' => $payableDays,
+            'settle_days' => $settleDays,
             'amount' => $amount,
         ];
+    }
+
+    /**
+     * Clamp requested settle days to [0, payableDays]. Null/blank means settle all payable days.
+     */
+    public function normalizeSettleLeaveDays(mixed $requested, float $payableDays): float
+    {
+        $payableDays = max(0.0, round($payableDays, 2));
+
+        if ($requested === null || $requested === '') {
+            return $payableDays;
+        }
+
+        if (! is_numeric($requested)) {
+            return $payableDays;
+        }
+
+        return max(0.0, min($payableDays, round((float) $requested, 2)));
     }
 
     public function previouslySettledLeaveDays(Employee $employee): float
@@ -535,17 +560,11 @@ class EmployeeEntitlementSettlementService
                 $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
                 $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
 
+                // Reduce accrued by the days actually paid in this settlement only.
+                // Leave used/reservations untouched so partial settlements keep the rest available.
                 $employee->update([
                     'leave_accrued_balance' => max(0.0, round($currentAccrued - $paidLeaveDays, 2)),
-                    'leave_days_used' => 0,
                 ]);
-
-                // Clear all balance reservations, including future approved leave already
-                // netted out of the payable annual-leave amount.
-                Leave::query()
-                    ->where('employee_id', $employee->id)
-                    ->where('deduct_from_balance', true)
-                    ->update(['deduct_from_balance' => false]);
             }
 
             if ($includeAdvances) {

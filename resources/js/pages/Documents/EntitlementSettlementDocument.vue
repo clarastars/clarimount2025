@@ -343,20 +343,9 @@ const formatNumber = (value: number | string | null | undefined) => {
 };
 
 const annualLeaveDisplayHint = computed(() => {
-    const payable =
-        props.settlement.payable_leave_days
-        ?? Math.max(0, Number(props.settlement.remaining_leave_days) - Number(props.settlement.used_annual_leave_days));
-    const used = Number(props.settlement.used_annual_leave_days ?? 0);
+    const settle = Number(props.settlement.payable_leave_days ?? props.settlement.remaining_leave_days ?? 0);
 
-    if (used > 0) {
-        return t('entitlement_settlement.annual_leave_net_hint', {
-            payable: formatNumber(payable),
-            accrued: formatNumber(props.settlement.remaining_leave_days),
-            used: formatNumber(used),
-        });
-    }
-
-    return `${formatNumber(payable)} ${t('leaves.days')}`;
+    return `${formatNumber(settle)} ${t('leaves.days')}`;
 });
 
 const duesRows = computed(() => [
