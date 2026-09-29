@@ -337,41 +337,6 @@
                                 />
                             </div>
 
-                            <div
-                                class="space-y-1 rounded-md border border-transparent p-2 transition-opacity"
-                                :class="isLineIncluded('used_annual_leave_deduction') ? '' : 'opacity-45'"
-                            >
-                                <div class="flex items-center justify-between gap-2">
-                                    <label class="flex min-w-0 cursor-pointer items-center gap-2.5">
-                                        <input
-                                            type="checkbox"
-                                            class="peer sr-only"
-                                            :checked="isLineIncluded('used_annual_leave_deduction')"
-                                            @change="setLineIncluded('used_annual_leave_deduction', ($event.target as HTMLInputElement).checked)"
-                                        />
-                                        <span
-                                            class="flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors"
-                                            :class="isLineIncluded('used_annual_leave_deduction')
-                                                ? 'border-blue-600 bg-blue-600 text-white'
-                                                : 'border-slate-300 bg-white text-transparent'"
-                                            aria-hidden="true"
-                                        >
-                                            <Check class="size-3.5 stroke-[3]" />
-                                        </span>
-                                        <div>
-                                            <p class="text-sm font-medium">{{ t('entitlement_settlement.used_annual_leave') }}</p>
-                                            <p class="text-xs text-muted-foreground">{{ usedLeaveHint }}</p>
-                                        </div>
-                                    </label>
-                                    <span class="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
-                                        {{ t('entitlement_settlement.auto_field') }}
-                                    </span>
-                                </div>
-                                <p class="text-lg font-semibold tabular-nums">
-                                    {{ formatCurrency(preview.deductions.used_annual_leave_deduction) }}
-                                </p>
-                            </div>
-
                             <div class="flex items-center justify-between border-t pt-4 font-semibold">
                                 <span>{{ t('entitlement_settlement.total_deductions') }}</span>
                                 <span>{{ formatCurrency(totalDeductions) }}</span>
@@ -500,8 +465,7 @@ type SettlementLineKey =
     | 'custody_deduction'
     | 'excess_leave_deduction'
     | 'social_insurance_deduction'
-    | 'penalties_deduction'
-    | 'used_annual_leave_deduction';
+    | 'penalties_deduction';
 
 type Preview = {
     settlement_date: string;
@@ -529,10 +493,11 @@ type Preview = {
         salary_unpaid_to?: string | null;
         annual_leave_dues: number;
         remaining_leave_days: number;
+        payable_leave_days?: number;
+        accrued_leave_days?: number;
     };
     deductions: {
         advances: number;
-        used_annual_leave_deduction: number;
         used_annual_leave_days: number;
     };
     line_exclusions?: string[];
@@ -700,8 +665,7 @@ const totalDeductions = computed(() =>
             + includedAmount('custody_deduction', parseAmount(form.custody_deduction))
             + includedAmount('excess_leave_deduction', parseAmount(form.excess_leave_deduction))
             + includedAmount('social_insurance_deduction', parseAmount(form.social_insurance_deduction))
-            + includedAmount('penalties_deduction', parseAmount(form.penalties_deduction))
-            + includedAmount('used_annual_leave_deduction', preview.value.deductions.used_annual_leave_deduction),
+            + includedAmount('penalties_deduction', parseAmount(form.penalties_deduction)),
     ),
 );
 
@@ -716,13 +680,26 @@ const salaryDuesHint = computed(() => {
     return `${formatNumber(salary_unpaid_days)} ${t('leaves.days')} (${formatDate(salary_unpaid_from)} → ${formatDate(salary_unpaid_to)})`;
 });
 
-const annualLeaveHint = computed(
-    () => `${formatNumber(preview.value.dues.remaining_leave_days)} ${t('leaves.days')}`,
-);
+const annualLeaveHint = computed(() => {
+    const payable =
+        preview.value.dues.payable_leave_days
+        ?? Math.max(
+            0,
+            Number(preview.value.dues.remaining_leave_days ?? 0) - Number(preview.value.deductions.used_annual_leave_days ?? 0),
+        );
+    const accrued = preview.value.dues.accrued_leave_days ?? preview.value.dues.remaining_leave_days;
+    const used = preview.value.deductions.used_annual_leave_days ?? 0;
 
-const usedLeaveHint = computed(
-    () => `${formatNumber(preview.value.deductions.used_annual_leave_days)} ${t('leaves.days')}`,
-);
+    if (used > 0) {
+        return t('entitlement_settlement.annual_leave_net_hint', {
+            payable: formatNumber(payable),
+            accrued: formatNumber(accrued),
+            used: formatNumber(used),
+        });
+    }
+
+    return `${formatNumber(payable)} ${t('leaves.days')}`;
+});
 
 const formatCurrency = (amount: number) => `${Number(amount).toFixed(2)} SAR`;
 

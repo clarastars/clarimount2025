@@ -587,6 +587,20 @@ class EmployeeEntitlementSettlementController extends Controller
             'social_insurance_deduction' => (float) $settlement->social_insurance_deduction,
             'penalties_deduction' => (float) $settlement->penalties_deduction,
             'used_annual_leave_deduction' => (float) $settlement->used_annual_leave_deduction,
+            'payable_leave_days' => max(
+                0.0,
+                round(
+                    (float) $settlement->remaining_leave_days - (float) $settlement->used_annual_leave_days,
+                    2
+                )
+            ),
+            'display_annual_leave_dues' => round(
+                max(
+                    0.0,
+                    (float) $settlement->annual_leave_dues - (float) $settlement->used_annual_leave_deduction
+                ),
+                2
+            ),
             'notes' => $settlement->notes,
             'line_exclusions' => is_array($settlement->line_exclusions) ? array_values($settlement->line_exclusions) : [],
             'reviewed_by_name' => $settlement->reviewer?->name,

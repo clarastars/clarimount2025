@@ -47,7 +47,6 @@ class EmployeeEntitlementSettlementService
         $serviceDays = $this->calculateServiceDays($hireDate, $settlementDate);
         $salaryDues = $this->calculateSalaryDues($employee, $settlementDate);
         $annualLeave = $this->calculateAnnualLeaveDues($employee, $settlementDate);
-        $usedLeave = $this->calculateUsedAnnualLeaveDeduction($employee, $settlementDate);
         $advances = $this->calculateAdvancesTotal($employee);
 
         $manual = $this->normalizeManualInput($manualInput);
@@ -68,7 +67,6 @@ class EmployeeEntitlementSettlementService
             'excess_leave_deduction' => $manual['excess_leave_deduction'],
             'social_insurance_deduction' => $manual['social_insurance_deduction'],
             'penalties_deduction' => $manual['penalties_deduction'],
-            'used_annual_leave_deduction' => $usedLeave['amount'],
         ];
 
         $totalDues = $this->sumIncludedAmounts($duesAmounts, $lineExclusions);
@@ -113,6 +111,8 @@ class EmployeeEntitlementSettlementService
                 'salary_unpaid_to' => $salaryDues['to'],
                 'annual_leave_dues' => $annualLeave['amount'],
                 'remaining_leave_days' => $annualLeave['days'],
+                'payable_leave_days' => $annualLeave['payable_days'],
+                'accrued_leave_days' => $annualLeave['accrued_days'],
                 'other_dues' => $manual['other_dues'],
                 'total_dues' => $totalDues,
             ],
@@ -122,8 +122,8 @@ class EmployeeEntitlementSettlementService
                 'excess_leave' => $manual['excess_leave_deduction'],
                 'social_insurance' => $manual['social_insurance_deduction'],
                 'penalties' => $manual['penalties_deduction'],
-                'used_annual_leave_days' => $usedLeave['days'],
-                'used_annual_leave_deduction' => $usedLeave['amount'],
+                'used_annual_leave_days' => $annualLeave['used_days'],
+                'used_annual_leave_deduction' => 0.0,
                 'total_deductions' => $totalDeductions,
             ],
             'line_exclusions' => $lineExclusions,
@@ -168,7 +168,7 @@ class EmployeeEntitlementSettlementService
             'excess_leave_deduction' => $preview['deductions']['excess_leave'],
             'social_insurance_deduction' => $preview['deductions']['social_insurance'],
             'penalties_deduction' => $preview['deductions']['penalties'],
-            'used_annual_leave_deduction' => $preview['deductions']['used_annual_leave_deduction'],
+            'used_annual_leave_deduction' => 0,
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
@@ -222,7 +222,7 @@ class EmployeeEntitlementSettlementService
             'excess_leave_deduction' => $preview['deductions']['excess_leave'],
             'social_insurance_deduction' => $preview['deductions']['social_insurance'],
             'penalties_deduction' => $preview['deductions']['penalties'],
-            'used_annual_leave_deduction' => $preview['deductions']['used_annual_leave_deduction'],
+            'used_annual_leave_deduction' => 0,
             'total_deductions' => $preview['deductions']['total_deductions'],
             'net_due' => $preview['net_due'],
             'notes' => $preview['notes'],
@@ -280,12 +280,14 @@ class EmployeeEntitlementSettlementService
             ->lockForUpdate()
             ->findOrFail($settlement->employee_id);
 
-        $paidLeaveDays = $settlement->isLineExcluded('annual_leave_dues')
-            ? 0.0
-            : max(0.0, round((float) $settlement->remaining_leave_days, 2));
-        $usedLeaveDays = $settlement->isLineExcluded('used_annual_leave_deduction')
-            ? 0.0
-            : max(0.0, round((float) $settlement->used_annual_leave_days, 2));
+        // Annual leave dues now include used days netted into the payable amount,
+        // so reversing that line restores both accrued and used leave side effects.
+        if ($settlement->isLineExcluded('annual_leave_dues')) {
+            return;
+        }
+
+        $paidLeaveDays = max(0.0, round((float) $settlement->remaining_leave_days, 2));
+        $usedLeaveDays = max(0.0, round((float) $settlement->used_annual_leave_days, 2));
         $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
         $currentUsed = round((float) ($employee->leave_days_used ?? 0), 2);
 
@@ -398,19 +400,31 @@ class EmployeeEntitlementSettlementService
     }
 
     /**
-     * Pay out annual leave earned through the settlement date (inclusive).
+     * Pay out remaining annual leave through the settlement date (inclusive).
+     * Accrued days are stored for balance adjustments; the payable amount nets out used leave.
      *
-     * @return array{days: float, amount: float}
+     * @return array{
+     *     days: float,
+     *     accrued_days: float,
+     *     used_days: float,
+     *     payable_days: float,
+     *     amount: float
+     * }
      */
     public function calculateAnnualLeaveDues(Employee $employee, Carbon $settlementDate): array
     {
         $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceThroughDate($employee, $settlementDate);
         $previouslyPaid = $this->previouslySettledLeaveDays($employee);
-        $days = max(0, round($accruedAsOf - $previouslyPaid, 2));
-        $amount = $this->amountService->fromLeavePayDays($employee, $days) ?? 0.0;
+        $accruedDays = max(0.0, round($accruedAsOf - $previouslyPaid, 2));
+        $usedDays = $this->calculateUsedAnnualLeaveDeduction($employee, $settlementDate)['days'];
+        $payableDays = max(0.0, round($accruedDays - $usedDays, 2));
+        $amount = $this->amountService->fromLeavePayDays($employee, $payableDays) ?? 0.0;
 
         return [
-            'days' => $days,
+            'days' => $accruedDays,
+            'accrued_days' => $accruedDays,
+            'used_days' => $usedDays,
+            'payable_days' => $payableDays,
             'amount' => $amount,
         ];
     }
@@ -448,6 +462,10 @@ class EmployeeEntitlementSettlementService
 
     public function calculateElapsedDeductibleLeaveDays(Employee $employee, Carbon $settlementDate): float
     {
+        if ($employee->getKey() === null) {
+            return 0.0;
+        }
+
         $total = 0.0;
 
         foreach ($employee->leaves()->where('deduct_from_balance', true)->get() as $leave) {
@@ -489,31 +507,24 @@ class EmployeeEntitlementSettlementService
             $settlementCreatedAt = $lockedSettlement->created_at?->copy();
 
             $includeAnnualLeaveDues = ! $lockedSettlement->isLineExcluded('annual_leave_dues');
-            $includeUsedLeaveDeduction = ! $lockedSettlement->isLineExcluded('used_annual_leave_deduction');
             $includeAdvances = ! $lockedSettlement->isLineExcluded('advances_deduction');
-
-            $employeeUpdates = [];
 
             if ($includeAnnualLeaveDues) {
                 $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
                 $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
-                $employeeUpdates['leave_accrued_balance'] = max(0.0, round($currentAccrued - $paidLeaveDays, 2));
-            }
 
-            if ($includeUsedLeaveDeduction) {
-                $employeeUpdates['leave_days_used'] = 0;
-            }
+                $employee->update([
+                    'leave_accrued_balance' => max(0.0, round($currentAccrued - $paidLeaveDays, 2)),
+                    'leave_days_used' => 0,
+                ]);
 
-            if ($employeeUpdates !== []) {
-                $employee->update($employeeUpdates);
-            }
-
-            if ($includeUsedLeaveDeduction && $settlementDate !== null) {
-                Leave::query()
-                    ->where('employee_id', $employee->id)
-                    ->where('deduct_from_balance', true)
-                    ->whereDate('start_date', '<=', $settlementDate->toDateString())
-                    ->update(['deduct_from_balance' => false]);
+                if ($settlementDate !== null) {
+                    Leave::query()
+                        ->where('employee_id', $employee->id)
+                        ->where('deduct_from_balance', true)
+                        ->whereDate('start_date', '<=', $settlementDate->toDateString())
+                        ->update(['deduct_from_balance' => false]);
+                }
             }
 
             if ($includeAdvances) {

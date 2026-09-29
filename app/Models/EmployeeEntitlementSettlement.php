@@ -102,7 +102,6 @@ class EmployeeEntitlementSettlement extends Model
             'excess_leave_deduction',
             'social_insurance_deduction',
             'penalties_deduction',
-            'used_annual_leave_deduction',
         ];
     }
 

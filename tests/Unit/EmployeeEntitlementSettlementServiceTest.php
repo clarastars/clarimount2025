@@ -84,6 +84,7 @@ it('calculates annual leave dues only through the settlement date', function ():
 
     // Settlement on 25 Aug: Mar 11→Aug 25 = 5 months + 14 days → 9.57
     expect($throughPastDate['days'])->toBe(9.57);
+    expect($throughPastDate['payable_days'])->toBe(9.57);
     expect($throughPastDate['amount'])->toBe(
         app(ManualDeductionAmountService::class)->fromLeavePayDays($employee, 9.57)
     );
@@ -111,8 +112,28 @@ it('excludes personal car allowance from annual leave dues', function (): void {
         Carbon::parse('2026-08-23', 'Asia/Riyadh'),
     );
 
-    expect($dues['amount'])->toBe(round(($dues['days'] * 5000) / 30, 2));
-    expect($dues['amount'])->not->toBe(round(($dues['days'] * 6000) / 30, 2));
+    expect($dues['amount'])->toBe(round(($dues['payable_days'] * 5000) / 30, 2));
+    expect($dues['amount'])->not->toBe(round(($dues['payable_days'] * 6000) / 30, 2));
+});
+
+it('nets used leave out of annual leave dues payable amount', function (): void {
+    $employee = makeSettlementEmployee([
+        'leave_accrued_balance' => 21,
+        'leave_days_used' => 5,
+    ]);
+
+    $service = app(EmployeeEntitlementSettlementService::class);
+
+    $dues = $service->calculateAnnualLeaveDues(
+        $employee,
+        Carbon::parse('2026-08-23', 'Asia/Riyadh'),
+    );
+
+    expect($dues['used_days'])->toBe(5.0);
+    expect($dues['payable_days'])->toBe(round($dues['accrued_days'] - 5.0, 2));
+    expect($dues['amount'])->toBe(
+        app(ManualDeductionAmountService::class)->fromLeavePayDays($employee, $dues['payable_days'])
+    );
 });
 
 it('does not deduct approved future leave from annual leave settlement', function (): void {

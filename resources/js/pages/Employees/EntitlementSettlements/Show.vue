@@ -330,6 +330,8 @@ type SettlementDetail = {
     social_insurance_deduction: number;
     penalties_deduction: number;
     used_annual_leave_deduction: number;
+    payable_leave_days?: number;
+    display_annual_leave_dues?: number;
     total_deductions: number;
     net_due: number;
     notes?: string | null;
@@ -372,6 +374,23 @@ const lineExclusions = computed(() => props.settlement.line_exclusions ?? []);
 
 const isLineExcluded = (key: string) => lineExclusions.value.includes(key);
 
+const annualLeaveDisplayHint = computed(() => {
+    const payable =
+        props.settlement.payable_leave_days
+        ?? Math.max(0, Number(props.settlement.remaining_leave_days) - Number(props.settlement.used_annual_leave_days));
+    const used = Number(props.settlement.used_annual_leave_days ?? 0);
+
+    if (used > 0) {
+        return t('entitlement_settlement.annual_leave_net_hint', {
+            payable: formatNumber(payable),
+            accrued: formatNumber(props.settlement.remaining_leave_days),
+            used: formatNumber(used),
+        });
+    }
+
+    return `${formatNumber(payable)} ${t('leaves.days')}`;
+});
+
 const duesRows = computed(() => [
     {
         label: t('entitlement_settlement.end_of_service_bonus'),
@@ -396,8 +415,8 @@ const duesRows = computed(() => [
     },
     {
         label: t('entitlement_settlement.annual_leave_dues'),
-        value: props.settlement.annual_leave_dues,
-        hint: `${formatNumber(props.settlement.remaining_leave_days)} ${t('leaves.days')}`,
+        value: props.settlement.display_annual_leave_dues ?? props.settlement.annual_leave_dues,
+        hint: annualLeaveDisplayHint.value,
         excluded: isLineExcluded('annual_leave_dues'),
     },
     {
@@ -432,12 +451,6 @@ const deductionRows = computed(() => [
         label: t('entitlement_settlement.penalties'),
         value: props.settlement.penalties_deduction,
         excluded: isLineExcluded('penalties_deduction'),
-    },
-    {
-        label: t('entitlement_settlement.used_annual_leave'),
-        value: props.settlement.used_annual_leave_deduction,
-        hint: `${formatNumber(props.settlement.used_annual_leave_days)} ${t('leaves.days')}`,
-        excluded: isLineExcluded('used_annual_leave_deduction'),
     },
 ]);
 
