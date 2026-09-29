@@ -2702,7 +2702,7 @@ return [
         'salary_unpaid_days' => 'Unpaid salary days',
         'salary_unpaid_period' => 'Unpaid period',
         'annual_leave_dues' => 'Annual leave dues',
-        'annual_leave_net_hint' => ':payable days (accrued :accrued − used :used)',
+        'annual_leave_net_hint' => '{payable} days (accrued {accrued} − used {used})',
         'remaining_leave_days' => 'Remaining leave days',
         'other_dues' => 'Other',
         'total_dues' => 'Total dues',

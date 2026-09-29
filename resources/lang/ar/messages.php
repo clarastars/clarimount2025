@@ -2715,7 +2715,7 @@ return [
         'salary_unpaid_days' => 'أيام الراتب غير المسددة',
         'salary_unpaid_period' => 'فترة الراتب غير المسددة',
         'annual_leave_dues' => 'مستحقات الإجازة السنوية',
-        'annual_leave_net_hint' => ':payable يوم (مستحق :accrued − مستخدم :used)',
+        'annual_leave_net_hint' => '{payable} يوم (مستحق {accrued} − مستخدم {used})',
         'remaining_leave_days' => 'أيام الإجازة المتبقية',
         'other_dues' => 'أخرى',
         'total_dues' => 'إجمالي المستحقات',
