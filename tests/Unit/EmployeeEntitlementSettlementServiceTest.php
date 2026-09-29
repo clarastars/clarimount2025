@@ -85,8 +85,34 @@ it('calculates annual leave dues only through the settlement date', function ():
     // Settlement on 25 Aug: Mar 11→Aug 25 = 5 months + 14 days → 9.57
     expect($throughPastDate['days'])->toBe(9.57);
     expect($throughPastDate['amount'])->toBe(
-        app(ManualDeductionAmountService::class)->fromGrossDays($employee, 9.57)
+        app(ManualDeductionAmountService::class)->fromLeavePayDays($employee, 9.57)
     );
+});
+
+it('excludes personal car allowance from annual leave dues', function (): void {
+    $employee = makeSettlementEmployee([
+        'basic_salary' => 4000,
+        'allowances' => 2000,
+        'allowance_personal_car' => 1000,
+        'hire_date' => '2024-08-11',
+        'annual_leave_balance' => 21,
+        'leave_accrued_balance' => 21,
+        'leave_days_used' => 0,
+    ]);
+
+    $service = app(EmployeeEntitlementSettlementService::class);
+    $amountService = app(ManualDeductionAmountService::class);
+
+    expect($amountService->grossMonthly($employee))->toBe(6000.0);
+    expect($amountService->grossMonthlyExcludingPersonalCar($employee))->toBe(5000.0);
+
+    $dues = $service->calculateAnnualLeaveDues(
+        $employee,
+        Carbon::parse('2026-08-23', 'Asia/Riyadh'),
+    );
+
+    expect($dues['amount'])->toBe(round(($dues['days'] * 5000) / 30, 2));
+    expect($dues['amount'])->not->toBe(round(($dues['days'] * 6000) / 30, 2));
 });
 
 it('does not deduct approved future leave from annual leave settlement', function (): void {

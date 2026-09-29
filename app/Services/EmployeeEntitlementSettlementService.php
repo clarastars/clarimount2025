@@ -407,7 +407,7 @@ class EmployeeEntitlementSettlementService
         $accruedAsOf = $this->leaveAccrualService->projectedAccruedBalanceThroughDate($employee, $settlementDate);
         $previouslyPaid = $this->previouslySettledLeaveDays($employee);
         $days = max(0, round($accruedAsOf - $previouslyPaid, 2));
-        $amount = $this->amountService->fromGrossDays($employee, $days) ?? 0.0;
+        $amount = $this->amountService->fromLeavePayDays($employee, $days) ?? 0.0;
 
         return [
             'days' => $days,

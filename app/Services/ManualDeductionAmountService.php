@@ -48,6 +48,16 @@ class ManualDeductionAmountService
         return $basic + $allowances;
     }
 
+    /**
+     * Gross monthly pay used for leave settlement: full gross minus personal car allowance.
+     */
+    public function grossMonthlyExcludingPersonalCar(Employee $employee): float
+    {
+        $carAllowance = (float) ($employee->allowance_personal_car ?? 0);
+
+        return max(0.0, round($this->grossMonthly($employee) - $carAllowance, 2));
+    }
+
     public function hasValidGrossSalary(Employee $employee): bool
     {
         return $this->grossMonthly($employee) > 0;
@@ -75,6 +85,19 @@ class ManualDeductionAmountService
         }
 
         return round($this->grossMonthly($employee) / 30, 8);
+    }
+
+    /**
+     * Leave-pay daily wage: (gross − personal car allowance) / 30.
+     */
+    public function leavePayDailyWage(Employee $employee): ?float
+    {
+        $monthly = $this->grossMonthlyExcludingPersonalCar($employee);
+        if ($monthly <= 0) {
+            return null;
+        }
+
+        return round($monthly / 30, 8);
     }
 
     /**
@@ -161,6 +184,23 @@ class ManualDeductionAmountService
             return null;
         }
         $daily = $this->grossDailyWage($employee);
+        if ($daily === null) {
+            return null;
+        }
+
+        return round($days * $daily, 2);
+    }
+
+    /**
+     * Leave entitlement amount for a number of days, excluding personal car allowance from the daily rate.
+     */
+    public function fromLeavePayDays(Employee $employee, ?float $days): ?float
+    {
+        if ($days === null || $days <= 0) {
+            return null;
+        }
+
+        $daily = $this->leavePayDailyWage($employee);
         if ($daily === null) {
             return null;
         }
