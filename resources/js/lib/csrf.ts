@@ -95,6 +95,11 @@ function buildHeaders(init?: RequestInit): Headers {
     const headers = new Headers(init?.headers);
 
     for (const [key, value] of Object.entries(csrfHeaders())) {
+        // Preserve caller-provided Accept (e.g. file downloads).
+        if (key.toLowerCase() === 'accept' && headers.has('Accept')) {
+            continue;
+        }
+
         headers.set(key, value);
     }
 

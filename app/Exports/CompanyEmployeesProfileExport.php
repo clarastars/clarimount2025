@@ -10,18 +10,19 @@ use App\Services\ManualDeductionAmountService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class CompanyEmployeesProfileExport implements FromArray, ShouldAutoSize, WithEvents, WithStyles
+class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithStyles
 {
     use ResolvesEmployeeProfileExportFields;
 
@@ -30,6 +31,8 @@ class CompanyEmployeesProfileExport implements FromArray, ShouldAutoSize, WithEv
 
     /** @var Collection<int, Employee> */
     private Collection $employees;
+
+    private EmployeeProfileExportValueBinder $valueBinder;
 
     /**
      * @param  Collection<int, Employee>|iterable<int, Employee>  $employees
@@ -44,6 +47,12 @@ class CompanyEmployeesProfileExport implements FromArray, ShouldAutoSize, WithEv
             ? $employees->values()
             : collect($employees)->values();
         $this->fields = self::normalizeFields($fields);
+        $this->valueBinder = new EmployeeProfileExportValueBinder;
+    }
+
+    public function bindValue(\PhpOffice\PhpSpreadsheet\Cell\Cell $cell, mixed $value): bool
+    {
+        return $this->valueBinder->bindValue($cell, $value);
     }
 
     public function array(): array
@@ -115,20 +124,11 @@ class CompanyEmployeesProfileExport implements FromArray, ShouldAutoSize, WithEv
                 if ($lastRow >= 2) {
                     $sheet->getStyle('A2:'.$highestColumn.$lastRow)->applyFromArray([
                         'font' => ['size' => 11],
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'F8FAFC'],
+                        ],
                     ]);
-
-                    for ($row = 2; $row <= $lastRow; $row++) {
-                        $sheet->getRowDimension($row)->setRowHeight(26);
-
-                        if ($row % 2 === 0) {
-                            $sheet->getStyle('A'.$row.':'.$highestColumn.$row)->applyFromArray([
-                                'fill' => [
-                                    'fillType' => Fill::FILL_SOLID,
-                                    'startColor' => ['rgb' => 'F8FAFC'],
-                                ],
-                            ]);
-                        }
-                    }
                 }
 
                 foreach ($this->fields as $index => $field) {
@@ -139,10 +139,6 @@ class CompanyEmployeesProfileExport implements FromArray, ShouldAutoSize, WithEv
                     }
 
                     if (in_array($field, self::TEXT_FIELDS, true)) {
-                        for ($row = 2; $row <= $lastRow; $row++) {
-                            $cell = $sheet->getCell($column.$row);
-                            $cell->setValueExplicit((string) $cell->getValue(), DataType::TYPE_STRING);
-                        }
                         $sheet->getStyle($column.'2:'.$column.$lastRow)
                             ->getNumberFormat()
                             ->setFormatCode(NumberFormat::FORMAT_TEXT);

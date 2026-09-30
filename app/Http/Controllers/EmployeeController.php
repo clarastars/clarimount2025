@@ -541,7 +541,7 @@ class EmployeeController extends Controller
         Request $request,
         Employee $employee,
         ManualDeductionAmountService $amountService,
-    ): BinaryFileResponse {
+    ): BinaryFileResponse|\Illuminate\Http\JsonResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
         $this->abortUnlessCanExportEmployeeProfileForEmployee($user, $employee);
@@ -551,23 +551,30 @@ class EmployeeController extends Controller
             'fields.*' => ['string', Rule::in(EmployeeProfileExport::allowedFields())],
         ]);
 
-        $employee->loadMissing(['company', 'department', 'nationality']);
-        $employee->append('full_name');
+        try {
+            $employee->loadMissing(['company', 'department', 'nationality']);
+            $employee->append('full_name');
 
-        $safeName = preg_replace('/[^\p{L}\p{N}\-_]+/u', '_', (string) ($employee->full_name ?: $employee->id)) ?: (string) $employee->id;
-        $filename = 'employee-profile-'.$safeName.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+            $filename = 'employee-profile-'.$employee->id.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
 
-        return Excel::download(
-            new EmployeeProfileExport($employee, $validated['fields'], $amountService),
-            $filename,
-            \Maatwebsite\Excel\Excel::XLSX,
-        );
+            return Excel::download(
+                new EmployeeProfileExport($employee, $validated['fields'], $amountService),
+                $filename,
+                \Maatwebsite\Excel\Excel::XLSX,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('messages.employees.export_profile_failed'),
+            ], 500);
+        }
     }
 
     public function exportCompanyProfiles(
         Request $request,
         ManualDeductionAmountService $amountService,
-    ): BinaryFileResponse {
+    ): BinaryFileResponse|\Illuminate\Http\JsonResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
@@ -581,32 +588,38 @@ class EmployeeController extends Controller
         $company = Company::query()->findOrFail((int) $validated['company_id']);
         $this->abortUnlessCanExportCompanyEmployeeProfilesForCompany($user, $company);
 
-        $query = Employee::query()
-            ->where('company_id', $company->id)
-            ->with(['company', 'department', 'nationality'])
-            ->orderBy('first_name')
-            ->orderBy('last_name');
+        try {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(120);
 
-        $this->applyEmployeePermissionScope($query, $user, [
-            'employees.export-company-profile',
-            ...$this->employeeViewPermissions(),
-        ]);
+            $query = Employee::query()
+                ->where('company_id', $company->id)
+                ->with(['company', 'department', 'nationality'])
+                ->orderBy('first_name')
+                ->orderBy('last_name');
 
-        $employees = $query->get();
-        $employees->each->append('full_name');
+            $this->applyEmployeePermissionScope($query, $user, [
+                'employees.export-company-profile',
+                ...$this->employeeViewPermissions(),
+            ]);
 
-        $safeName = preg_replace(
-            '/[^\p{L}\p{N}\-_]+/u',
-            '_',
-            (string) ($company->name_ar ?: $company->name_en ?: $company->id)
-        ) ?: (string) $company->id;
-        $filename = 'company-employees-'.$safeName.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+            $employees = $query->get();
+            $employees->each->append('full_name');
 
-        return Excel::download(
-            new CompanyEmployeesProfileExport($employees, $validated['fields'], $amountService),
-            $filename,
-            \Maatwebsite\Excel\Excel::XLSX,
-        );
+            $filename = 'company-employees-'.$company->id.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+
+            return Excel::download(
+                new CompanyEmployeesProfileExport($employees, $validated['fields'], $amountService),
+                $filename,
+                \Maatwebsite\Excel\Excel::XLSX,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('messages.employees.export_company_profile_failed'),
+            ], 500);
+        }
     }
 
     public function toggleExcludeFromSalary(Employee $employee): RedirectResponse

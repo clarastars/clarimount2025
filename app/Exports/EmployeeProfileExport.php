@@ -9,23 +9,27 @@ use App\Models\Employee;
 use App\Services\ManualDeductionAmountService;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, WithStyles
+class EmployeeProfileExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithStyles
 {
     use ResolvesEmployeeProfileExportFields;
 
     /** @var list<string> */
     private array $fields;
+
+    private EmployeeProfileExportValueBinder $valueBinder;
 
     /**
      * @param  list<string>  $fields
@@ -36,6 +40,12 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
         private readonly ManualDeductionAmountService $amountService,
     ) {
         $this->fields = self::normalizeFields($fields);
+        $this->valueBinder = new EmployeeProfileExportValueBinder;
+    }
+
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        return $this->valueBinder->bindValue($cell, $value);
     }
 
     public function array(): array
@@ -88,14 +98,13 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
                 $sheet = $event->sheet->getDelegate();
                 $columnCount = count($this->fields);
                 $highestColumn = Coordinate::stringFromColumnIndex($columnCount);
-                $lastRow = 2;
 
                 $sheet->setRightToLeft(true);
                 $sheet->freezePane('A2');
                 $sheet->getRowDimension(1)->setRowHeight(32);
                 $sheet->getRowDimension(2)->setRowHeight(28);
 
-                $range = 'A1:'.$highestColumn.$lastRow;
+                $range = 'A1:'.$highestColumn.'2';
                 $sheet->getStyle($range)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -116,8 +125,6 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
                     $column = Coordinate::stringFromColumnIndex($index + 1);
 
                     if (in_array($field, self::TEXT_FIELDS, true)) {
-                        $cell = $sheet->getCell($column.'2');
-                        $cell->setValueExplicit((string) $cell->getValue(), DataType::TYPE_STRING);
                         $sheet->getStyle($column.'2')
                             ->getNumberFormat()
                             ->setFormatCode(NumberFormat::FORMAT_TEXT);

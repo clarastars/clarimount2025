@@ -501,6 +501,7 @@ import type { EmployeeAuditLogEntry } from '@/components/employees/EmployeeAudit
 import EmployeeInfoField from '@/components/employees/EmployeeInfoField.vue';
 import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import { fetchWithCsrf } from '@/lib/csrf';
+import { downloadExcelResponse } from '@/lib/downloadExcel';
 import type { Employee, BreadcrumbItem } from '@/types';
 
 type ExportProfileFieldKey =
@@ -631,36 +632,20 @@ async function downloadEmployeeProfile() {
     try {
         const response = await fetchWithCsrf(route('employees.export-profile', props.employee.id), {
             method: 'POST',
+            redirect: 'error',
             headers: {
                 'Content-Type': 'application/json',
+                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
             },
             body: JSON.stringify({
                 fields: selectedExportFields.value,
             }),
         });
 
-        if (!response.ok) {
-            throw new Error('Export failed');
-        }
-
-        const blob = await response.blob();
-        const disposition = response.headers.get('Content-Disposition') || '';
-        const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-        const basicMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-        const filename = utfMatch?.[1]
-            ? decodeURIComponent(utfMatch[1])
-            : basicMatch?.[1]
-              ? decodeURIComponent(basicMatch[1].replace(/['"]/g, ''))
-              : `employee-profile-${props.employee.id}.xlsx`;
-
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        await downloadExcelResponse(
+            response,
+            `employee-profile-${props.employee.id}.xlsx`,
+        );
         exportProfileDialogOpen.value = false;
     } catch {
         window.alert(t('employees.export_profile_failed'));
