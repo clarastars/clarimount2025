@@ -46,6 +46,7 @@ trait AuthorizesEmployeeAccess
             'employees.entitlements.settle',
             'employees.entitlements.approve',
             'employees.export-profile',
+            'employees.export-company-profile',
             'attendance.fingerprint-month.sync',
         ];
     }
@@ -235,6 +236,40 @@ trait AuthorizesEmployeeAccess
             'employees.export-profile',
             (int) $employee->company_id,
             $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function canExportCompanyEmployeeProfiles(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.export-company-profile');
+    }
+
+    protected function canExportCompanyEmployeeProfilesForCompany(User $user, Company $company): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        if ($this->roleService()->canForCompany($user, 'employees.export-company-profile', (int) $company->id)) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessCompanyViaDepartmentScope(
+            $user,
+            (int) $company->id,
+            ['employees.export-company-profile'],
         );
     }
 
@@ -773,6 +808,11 @@ trait AuthorizesEmployeeAccess
     {
         abort_unless($this->canExportEmployeeProfileForEmployee($user, $employee), 403);
         abort_unless($this->canAccessEmployee($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanExportCompanyEmployeeProfilesForCompany(User $user, Company $company): void
+    {
+        abort_unless($this->canExportCompanyEmployeeProfilesForCompany($user, $company), 403);
     }
 
     protected function abortUnlessCanSettleEmployeeEntitlementsForEmployee(User $user, Employee $employee): void

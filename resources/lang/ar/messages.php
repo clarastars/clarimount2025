@@ -1051,6 +1051,12 @@ return [
         'export_profile_clear' => 'إلغاء التحديد',
         'export_profile_download' => 'تحميل Excel',
         'export_profile_failed' => 'تعذر إصدار بيانات الموظف. حاول مرة أخرى.',
+        'export_company_profile' => 'إصدار بيانات الموظفين',
+        'export_company_profile_title' => 'إصدار بيانات موظفي الشركة',
+        'export_company_profile_description' => 'حدد الحقول المطلوب ظهورها في ملف الإكسل لجميع موظفي الشركة.',
+        'export_company_profile_company' => 'الشركة',
+        'export_company_profile_select_company' => 'اختر الشركة أولاً',
+        'export_company_profile_failed' => 'تعذر إصدار بيانات موظفي الشركة. حاول مرة أخرى.',
         'export_profile_fields' => [
             'full_name' => 'الاسم كامل',
             'id_number' => 'الهوية',

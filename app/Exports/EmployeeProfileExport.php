@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Exports\Concerns\ResolvesEmployeeProfileExportFields;
 use App\Models\Employee;
 use App\Services\ManualDeductionAmountService;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -21,27 +22,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, WithStyles
 {
-    /** @var list<string> */
-    public const ALLOWED_FIELDS = [
-        'full_name',
-        'id_number',
-        'work_phone',
-        'work_email',
-        'basic_salary',
-        'gross_salary',
-        'job_title',
-        'company',
-        'department',
-        'nationality',
-        'hire_date',
-    ];
-
-    /** @var list<string> */
-    private const TEXT_FIELDS = [
-        'id_number',
-        'work_phone',
-        'work_email',
-    ];
+    use ResolvesEmployeeProfileExportFields;
 
     /** @var list<string> */
     private array $fields;
@@ -54,42 +35,19 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
         array $fields,
         private readonly ManualDeductionAmountService $amountService,
     ) {
-        $allowed = array_flip(self::ALLOWED_FIELDS);
-        $normalized = [];
-
-        foreach ($fields as $field) {
-            if (! is_string($field)) {
-                continue;
-            }
-
-            if (isset($allowed[$field]) && ! in_array($field, $normalized, true)) {
-                $normalized[] = $field;
-            }
-        }
-
-        $this->fields = $normalized !== [] ? $normalized : self::ALLOWED_FIELDS;
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function allowedFields(): array
-    {
-        return self::ALLOWED_FIELDS;
+        $this->fields = self::normalizeFields($fields);
     }
 
     public function array(): array
     {
-        $headers = [];
         $values = [];
 
         foreach ($this->fields as $field) {
-            $headers[] = __('messages.employees.export_profile_fields.'.$field);
-            $values[] = $this->resolveFieldValue($field);
+            $values[] = $this->resolveFieldValue($this->employee, $field, $this->amountService);
         }
 
         return [
-            $headers,
+            $this->fieldHeaders(),
             $values,
         ];
     }
@@ -130,13 +88,14 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
                 $sheet = $event->sheet->getDelegate();
                 $columnCount = count($this->fields);
                 $highestColumn = Coordinate::stringFromColumnIndex($columnCount);
+                $lastRow = 2;
 
                 $sheet->setRightToLeft(true);
                 $sheet->freezePane('A2');
                 $sheet->getRowDimension(1)->setRowHeight(32);
                 $sheet->getRowDimension(2)->setRowHeight(28);
 
-                $range = 'A1:'.$highestColumn.'2';
+                $range = 'A1:'.$highestColumn.$lastRow;
                 $sheet->getStyle($range)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -164,7 +123,7 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
                             ->setFormatCode(NumberFormat::FORMAT_TEXT);
                     }
 
-                    if (in_array($field, ['basic_salary', 'gross_salary'], true)) {
+                    if (in_array($field, self::MONEY_FIELDS, true)) {
                         $sheet->getStyle($column.'2')
                             ->getNumberFormat()
                             ->setFormatCode('#,##0.00');
@@ -172,36 +131,5 @@ class EmployeeProfileExport implements FromArray, ShouldAutoSize, WithEvents, Wi
                 }
             },
         ];
-    }
-
-    private function resolveFieldValue(string $field): string|float|int|null
-    {
-        $employee = $this->employee;
-
-        return match ($field) {
-            'full_name' => (string) ($employee->full_name ?? ''),
-            'id_number' => (string) ($employee->id_number ?? ''),
-            'work_phone' => (string) ($employee->work_phone ?? ''),
-            'work_email' => (string) ($employee->work_email ?? ''),
-            'basic_salary' => round((float) ($employee->basic_salary ?? 0), 2),
-            'gross_salary' => $this->amountService->grossMonthly($employee),
-            'job_title' => (string) ($employee->job_title ?? ''),
-            'company' => (string) ($employee->company?->name_ar ?: $employee->company?->name_en ?: ''),
-            'department' => $this->resolveDepartmentLabel($employee),
-            'nationality' => (string) ($employee->nationality?->name ?? ''),
-            'hire_date' => $employee->hire_date?->format('Y-m-d') ?? '',
-            default => '',
-        };
-    }
-
-    private function resolveDepartmentLabel(Employee $employee): string
-    {
-        if ($employee->department instanceof \App\Models\Department) {
-            return (string) $employee->department->name;
-        }
-
-        $legacy = $employee->getAttributes()['department'] ?? null;
-
-        return is_string($legacy) ? $legacy : '';
     }
 }

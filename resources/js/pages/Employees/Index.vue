@@ -17,6 +17,7 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import Icon from '@/components/Icon.vue';
+import { fetchWithCsrf } from '@/lib/csrf';
 import { useI18n } from 'vue-i18n';
 import { computed, ref, watch } from 'vue';
 import type { Employee, Company, BreadcrumbItem } from '@/types';
@@ -28,6 +29,19 @@ interface FingerprintEmployee {
     dept_name: string;
     position_name: string;
 }
+
+type ExportProfileFieldKey =
+    | 'full_name'
+    | 'id_number'
+    | 'work_phone'
+    | 'work_email'
+    | 'basic_salary'
+    | 'gross_salary'
+    | 'job_title'
+    | 'company'
+    | 'department'
+    | 'nationality'
+    | 'hire_date';
 
 const { t } = useI18n();
 
@@ -54,6 +68,7 @@ interface Props {
         company_id?: string;
     };
     canManageEmployees?: boolean;
+    canExportCompanyEmployeeProfiles?: boolean;
     isReadOnly?: boolean;
 }
 
@@ -65,6 +80,7 @@ const authCanManageEmployees = computed(() => {
     return props.canManageEmployees ?? auth?.can_manage_employees ?? true;
 });
 const isReadOnly = computed(() => props.isReadOnly ?? !authCanManageEmployees.value);
+const canExportCompanyEmployeeProfiles = computed(() => props.canExportCompanyEmployeeProfiles ?? false);
 
 function getFullName(person?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
     if (!person) return '';
@@ -89,6 +105,133 @@ const fingerprintSearch = ref('');
 const loadingFingerprint = ref(false);
 const linking = ref(false);
 const fingerprintListError = ref<string | null>(null);
+
+const exportCompanyDialogOpen = ref(false);
+const isExportingCompanyProfiles = ref(false);
+const exportCompanyId = ref(String(props.filters?.company_id || ''));
+
+const exportProfileFields = computed(() =>
+    (
+        [
+            'full_name',
+            'id_number',
+            'work_phone',
+            'work_email',
+            'basic_salary',
+            'gross_salary',
+            'job_title',
+            'company',
+            'department',
+            'nationality',
+            'hire_date',
+        ] as ExportProfileFieldKey[]
+    ).map((key) => ({
+        key,
+        label: t(`employees.export_profile_fields.${key}`),
+    })),
+);
+
+const selectedExportFields = ref<ExportProfileFieldKey[]>([
+    'full_name',
+    'id_number',
+    'work_phone',
+    'work_email',
+    'basic_salary',
+    'gross_salary',
+    'job_title',
+    'company',
+    'department',
+    'nationality',
+    'hire_date',
+]);
+
+watch(companyFilter, (value) => {
+    if (value) {
+        exportCompanyId.value = String(value);
+    }
+});
+
+function openExportCompanyDialog() {
+    if (companyFilter.value) {
+        exportCompanyId.value = String(companyFilter.value);
+    } else if (!exportCompanyId.value && (props.companies?.length ?? 0) === 1) {
+        exportCompanyId.value = String(props.companies?.[0]?.id ?? '');
+    }
+
+    exportCompanyDialogOpen.value = true;
+}
+
+function selectAllExportFields() {
+    selectedExportFields.value = exportProfileFields.value.map((field) => field.key);
+}
+
+function clearExportFields() {
+    selectedExportFields.value = [];
+}
+
+function toggleExportField(key: ExportProfileFieldKey, checked: boolean) {
+    if (checked) {
+        if (!selectedExportFields.value.includes(key)) {
+            selectedExportFields.value = [...selectedExportFields.value, key];
+        }
+        return;
+    }
+
+    selectedExportFields.value = selectedExportFields.value.filter((field) => field !== key);
+}
+
+async function downloadCompanyEmployeeProfiles() {
+    if (
+        !exportCompanyId.value ||
+        selectedExportFields.value.length === 0 ||
+        isExportingCompanyProfiles.value
+    ) {
+        return;
+    }
+
+    isExportingCompanyProfiles.value = true;
+
+    try {
+        const response = await fetchWithCsrf(route('employees.export-company-profile'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                company_id: Number(exportCompanyId.value),
+                fields: selectedExportFields.value,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+        const basicMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        const filename = utfMatch?.[1]
+            ? decodeURIComponent(utfMatch[1])
+            : basicMatch?.[1]
+              ? decodeURIComponent(basicMatch[1].replace(/['"]/g, ''))
+              : `company-employees-${exportCompanyId.value}.xlsx`;
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        exportCompanyDialogOpen.value = false;
+    } catch {
+        window.alert(t('employees.export_company_profile_failed'));
+    } finally {
+        isExportingCompanyProfiles.value = false;
+    }
+}
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     {
@@ -377,25 +520,35 @@ async function unlinkFingerprint() {
             :title="t('employees.my_employees')"
             :description="t('employees.manage_workforce')"
         >
-            <template v-if="!isReadOnly" #actions>
-                <Button variant="outline" asChild>
-                    <Link :href="route('employees.fingerprint-device')">
-                        <Icon name="Fingerprint" class="me-2 size-4" />
-                        {{ t('employees.fingerprint_device_employees') }}
-                    </Link>
+            <template v-if="!isReadOnly || canExportCompanyEmployeeProfiles" #actions>
+                <Button
+                    v-if="canExportCompanyEmployeeProfiles"
+                    variant="outline"
+                    @click="openExportCompanyDialog"
+                >
+                    <Icon name="FileSpreadsheet" class="me-2 size-4" />
+                    {{ t('employees.export_company_profile') }}
                 </Button>
-                <Button variant="outline" asChild>
-                    <Link :href="route('employees.import')">
-                        <Icon name="Upload" class="me-2 size-4" />
-                        {{ t('employees.import_csv') }}
-                    </Link>
-                </Button>
-                <Button asChild>
-                    <Link :href="route('employees.create')">
-                        <Icon name="Plus" class="me-2 size-4" />
-                        {{ t('employees.create_employee') }}
-                    </Link>
-                </Button>
+                <template v-if="!isReadOnly">
+                    <Button variant="outline" asChild>
+                        <Link :href="route('employees.fingerprint-device')">
+                            <Icon name="Fingerprint" class="me-2 size-4" />
+                            {{ t('employees.fingerprint_device_employees') }}
+                        </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link :href="route('employees.import')">
+                            <Icon name="Upload" class="me-2 size-4" />
+                            {{ t('employees.import_csv') }}
+                        </Link>
+                    </Button>
+                    <Button asChild>
+                        <Link :href="route('employees.create')">
+                            <Icon name="Plus" class="me-2 size-4" />
+                            {{ t('employees.create_employee') }}
+                        </Link>
+                    </Button>
+                </template>
             </template>
         </PageHeader>
 
@@ -859,6 +1012,72 @@ async function unlinkFingerprint() {
                         </Button>
                         <Button variant="outline" @click="closeFingerprintLinkDialog()">
                             {{ t('common.cancel') }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog v-model:open="exportCompanyDialogOpen">
+                <DialogContent class="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{{ t('employees.export_company_profile_title') }}</DialogTitle>
+                        <DialogDescription>{{ t('employees.export_company_profile_description') }}</DialogDescription>
+                    </DialogHeader>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium">{{ t('employees.export_company_profile_company') }}</label>
+                        <select
+                            v-model="exportCompanyId"
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                            <option value="">{{ t('employees.export_company_profile_select_company') }}</option>
+                            <option v-for="company in companies" :key="company.id" :value="String(company.id)">
+                                {{ company.name_ar || company.name_en }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" @click="selectAllExportFields">
+                            {{ t('employees.export_profile_select_all') }}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" @click="clearExportFields">
+                            {{ t('employees.export_profile_clear') }}
+                        </Button>
+                    </div>
+
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        <label
+                            v-for="field in exportProfileFields"
+                            :key="field.key"
+                            class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
+                            :class="selectedExportFields.includes(field.key) ? 'border-blue-300 bg-blue-50/50' : 'border-border'"
+                        >
+                            <input
+                                type="checkbox"
+                                class="size-4 rounded border-slate-300 text-blue-600"
+                                :checked="selectedExportFields.includes(field.key)"
+                                @change="toggleExportField(field.key, ($event.target as HTMLInputElement).checked)"
+                            />
+                            <span>{{ field.label }}</span>
+                        </label>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" @click="exportCompanyDialogOpen = false">
+                            {{ t('common.cancel') }}
+                        </Button>
+                        <Button
+                            type="button"
+                            :disabled="!exportCompanyId || selectedExportFields.length === 0 || isExportingCompanyProfiles"
+                            @click="downloadCompanyEmployeeProfiles"
+                        >
+                            <Icon name="Download" class="h-4 w-4" />
+                            {{
+                                isExportingCompanyProfiles
+                                    ? t('common.saving')
+                                    : t('employees.export_profile_download')
+                            }}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

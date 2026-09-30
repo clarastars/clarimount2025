@@ -217,6 +217,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('employees/{employee}/fingerprint-link', [EmployeeController::class, 'updateFingerprintLink'])->name('employees.fingerprint-link');
     Route::post('employees/{employee}/sync-fingerprint-month', [EmployeeController::class, 'syncFingerprintMonth'])->name('employees.sync-fingerprint-month');
     Route::post('employees/{employee}/exclude-from-salary', [EmployeeController::class, 'toggleExcludeFromSalary'])->name('employees.exclude-from-salary');
+    Route::post('employees/export-company-profile', [EmployeeController::class, 'exportCompanyProfiles'])->name('employees.export-company-profile');
     Route::post('employees/{employee}/export-profile', [EmployeeController::class, 'exportProfile'])->name('employees.export-profile');
     Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
     Route::delete('employees/{employee}/documents/{type}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');

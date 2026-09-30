@@ -1053,6 +1053,12 @@ return [
         'export_profile_clear' => 'Clear',
         'export_profile_download' => 'Download Excel',
         'export_profile_failed' => 'Could not issue employee data. Please try again.',
+        'export_company_profile' => 'Issue employees data',
+        'export_company_profile_title' => 'Issue company employees data',
+        'export_company_profile_description' => 'Select the fields to include in the Excel file for all company employees.',
+        'export_company_profile_company' => 'Company',
+        'export_company_profile_select_company' => 'Select a company first',
+        'export_company_profile_failed' => 'Could not issue company employees data. Please try again.',
         'export_profile_fields' => [
             'full_name' => 'Full name',
             'id_number' => 'National ID',

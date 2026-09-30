@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\CompanyEmployeesProfileExport;
 use App\Exports\EmployeeProfileExport;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Company;
@@ -216,6 +217,7 @@ class EmployeeController extends Controller
             'employees' => $employees,
             'companies' => $companiesList,
             'canManageEmployees' => $this->canManageEmployees($user),
+            'canExportCompanyEmployeeProfiles' => $this->canExportCompanyEmployeeProfiles($user),
             'isReadOnly' => $this->canViewEmployees($user) && ! $this->canManageEmployees($user),
             'stats' => [
                 'total' => $total,
@@ -557,6 +559,51 @@ class EmployeeController extends Controller
 
         return Excel::download(
             new EmployeeProfileExport($employee, $validated['fields'], $amountService),
+            $filename,
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+    }
+
+    public function exportCompanyProfiles(
+        Request $request,
+        ManualDeductionAmountService $amountService,
+    ): BinaryFileResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $accessibleCompanyIds = $this->employeeQueryableCompanyIds($user);
+        $validated = $request->validate([
+            'company_id' => ['required', 'integer', Rule::in($accessibleCompanyIds->all() ?: [-1])],
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['string', Rule::in(CompanyEmployeesProfileExport::allowedFields())],
+        ]);
+
+        $company = Company::query()->findOrFail((int) $validated['company_id']);
+        $this->abortUnlessCanExportCompanyEmployeeProfilesForCompany($user, $company);
+
+        $query = Employee::query()
+            ->where('company_id', $company->id)
+            ->with(['company', 'department', 'nationality'])
+            ->orderBy('first_name')
+            ->orderBy('last_name');
+
+        $this->applyEmployeePermissionScope($query, $user, [
+            'employees.export-company-profile',
+            ...$this->employeeViewPermissions(),
+        ]);
+
+        $employees = $query->get();
+        $employees->each->append('full_name');
+
+        $safeName = preg_replace(
+            '/[^\p{L}\p{N}\-_]+/u',
+            '_',
+            (string) ($company->name_ar ?: $company->name_en ?: $company->id)
+        ) ?: (string) $company->id;
+        $filename = 'company-employees-'.$safeName.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+
+        return Excel::download(
+            new CompanyEmployeesProfileExport($employees, $validated['fields'], $amountService),
             $filename,
             \Maatwebsite\Excel\Excel::XLSX,
         );
