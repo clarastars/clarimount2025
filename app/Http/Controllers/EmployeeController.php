@@ -26,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -574,7 +575,7 @@ class EmployeeController extends Controller
     public function exportCompanyProfiles(
         Request $request,
         ManualDeductionAmountService $amountService,
-    ): BinaryFileResponse|\Illuminate\Http\JsonResponse {
+    ): BinaryFileResponse|\Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
@@ -589,12 +590,14 @@ class EmployeeController extends Controller
         $this->abortUnlessCanExportCompanyEmployeeProfilesForCompany($user, $company);
 
         try {
-            @ini_set('memory_limit', '512M');
-            @set_time_limit(120);
+            @ini_set('memory_limit', '1024M');
+            @set_time_limit(180);
 
+            // Avoid eager-loading the department relation: Employee also has a legacy
+            // `department` string column, and the name clash can break exports.
             $query = Employee::query()
                 ->where('company_id', $company->id)
-                ->with(['company', 'department', 'nationality'])
+                ->with(['company', 'nationality'])
                 ->orderBy('first_name')
                 ->orderBy('last_name');
 
@@ -606,18 +609,32 @@ class EmployeeController extends Controller
             $employees = $query->get();
             $employees->each->append('full_name');
 
-            $filename = 'company-employees-'.$company->id.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+            $filename = 'company-employees-'.$company->id.'-'.now('Asia/Riyadh')->format('Y-m-d_His').'.xlsx';
+            $relativePath = 'exports/'.$filename;
 
-            return Excel::download(
+            Storage::disk('local')->makeDirectory('exports');
+
+            Excel::store(
                 new CompanyEmployeesProfileExport($employees, $validated['fields'], $amountService),
-                $filename,
+                $relativePath,
+                'local',
                 \Maatwebsite\Excel\Excel::XLSX,
             );
+
+            abort_unless(Storage::disk('local')->exists($relativePath), 500, 'Export file missing');
+
+            $absolutePath = Storage::disk('local')->path($relativePath);
+            abort_unless(is_file($absolutePath) && filesize($absolutePath) > 32, 500, 'Export file invalid');
+
+            return response()->download($absolutePath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
         } catch (\Throwable $e) {
             report($e);
 
             return response()->json([
                 'message' => __('messages.employees.export_company_profile_failed'),
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }

@@ -9,20 +9,17 @@ use App\Models\Employee;
 use App\Services\ManualDeductionAmountService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithStyles
+class CompanyEmployeesProfileExport implements FromArray, WithEvents, WithStyles
 {
     use ResolvesEmployeeProfileExportFields;
 
@@ -31,8 +28,6 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
 
     /** @var Collection<int, Employee> */
     private Collection $employees;
-
-    private EmployeeProfileExportValueBinder $valueBinder;
 
     /**
      * @param  Collection<int, Employee>|iterable<int, Employee>  $employees
@@ -47,12 +42,6 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
             ? $employees->values()
             : collect($employees)->values();
         $this->fields = self::normalizeFields($fields);
-        $this->valueBinder = new EmployeeProfileExportValueBinder;
-    }
-
-    public function bindValue(\PhpOffice\PhpSpreadsheet\Cell\Cell $cell, mixed $value): bool
-    {
-        return $this->valueBinder->bindValue($cell, $value);
     }
 
     public function array(): array
@@ -63,7 +52,14 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
             $values = [];
 
             foreach ($this->fields as $field) {
-                $values[] = $this->resolveFieldValue($employee, $field, $this->amountService);
+                $value = $this->resolveFieldValue($employee, $field, $this->amountService);
+
+                // Keep identity-like values as strings so Excel does not corrupt them.
+                if (in_array($field, self::TEXT_FIELDS, true)) {
+                    $values[] = (string) $value;
+                } else {
+                    $values[] = $value;
+                }
             }
 
             $rows[] = $values;
@@ -104,10 +100,9 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
 
                 $sheet->setRightToLeft(true);
                 $sheet->freezePane('A2');
-                $sheet->getRowDimension(1)->setRowHeight(32);
+                $sheet->getRowDimension(1)->setRowHeight(28);
 
-                $range = 'A1:'.$highestColumn.$lastRow;
-                $sheet->getStyle($range)->applyFromArray([
+                $sheet->getStyle('A1:'.$highestColumn.$lastRow)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => Border::BORDER_THIN,
@@ -117,19 +112,8 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
                         'vertical' => Alignment::VERTICAL_CENTER,
-                        'wrapText' => true,
                     ],
                 ]);
-
-                if ($lastRow >= 2) {
-                    $sheet->getStyle('A2:'.$highestColumn.$lastRow)->applyFromArray([
-                        'font' => ['size' => 11],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'F8FAFC'],
-                        ],
-                    ]);
-                }
 
                 foreach ($this->fields as $index => $field) {
                     $column = Coordinate::stringFromColumnIndex($index + 1);
@@ -149,6 +133,8 @@ class CompanyEmployeesProfileExport extends DefaultValueBinder implements FromAr
                             ->getNumberFormat()
                             ->setFormatCode('#,##0.00');
                     }
+
+                    $sheet->getColumnDimension($column)->setWidth(18);
                 }
             },
         ];

@@ -262,15 +262,25 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
+        if (! $this->employeeQueryableCompanyIds($user)->contains($company->id)) {
+            return false;
+        }
+
         if ($this->roleService()->canForCompany($user, 'employees.export-company-profile', (int) $company->id)) {
             return true;
         }
 
-        return $this->roleService()->canAccessCompanyViaDepartmentScope(
+        if ($this->roleService()->canAccessCompanyViaDepartmentScope(
             $user,
             (int) $company->id,
             ['employees.export-company-profile'],
-        );
+        )) {
+            return true;
+        }
+
+        // Team members who can open this company employees list and hold the export
+        // permission on any assigned team should be able to export it.
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.export-company-profile');
     }
 
     protected function canUpdateEmployeeCustody(User $user): bool

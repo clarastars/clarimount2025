@@ -632,7 +632,6 @@ async function downloadEmployeeProfile() {
     try {
         const response = await fetchWithCsrf(route('employees.export-profile', props.employee.id), {
             method: 'POST',
-            redirect: 'error',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
@@ -647,8 +646,11 @@ async function downloadEmployeeProfile() {
             `employee-profile-${props.employee.id}.xlsx`,
         );
         exportProfileDialogOpen.value = false;
-    } catch {
-        window.alert(t('employees.export_profile_failed'));
+    } catch (error) {
+        const details = error instanceof Error && error.message && !error.message.startsWith('HTTP')
+            ? `\n${error.message}`
+            : '';
+        window.alert(`${t('employees.export_profile_failed')}${details}`);
     } finally {
         isExportingProfile.value = false;
     }

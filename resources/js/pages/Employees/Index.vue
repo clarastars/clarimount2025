@@ -195,7 +195,6 @@ async function downloadCompanyEmployeeProfiles() {
     try {
         const response = await fetchWithCsrf(route('employees.export-company-profile'), {
             method: 'POST',
-            redirect: 'error',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
@@ -211,8 +210,11 @@ async function downloadCompanyEmployeeProfiles() {
             `company-employees-${exportCompanyId.value}.xlsx`,
         );
         exportCompanyDialogOpen.value = false;
-    } catch {
-        window.alert(t('employees.export_company_profile_failed'));
+    } catch (error) {
+        const details = error instanceof Error && error.message && !error.message.startsWith('HTTP')
+            ? `\n${error.message}`
+            : '';
+        window.alert(`${t('employees.export_company_profile_failed')}${details}`);
     } finally {
         isExportingCompanyProfiles.value = false;
     }

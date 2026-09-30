@@ -1,6 +1,6 @@
 /**
  * Validate and trigger a browser download for an Excel (.xlsx) response.
- * Rejects HTML/JSON/login redirects masquerading as successful downloads.
+ * Rejects HTML/JSON/login pages masquerading as successful downloads.
  */
 export class ExcelDownloadError extends Error {
     constructor(message: string) {
@@ -42,6 +42,23 @@ async function looksLikeXlsx(blob: Blob): Promise<boolean> {
     return header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
 }
 
+async function readErrorMessage(response: Response): Promise<string | null> {
+    const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+
+    try {
+        if (contentType.includes('application/json') || contentType.includes('text/json')) {
+            const data = await response.clone().json();
+            if (typeof data?.message === 'string' && data.message.trim() !== '') {
+                return data.message;
+            }
+        }
+    } catch {
+        // ignore parse errors
+    }
+
+    return null;
+}
+
 export async function downloadExcelResponse(
     response: Response,
     fallbackFilename: string,
@@ -51,7 +68,8 @@ export async function downloadExcelResponse(
     }
 
     if (!response.ok) {
-        throw new ExcelDownloadError(`HTTP ${response.status}`);
+        const serverMessage = await readErrorMessage(response);
+        throw new ExcelDownloadError(serverMessage || `HTTP ${response.status}`);
     }
 
     const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
@@ -61,7 +79,8 @@ export async function downloadExcelResponse(
         contentType.includes('text/json') ||
         contentType.includes('application/problem+json')
     ) {
-        throw new ExcelDownloadError('Invalid content type');
+        const serverMessage = await readErrorMessage(response);
+        throw new ExcelDownloadError(serverMessage || 'Invalid content type');
     }
 
     const blob = await response.blob();
