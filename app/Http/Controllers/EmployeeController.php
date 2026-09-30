@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\EmployeeProfileExport;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
 use App\Models\Company;
 use App\Models\Country;
@@ -18,6 +19,7 @@ use App\Services\EmployeeFingerprintMonthSyncService;
 use App\Services\EmployeePortalUserService;
 use App\Services\EmployeeUserRoleService;
 use App\Services\LeaveAccrualService;
+use App\Services\ManualDeductionAmountService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +28,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class EmployeeController extends Controller
 {
     use AuthorizesEmployeeAccess;
@@ -523,11 +527,39 @@ class EmployeeController extends Controller
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
             'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
+            'canExportEmployeeProfile' => $this->canExportEmployeeProfileForEmployee($user, $employee),
             'canViewEmployeeAuditLog' => $this->canViewEmployeeAuditLog($user, $employee),
             'auditLogs' => $this->canViewEmployeeAuditLog($user, $employee)
                 ? app(EmployeeAuditLogPresenter::class)->forEmployee($employee)
                 : [],
         ]);
+    }
+
+    public function exportProfile(
+        Request $request,
+        Employee $employee,
+        ManualDeductionAmountService $amountService,
+    ): BinaryFileResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+        $this->abortUnlessCanExportEmployeeProfileForEmployee($user, $employee);
+
+        $validated = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['string', Rule::in(EmployeeProfileExport::allowedFields())],
+        ]);
+
+        $employee->loadMissing(['company', 'department', 'nationality']);
+        $employee->append('full_name');
+
+        $safeName = preg_replace('/[^\p{L}\p{N}\-_]+/u', '_', (string) ($employee->full_name ?: $employee->id)) ?: (string) $employee->id;
+        $filename = 'employee-profile-'.$safeName.'-'.now('Asia/Riyadh')->format('Y-m-d').'.xlsx';
+
+        return Excel::download(
+            new EmployeeProfileExport($employee, $validated['fields'], $amountService),
+            $filename,
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
     }
 
     public function toggleExcludeFromSalary(Employee $employee): RedirectResponse

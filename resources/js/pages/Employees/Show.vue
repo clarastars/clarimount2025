@@ -49,7 +49,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth || canExcludeFromSalary"
+                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -57,6 +57,15 @@
                                     <Icon name="Pencil" class="h-4 w-4" />
                                     {{ t('employees.edit') }}
                                 </Link>
+                            </Button>
+                            <Button
+                                v-if="canExportEmployeeProfile"
+                                variant="outline"
+                                size="sm"
+                                @click="openExportProfileDialog"
+                            >
+                                <Icon name="FileSpreadsheet" class="h-4 w-4" />
+                                {{ t('employees.export_profile') }}
                             </Button>
                             <Button v-if="canUpdateEmployeeCustody" variant="secondary" size="sm" as-child>
                                 <Link :href="route('employees.custody.show', employee.id)">
@@ -411,6 +420,59 @@
                 {{ t('common.created_at') }}: {{ displayDate(employee.created_at) }}
             </p>
         </div>
+
+        <Dialog v-model:open="exportProfileDialogOpen">
+            <DialogContent class="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{{ t('employees.export_profile_title') }}</DialogTitle>
+                    <DialogDescription>{{ t('employees.export_profile_description') }}</DialogDescription>
+                </DialogHeader>
+
+                <div class="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="selectAllExportFields">
+                        {{ t('employees.export_profile_select_all') }}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" @click="clearExportFields">
+                        {{ t('employees.export_profile_clear') }}
+                    </Button>
+                </div>
+
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <label
+                        v-for="field in exportProfileFields"
+                        :key="field.key"
+                        class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/40"
+                        :class="selectedExportFields.includes(field.key) ? 'border-blue-300 bg-blue-50/50' : 'border-border'"
+                    >
+                        <input
+                            type="checkbox"
+                            class="size-4 rounded border-slate-300 text-blue-600"
+                            :checked="selectedExportFields.includes(field.key)"
+                            @change="toggleExportField(field.key, ($event.target as HTMLInputElement).checked)"
+                        />
+                        <span>{{ field.label }}</span>
+                    </label>
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="exportProfileDialogOpen = false">
+                        {{ t('common.cancel') }}
+                    </Button>
+                    <Button
+                        type="button"
+                        :disabled="selectedExportFields.length === 0 || isExportingProfile"
+                        @click="downloadEmployeeProfile"
+                    >
+                        <Icon name="Download" class="h-4 w-4" />
+                        {{
+                            isExportingProfile
+                                ? t('common.saving')
+                                : t('employees.export_profile_download')
+                        }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
@@ -423,6 +485,14 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import Icon from '@/components/Icon.vue';
 import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
 import EmployeeShowSection from '@/components/employees/EmployeeShowSection.vue';
@@ -430,7 +500,21 @@ import EmployeeAuditLogSection from '@/components/employees/EmployeeAuditLogSect
 import type { EmployeeAuditLogEntry } from '@/components/employees/EmployeeAuditLogSection.vue';
 import EmployeeInfoField from '@/components/employees/EmployeeInfoField.vue';
 import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
+import { fetchWithCsrf } from '@/lib/csrf';
 import type { Employee, BreadcrumbItem } from '@/types';
+
+type ExportProfileFieldKey =
+    | 'full_name'
+    | 'id_number'
+    | 'work_phone'
+    | 'work_email'
+    | 'basic_salary'
+    | 'gross_salary'
+    | 'job_title'
+    | 'company'
+    | 'department'
+    | 'nationality'
+    | 'hire_date';
 
 interface Props {
     employee: Employee;
@@ -456,6 +540,7 @@ interface Props {
     canSettleEmployeeEntitlements?: boolean;
     canSyncEmployeeFingerprintMonth?: boolean;
     canExcludeFromSalary?: boolean;
+    canExportEmployeeProfile?: boolean;
     canViewEmployeeAuditLog?: boolean;
     auditLogs?: EmployeeAuditLogEntry[];
 }
@@ -469,11 +554,120 @@ const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const canExcludeFromSalary = computed(() => props.canExcludeFromSalary ?? false);
+const canExportEmployeeProfile = computed(() => props.canExportEmployeeProfile ?? false);
 const canViewEmployeeAuditLog = computed(() => props.canViewEmployeeAuditLog ?? false);
 const isSyncingFingerprintMonth = ref(false);
 const isTogglingExcludeFromSalary = ref(false);
+const isExportingProfile = ref(false);
+const exportProfileDialogOpen = ref(false);
 const showBasicSalary = ref(false);
 const maskedCurrency = '•••••• SAR';
+
+const exportProfileFields = computed(() =>
+    (
+        [
+            'full_name',
+            'id_number',
+            'work_phone',
+            'work_email',
+            'basic_salary',
+            'gross_salary',
+            'job_title',
+            'company',
+            'department',
+            'nationality',
+            'hire_date',
+        ] as ExportProfileFieldKey[]
+    ).map((key) => ({
+        key,
+        label: t(`employees.export_profile_fields.${key}`),
+    })),
+);
+
+const selectedExportFields = ref<ExportProfileFieldKey[]>([
+    'full_name',
+    'id_number',
+    'work_phone',
+    'work_email',
+    'basic_salary',
+    'gross_salary',
+    'job_title',
+    'company',
+    'department',
+    'nationality',
+    'hire_date',
+]);
+
+function openExportProfileDialog() {
+    exportProfileDialogOpen.value = true;
+}
+
+function selectAllExportFields() {
+    selectedExportFields.value = exportProfileFields.value.map((field) => field.key);
+}
+
+function clearExportFields() {
+    selectedExportFields.value = [];
+}
+
+function toggleExportField(key: ExportProfileFieldKey, checked: boolean) {
+    if (checked) {
+        if (!selectedExportFields.value.includes(key)) {
+            selectedExportFields.value = [...selectedExportFields.value, key];
+        }
+        return;
+    }
+
+    selectedExportFields.value = selectedExportFields.value.filter((field) => field !== key);
+}
+
+async function downloadEmployeeProfile() {
+    if (selectedExportFields.value.length === 0 || isExportingProfile.value) {
+        return;
+    }
+
+    isExportingProfile.value = true;
+
+    try {
+        const response = await fetchWithCsrf(route('employees.export-profile', props.employee.id), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                fields: selectedExportFields.value,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+        const basicMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        const filename = utfMatch?.[1]
+            ? decodeURIComponent(utfMatch[1])
+            : basicMatch?.[1]
+              ? decodeURIComponent(basicMatch[1].replace(/['"]/g, ''))
+              : `employee-profile-${props.employee.id}.xlsx`;
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        exportProfileDialogOpen.value = false;
+    } catch {
+        window.alert(t('employees.export_profile_failed'));
+    } finally {
+        isExportingProfile.value = false;
+    }
+}
 
 const documentsCount = computed(() => props.documents?.length ?? 0);
 
