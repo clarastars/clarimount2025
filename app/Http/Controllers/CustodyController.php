@@ -106,7 +106,7 @@ class CustodyController extends Controller
     public function store(Request $request, Employee $employee): JsonResponse
     {
         $user = Auth::user();
-        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $employee)) {
+        if (! $this->canUpdateEmployeeCustodyForEmployee($user, $employee)) {
             return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
         }
 
@@ -154,7 +154,7 @@ class CustodyController extends Controller
     public function storeQuickAsset(Request $request, Employee $employee): JsonResponse
     {
         $user = Auth::user();
-        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $employee)) {
+        if (! $this->canUpdateEmployeeCustodyForEmployee($user, $employee)) {
             return response()->json(['error' => 'Unauthorized access to this employee.'], 403);
         }
 
@@ -376,7 +376,7 @@ class CustodyController extends Controller
     {
         $user = Auth::user();
         $custodyChange->loadMissing('employee');
-        if (! $this->canUpdateEmployeeCustody($user) || ! $this->canAccessEmployee($user, $custodyChange->employee)) {
+        if (! $this->canUpdateEmployeeCustodyForEmployee($user, $custodyChange->employee)) {
             return response()->json(['error' => 'Unauthorized access.'], 403);
         }
 

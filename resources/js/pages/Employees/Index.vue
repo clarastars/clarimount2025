@@ -69,6 +69,7 @@ interface Props {
         company_id?: string;
     };
     canManageEmployees?: boolean;
+    manageableCompanyIds?: number[];
     canExportCompanyEmployeeProfiles?: boolean;
     isReadOnly?: boolean;
 }
@@ -82,6 +83,15 @@ const authCanManageEmployees = computed(() => {
 });
 const isReadOnly = computed(() => props.isReadOnly ?? !authCanManageEmployees.value);
 const canExportCompanyEmployeeProfiles = computed(() => props.canExportCompanyEmployeeProfiles ?? false);
+const manageableCompanyIds = computed(() =>
+    (props.manageableCompanyIds ?? []).map((id) => Number(id)),
+);
+
+function canManageEmployeeRow(employee: Employee): boolean {
+    const companyId = Number(employee.company_id);
+
+    return Number.isFinite(companyId) && manageableCompanyIds.value.includes(companyId);
+}
 
 function getFullName(person?: { first_name?: string | null; father_name?: string | null; last_name?: string | null } | null): string {
     if (!person) return '';
@@ -816,7 +826,7 @@ async function unlinkFingerprint() {
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
                                     <div class="flex items-center justify-center">
                                         <Button
-                                            v-if="!isReadOnly && employee.fingerprint_device_id"
+                                            v-if="canManageEmployeeRow(employee) && employee.fingerprint_device_id"
                                             variant="outline"
                                             size="sm"
                                             class="border-green-600 text-green-700 dark:text-green-400"
@@ -826,7 +836,7 @@ async function unlinkFingerprint() {
                                             {{ t('employees.fingerprint_linked') }}
                                         </Button>
                                         <Button
-                                            v-else-if="!isReadOnly"
+                                            v-else-if="canManageEmployeeRow(employee)"
                                             variant="outline"
                                             size="sm"
                                             @click="openFingerprintLinkDialog(employee)"
@@ -856,13 +866,13 @@ async function unlinkFingerprint() {
                                                 <span class="sr-only">{{ t('common.view') }}</span>
                                             </Link>
                                         </Button>
-                                        <Button v-if="!isReadOnly" variant="ghost" size="sm" asChild>
+                                        <Button v-if="canManageEmployeeRow(employee)" variant="ghost" size="sm" asChild>
                                             <Link :href="route('employees.edit', employee.id)">
                                                 <Icon name="Pencil" class="h-4 w-4" />
                                                 <span class="sr-only">{{ t('common.edit') }}</span>
                                             </Link>
                                         </Button>
-                                        <DropdownMenu v-if="!isReadOnly">
+                                        <DropdownMenu v-if="canManageEmployeeRow(employee)">
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="sm">
                                                     <Icon name="MoreVertical" class="h-4 w-4" />

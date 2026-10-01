@@ -218,6 +218,7 @@ class EmployeeController extends Controller
             'employees' => $employees,
             'companies' => $companiesList,
             'canManageEmployees' => $this->canManageEmployees($user),
+            'manageableCompanyIds' => $this->employeeManageableCompanyIds($user)->values()->all(),
             'canExportCompanyEmployeeProfiles' => $this->canExportCompanyEmployeeProfiles($user),
             'isReadOnly' => $this->canViewEmployees($user) && ! $this->canManageEmployees($user),
             'stats' => [
@@ -524,9 +525,9 @@ class EmployeeController extends Controller
             'assignedTeams' => $employee->user
                 ? app(EmployeeUserRoleService::class)->assignedTeamsForUi($employee->user)
                 : [],
-            'canManageEmployees' => $this->canManageEmployees($user),
-            'canCreateLeaves' => $this->canCreateLeaves($user),
-            'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustody($user),
+            'canManageEmployees' => $this->canManageEmployee($user, $employee),
+            'canCreateLeaves' => $this->canCreateLeaveForEmployee($user, $employee),
+            'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustodyForEmployee($user, $employee),
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
             'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
@@ -579,7 +580,11 @@ class EmployeeController extends Controller
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
-        $accessibleCompanyIds = $this->employeeQueryableCompanyIds($user);
+        $accessibleCompanyIds = $this->employeeQueryableCompanyIds($user)
+            ->merge($this->roleService()->companyIdsWhereCan($user, ['employees.export-company-profile']))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
         $validated = $request->validate([
             'company_id' => ['required', 'integer', Rule::in($accessibleCompanyIds->all() ?: [-1])],
             'fields' => ['required', 'array', 'min:1'],

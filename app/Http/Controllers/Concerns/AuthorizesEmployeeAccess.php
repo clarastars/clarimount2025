@@ -35,6 +35,9 @@ trait AuthorizesEmployeeAccess
     }
 
     /**
+     * Permissions that unlock the employees directory (list/filter/search) and general profile access.
+     * Feature permissions like entitlement settlement must NOT be listed here.
+     *
      * @return array<int, string>
      */
     protected function employeeViewPermissions(): array
@@ -42,12 +45,6 @@ trait AuthorizesEmployeeAccess
         return [
             'employees.readonly',
             'employees.manage',
-            'employees.custody.update',
-            'employees.entitlements.settle',
-            'employees.entitlements.approve',
-            'employees.export-profile',
-            'employees.export-company-profile',
-            'attendance.fingerprint-month.sync',
         ];
     }
 
@@ -70,18 +67,23 @@ trait AuthorizesEmployeeAccess
         return collect($this->roleService()->companyIdsWhereCan($user, $this->employeeViewPermissions()));
     }
 
+    /**
+     * @return Collection<int, int>
+     */
     protected function employeeManageableCompanyIds(User $user): Collection
     {
         if ($user->hasRole('super-admin')) {
-            return Company::query()->pluck('id');
+            return Company::query()->pluck('id')->map(fn ($id): int => (int) $id);
         }
 
-        $ownedIds = $user->ownedCompanies()->pluck('id');
+        $ownedIds = $user->ownedCompanies()->pluck('id')->map(fn ($id): int => (int) $id);
         if ($ownedIds->isNotEmpty()) {
             return $ownedIds;
         }
 
-        return collect($this->roleService()->companyIdsWhereCan($user, ['employees.manage']));
+        return collect($this->roleService()->companyIdsWhereCan($user, ['employees.manage']))
+            ->map(fn ($id): int => (int) $id)
+            ->values();
     }
 
     /**
@@ -165,11 +167,16 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        if (! $this->roleService()->canForCompany($user, 'attendance.fingerprint-month.sync', (int) $employee->company_id)) {
-            return false;
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
         }
 
-        return $this->canAccessEmployee($user, $employee);
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'attendance.fingerprint-month.sync',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
     }
 
     protected function canViewEmployeeAuditLog(User $user, Employee $employee): bool
@@ -262,25 +269,15 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        if (! $this->employeeQueryableCompanyIds($user)->contains($company->id)) {
-            return false;
-        }
-
         if ($this->roleService()->canForCompany($user, 'employees.export-company-profile', (int) $company->id)) {
             return true;
         }
 
-        if ($this->roleService()->canAccessCompanyViaDepartmentScope(
+        return $this->roleService()->canAccessCompanyViaDepartmentScope(
             $user,
             (int) $company->id,
             ['employees.export-company-profile'],
-        )) {
-            return true;
-        }
-
-        // Team members who can open this company employees list and hold the export
-        // permission on any assigned team should be able to export it.
-        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.export-company-profile');
+        );
     }
 
     protected function canUpdateEmployeeCustody(User $user): bool
@@ -488,10 +485,6 @@ trait AuthorizesEmployeeAccess
     protected function canManageEmployee(User $user, Employee $employee): bool
     {
         if ($user->hasRole('super-admin')) {
-            return true;
-        }
-
-        if ($this->canAssignAnyCompany($user) && $this->canManageEmployees($user)) {
             return true;
         }
 
@@ -746,16 +739,16 @@ trait AuthorizesEmployeeAccess
 
     protected function canAccessEmployee(User $user, Employee $employee): bool
     {
-        if ($this->canAssignAnyCompany($user) && $this->canViewEmployees($user)) {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
             return true;
         }
 
         if (! $this->employeeQueryableCompanyIds($user)->contains($employee->company_id)) {
             return false;
-        }
-
-        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
-            return true;
         }
 
         foreach ($this->employeeViewPermissions() as $permission) {
@@ -800,7 +793,6 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanUpdateEmployeeCustody(User $user, Employee $employee): void
     {
         abort_unless($this->canUpdateEmployeeCustodyForEmployee($user, $employee), 403);
-        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     protected function abortUnlessCanSyncEmployeeFingerprintMonth(User $user, Employee $employee): void
@@ -811,13 +803,11 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanExcludeEmployeeFromSalary(User $user, Employee $employee): void
     {
         abort_unless($this->canExcludeEmployeeFromSalary($user, $employee), 403);
-        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     protected function abortUnlessCanExportEmployeeProfileForEmployee(User $user, Employee $employee): void
     {
         abort_unless($this->canExportEmployeeProfileForEmployee($user, $employee), 403);
-        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     protected function abortUnlessCanExportCompanyEmployeeProfilesForCompany(User $user, Company $company): void
@@ -828,7 +818,6 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanSettleEmployeeEntitlementsForEmployee(User $user, Employee $employee): void
     {
         abort_unless($this->canSettleEmployeeEntitlementsForEmployee($user, $employee), 403);
-        abort_unless($this->canAccessEmployee($user, $employee), 403);
     }
 
     /**
