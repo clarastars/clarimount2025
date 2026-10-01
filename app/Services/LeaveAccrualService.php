@@ -256,7 +256,7 @@ class LeaveAccrualService
     }
 
     /**
-     * Days earned from hire through a specific date.
+     * Days earned from hire through a specific date (inclusive).
      * Uses hire-anniversary months with a fixed 30-day month for leftover days:
      * (complete_months + leftover_days / 30) × monthly_accrual.
      */
@@ -408,7 +408,7 @@ class LeaveAccrualService
     }
 
     /**
-     * Continuous accrual from hire date to through date:
+     * Continuous accrual from hire date through the given date (inclusive):
      * (complete anniversary months + leftover days / 30) × monthly accrual.
      */
     public function accruedDaysFromHireThrough(Carbon $hireDate, Carbon $through, float $monthlyDays): float
@@ -417,7 +417,9 @@ class LeaveAccrualService
             return 0.0;
         }
 
-        $interval = $hireDate->copy()->startOfDay()->diff($through->copy()->startOfDay());
+        // Carbon::diff excludes the end date; add one day so $through itself is credited.
+        $exclusiveEnd = $through->copy()->startOfDay()->addDay();
+        $interval = $hireDate->copy()->startOfDay()->diff($exclusiveEnd);
         $months = ((int) $interval->y * 12) + (int) $interval->m;
         $days = (int) $interval->d;
 

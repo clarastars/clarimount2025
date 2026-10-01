@@ -74,19 +74,19 @@ it('calculates annual leave dues only through the settlement date', function ():
         $employee,
         Carbon::parse('2026-09-03', 'Asia/Riyadh'),
     );
-    // Settlement on 3 Sep: Mar 11→Sep 3 = 5 months + 23 days → 10.09
-    expect($throughToday['days'])->toBe(10.09);
+    // Settlement on 3 Sep inclusive: Mar 11→Sep 3 = 5 months + 24 days → 10.15
+    expect($throughToday['days'])->toBe(10.15);
 
     $throughPastDate = $service->calculateAnnualLeaveDues(
         $employee,
         Carbon::parse('2026-08-25', 'Asia/Riyadh'),
     );
 
-    // Settlement on 25 Aug: Mar 11→Aug 25 = 5 months + 14 days → 9.57
-    expect($throughPastDate['days'])->toBe(9.57);
-    expect($throughPastDate['payable_days'])->toBe(9.57);
+    // Settlement on 25 Aug inclusive: Mar 11→Aug 25 = 5 months + 15 days → 9.63
+    expect($throughPastDate['days'])->toBe(9.63);
+    expect($throughPastDate['payable_days'])->toBe(9.63);
     expect($throughPastDate['amount'])->toBe(
-        app(ManualDeductionAmountService::class)->fromLeavePayDays($employee, 9.57)
+        app(ManualDeductionAmountService::class)->fromLeavePayDays($employee, 9.63)
     );
 });
 
