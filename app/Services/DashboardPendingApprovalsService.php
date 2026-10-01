@@ -340,8 +340,29 @@ class DashboardPendingApprovalsService
             return $this->emptyBucket(visible: $visible);
         }
 
+        // Only companies where this user can actually approve salary runs
+        // (prevents fingerprint/other-team company access from surfacing HR items).
+        $approvableCompanyIds = array_values(array_filter(
+            $companyIds,
+            function (int $companyId) use ($user): bool {
+                if ($user->hasRole('super-admin')) {
+                    return true;
+                }
+
+                if ($user->ownedCompanies()->whereKey($companyId)->exists()) {
+                    return true;
+                }
+
+                return $this->roleService->canForCompany($user, 'salary-runs.approve', $companyId);
+            },
+        ));
+
+        if ($approvableCompanyIds === []) {
+            return $this->emptyBucket(visible: $visible);
+        }
+
         $candidates = SalaryRun::query()
-            ->whereIn('company_id', $companyIds)
+            ->whereIn('company_id', $approvableCompanyIds)
             ->where('status', '!=', 'finalized')
             ->with(['company:id,name_ar,name_en'])
             ->latest('id')
@@ -377,8 +398,8 @@ class DashboardPendingApprovalsService
             ];
         }
 
-        $viewAll = $companyIds !== []
-            ? route('salary-runs.index', $companyIds[0])
+        $viewAll = $approvableCompanyIds !== []
+            ? route('salary-runs.index', $approvableCompanyIds[0])
             : null;
 
         return $this->bucketFromItems($items, $viewAll);

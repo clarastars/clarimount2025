@@ -194,8 +194,10 @@ class SalaryRunApprovalService
         }
 
         $stepTeamId = (int) $step->team_id;
+        $roleService = app(EmployeeUserRoleService::class);
 
-        if (! app(EmployeeUserRoleService::class)->userBelongsToTeam($user, $stepTeamId)) {
+        // Require team membership scoped to this company (not just any company on the team).
+        if (! $roleService->userBelongsToTeamInCompany($user, $stepTeamId, (int) $company->id)) {
             return false;
         }
 

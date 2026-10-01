@@ -13,7 +13,6 @@ use App\Notifications\SalaryRunWorkflowNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Spatie\Permission\PermissionRegistrar;
 
 class SalaryRunNotificationService
 {
@@ -40,7 +39,7 @@ class SalaryRunNotificationService
                 continue;
             }
 
-            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep)) {
+            if ($nextStep !== null && $this->userIsAssignedToApprovalStep($user, $nextStep, $company)) {
                 $this->send($user, 'your_turn', [
                     ...$basePayload,
                     'step_id' => $nextStep->id,
@@ -70,7 +69,7 @@ class SalaryRunNotificationService
         ];
 
         foreach ($this->getWorkflowStakeholders($salaryRun, $company) as $user) {
-            if (! $this->userIsAssignedToApprovalStep($user, $nextStep)) {
+            if (! $this->userIsAssignedToApprovalStep($user, $nextStep, $company)) {
                 continue;
             }
 
@@ -88,13 +87,17 @@ class SalaryRunNotificationService
         }
     }
 
-    private function userIsAssignedToApprovalStep(User $user, SalaryRunApprovalStep $step): bool
+    private function userIsAssignedToApprovalStep(User $user, SalaryRunApprovalStep $step, Company $company): bool
     {
         if ($step->team_id === null) {
             return false;
         }
 
-        return app(EmployeeUserRoleService::class)->userBelongsToTeam($user, (int) $step->team_id);
+        return app(EmployeeUserRoleService::class)->userBelongsToTeamInCompany(
+            $user,
+            (int) $step->team_id,
+            (int) $company->id,
+        );
     }
 
     public function notifyStepRejected(
@@ -119,7 +122,7 @@ class SalaryRunNotificationService
                 continue;
             }
 
-            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($firstStep !== null && $this->userIsAssignedToApprovalStep($user, $firstStep, $company)) {
                 $this->send($user, 'your_turn', [
                     ...$payload,
                     'step_id' => $firstStep->id,
@@ -169,7 +172,7 @@ class SalaryRunNotificationService
                 continue;
             }
 
-            if ($this->userIsAssignedToApprovalStep($user, $firstStep)) {
+            if ($this->userIsAssignedToApprovalStep($user, $firstStep, $company)) {
                 $this->send($user, 'your_turn', $payload);
             }
         }
@@ -191,24 +194,13 @@ class SalaryRunNotificationService
         $roleService = app(EmployeeUserRoleService::class);
 
         foreach ($teamIds as $teamId) {
-            $teamMemberIds = $roleService->userIdsForTeam((int) $teamId);
+            $teamMemberIds = $roleService->userIdsForTeamInCompany((int) $teamId, (int) $company->id);
 
             if ($teamMemberIds === []) {
                 continue;
             }
 
-            $teamUserIds = User::query()
-                ->whereIn('id', $teamMemberIds)
-                ->where(function ($query) use ($company) {
-                    $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('companies.id', $company->id);
-                    })->orWhereHas('ownedCompanies', function ($companyQuery) use ($company) {
-                        $companyQuery->where('id', $company->id);
-                    });
-                })
-                ->pluck('id');
-
-            $userIds = $userIds->merge($teamUserIds);
+            $userIds = $userIds->merge($teamMemberIds);
         }
 
         return User::query()
@@ -228,34 +220,13 @@ class SalaryRunNotificationService
             return true;
         }
 
-        $teamIds = app(EmployeeUserRoleService::class)->assignedTeamIdsFor($user);
-
-        if ($teamIds === []) {
-            return false;
-        }
-
-        foreach ($teamIds as $teamId) {
-            $this->refreshUserPermissionContext($user, $teamId);
-
-            if (
-                $user->can('salary-runs.readonly')
-                || $user->can('salary-runs.approve')
-                || $user->can('salary-runs.create')
-                || $user->can('salary-runs.delete')
-                || $user->can('salary-runs.debt-deductions.manage')
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function refreshUserPermissionContext(User $user, ?int $teamId = null): void
-    {
-        app(PermissionRegistrar::class)->setPermissionsTeamId($teamId ?? $user->team_id);
-        $user->unsetRelation('roles');
-        $user->unsetRelation('permissions');
+        return app(EmployeeUserRoleService::class)->canAnyForCompany($user, [
+            'salary-runs.readonly',
+            'salary-runs.approve',
+            'salary-runs.create',
+            'salary-runs.delete',
+            'salary-runs.debt-deductions.manage',
+        ], (int) $company->id);
     }
 
     /**
