@@ -216,6 +216,11 @@ class Employee extends Model implements AuditableContract
         return $this->hasMany(EmployeeEntitlementSettlement::class);
     }
 
+    public function offboardingCases(): HasMany
+    {
+        return $this->hasMany(EmployeeOffboardingCase::class);
+    }
+
     public function fileAccessLogs(): HasMany
     {
         return $this->hasMany(EmployeeFileAccessLog::class);

@@ -116,6 +116,10 @@ const sidebarNavItems = computed((): NavItem[] => {
                 href: '/settings/entitlement-settlement-approvals',
             },
             {
+                title: t('settings.offboarding'),
+                href: '/settings/offboarding',
+            },
+            {
                 title: t('settings.salary_certificate_fee'),
                 href: '/settings/salary-certificate-fee',
             },

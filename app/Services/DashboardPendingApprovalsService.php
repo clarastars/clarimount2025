@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Models\AdvanceRequest;
 use App\Models\Company;
 use App\Models\EmployeeEntitlementSettlement;
+use App\Models\EmployeeOffboardingCase;
+use App\Models\EmployeeOffboardingItem;
 use App\Models\LeaveRequest;
 use App\Models\SalaryCertificateRequest;
 use App\Models\SalaryRun;
@@ -25,6 +27,8 @@ class DashboardPendingApprovalsService
         private AdvanceApprovalService $advanceApprovalService,
         private EntitlementSettlementApprovalService $settlementApprovalService,
         private SalaryRunApprovalService $salaryRunApprovalService,
+        private OffboardingItemApprovalService $offboardingItemApprovalService,
+        private OffboardingClearanceApprovalService $offboardingClearanceApprovalService,
         private EmployeeUserRoleService $roleService,
     ) {}
 
@@ -47,6 +51,7 @@ class DashboardPendingApprovalsService
         $advances = $this->pendingAdvances($user, $companyIds);
         $settlements = $this->pendingSettlements($user, $companyIds);
         $salaryRuns = $this->pendingSalaryRuns($user, $companyIds);
+        $offboarding = $this->pendingOffboarding($user, $companyIds);
 
         return [
             'leaves' => $leaves,
@@ -54,11 +59,13 @@ class DashboardPendingApprovalsService
             'advances' => $advances,
             'entitlement_settlements' => $settlements,
             'salary_runs' => $salaryRuns,
+            'offboarding' => $offboarding,
             'total_count' => $leaves['count']
                 + $certificates['count']
                 + $advances['count']
                 + $settlements['count']
-                + $salaryRuns['count'],
+                + $salaryRuns['count']
+                + $offboarding['count'],
         ];
     }
 
@@ -87,6 +94,9 @@ class DashboardPendingApprovalsService
             'advances.create',
             'employees.entitlements.approve',
             'employees.entitlements.settle',
+            'employees.offboarding.item-approve',
+            'employees.offboarding.clearance-approve',
+            'employees.offboarding.start',
             'salary-runs.approve',
             'salary-runs.readonly',
         ]);
@@ -403,6 +413,103 @@ class DashboardPendingApprovalsService
             : null;
 
         return $this->bucketFromItems($items, $viewAll);
+    }
+
+    /**
+     * @param  list<int>  $companyIds
+     * @return array{visible: bool, count: int, preview: list<array<string, mixed>>, view_all_url: string|null}
+     */
+    private function pendingOffboarding(User $user, array $companyIds): array
+    {
+        $visible = $user->hasRole('super-admin')
+            || $user->ownedCompanies()->exists()
+            || $this->roleService->canInAnyAssignedTeam($user, 'employees.offboarding.item-approve')
+            || $this->roleService->canInAnyAssignedTeam($user, 'employees.offboarding.clearance-approve');
+
+        if (! $visible || $companyIds === []) {
+            return $this->emptyBucket(visible: $visible);
+        }
+
+        $cases = EmployeeOffboardingCase::query()
+            ->whereIn('company_id', $companyIds)
+            ->whereIn('status', [
+                EmployeeOffboardingCase::STATUS_IN_PROGRESS,
+                EmployeeOffboardingCase::STATUS_PENDING_CLEARANCE,
+            ])
+            ->with([
+                'employee:id,first_name,father_name,last_name,company_id,department_id',
+                'company:id,name_ar,name_en',
+                'items',
+            ])
+            ->latest('id')
+            ->limit(self::CANDIDATE_LIMIT)
+            ->get();
+
+        $items = [];
+
+        foreach ($cases as $case) {
+            $employee = $case->employee;
+            $company = $case->company;
+            if ($employee === null || $company === null) {
+                continue;
+            }
+
+            if ($case->isInProgress()) {
+                foreach ($case->items as $item) {
+                    if (! $item instanceof EmployeeOffboardingItem || ! $item->isPending()) {
+                        continue;
+                    }
+
+                    $nextStep = $this->offboardingItemApprovalService->getNextPendingStep($item);
+                    if ($nextStep === null) {
+                        continue;
+                    }
+
+                    if (! $this->offboardingItemApprovalService->canUserApproveStep($user, $company, $item, $nextStep)) {
+                        continue;
+                    }
+
+                    $items[] = [
+                        'id' => (int) $item->id,
+                        'type' => 'offboarding_item',
+                        'title' => $employee->full_name,
+                        'subtitle' => $item->title,
+                        'meta' => $company->name_ar ?: $company->name_en,
+                        'step_title' => $nextStep->title,
+                        'url' => route('employees.offboarding.show', [$employee, $case]),
+                        'created_at' => $case->started_at?->toIso8601String() ?? $case->created_at?->toIso8601String(),
+                        'department_id' => $employee->department_id ? (string) $employee->department_id : null,
+                    ];
+                }
+
+                continue;
+            }
+
+            if ($case->isPendingClearance()) {
+                $nextStep = $this->offboardingClearanceApprovalService->getNextPendingStep($case);
+                if ($nextStep === null) {
+                    continue;
+                }
+
+                if (! $this->offboardingClearanceApprovalService->canUserApproveStep($user, $company, $case, $nextStep)) {
+                    continue;
+                }
+
+                $items[] = [
+                    'id' => (int) $case->id,
+                    'type' => 'offboarding_clearance',
+                    'title' => $employee->full_name,
+                    'subtitle' => __('messages.dashboard.pending.offboarding_clearance_fallback'),
+                    'meta' => $company->name_ar ?: $company->name_en,
+                    'step_title' => $nextStep->title,
+                    'url' => route('employees.offboarding.show', [$employee, $case]),
+                    'created_at' => $case->started_at?->toIso8601String() ?? $case->created_at?->toIso8601String(),
+                    'department_id' => $employee->department_id ? (string) $employee->department_id : null,
+                ];
+            }
+        }
+
+        return $this->bucketFromItems($items, null, $user);
     }
 
     private function userCanSeeLeaves(User $user): bool

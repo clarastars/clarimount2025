@@ -4,6 +4,7 @@ use App\Http\Controllers\Settings\AdvanceApprovalStepsController;
 use App\Http\Controllers\Settings\AdvanceEntitlementTiersController;
 use App\Http\Controllers\Settings\BirthdaySettingsController;
 use App\Http\Controllers\Settings\EntitlementSettlementApprovalStepsController;
+use App\Http\Controllers\Settings\OffboardingSettingsController;
 use App\Http\Controllers\Settings\LeaveApprovalStepsController;
 use App\Http\Controllers\Settings\LeaveTypeController;
 use App\Http\Controllers\Settings\SalaryCertificateApprovalStepsController;
@@ -71,6 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/salary-certificate-approvals', [SalaryCertificateApprovalStepsController::class, 'index'])->name('settings.salary-certificate-approvals.index');
     Route::get('settings/advance-approvals', [AdvanceApprovalStepsController::class, 'index'])->name('settings.advance-approvals.index');
     Route::get('settings/entitlement-settlement-approvals', [EntitlementSettlementApprovalStepsController::class, 'index'])->name('settings.entitlement-settlement-approvals.index');
+    Route::get('settings/offboarding', [OffboardingSettingsController::class, 'index'])->name('settings.offboarding.index');
     Route::middleware('role_or_permission:super-admin|settings.access|leave-types.manage')->group(function () {
         Route::get('settings/leave-types', [LeaveTypeController::class, 'index'])->name('settings.leave-types.index');
         Route::post('settings/leave-types', [LeaveTypeController::class, 'store'])->name('settings.leave-types.store');

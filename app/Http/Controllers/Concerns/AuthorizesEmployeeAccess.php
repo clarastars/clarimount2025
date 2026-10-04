@@ -7,10 +7,13 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeEntitlementSettlement;
+use App\Models\EmployeeOffboardingCase;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use App\Services\EmployeeUserRoleService;
 use App\Services\EntitlementSettlementApprovalService;
+use App\Services\OffboardingClearanceApprovalService;
+use App\Services\OffboardingItemApprovalService;
 use Illuminate\Support\Collection;
 
 trait AuthorizesEmployeeAccess
@@ -361,14 +364,11 @@ trait AuthorizesEmployeeAccess
             return true;
         }
 
-        if (! $this->canAccessEmployee($user, $employee)) {
-            return false;
-        }
-
         if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
             return true;
         }
 
+        // Chain approvers may only have entitlements.approve (not employees.readonly/manage).
         return $this->roleService()->canAccessEmployeeInCompanyDepartment(
             $user,
             'employees.entitlements.approve',
@@ -419,6 +419,115 @@ trait AuthorizesEmployeeAccess
         EmployeeEntitlementSettlement $settlement,
     ): void {
         abort_unless($this->canViewEntitlementSettlement($user, $employee, $settlement), 403);
+    }
+
+    protected function canStartEmployeeOffboarding(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.offboarding.start');
+    }
+
+    protected function canStartEmployeeOffboardingForEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.offboarding.start',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function abortUnlessCanStartEmployeeOffboarding(User $user, Employee $employee): void
+    {
+        abort_unless($this->canStartEmployeeOffboardingForEmployee($user, $employee), 403);
+    }
+
+    protected function canSeeFullOffboardingCase(User $user, Employee $employee): bool
+    {
+        if ($this->canStartEmployeeOffboardingForEmployee($user, $employee)) {
+            return true;
+        }
+
+        if ($user->hasRole('super-admin') || $user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAnyAccessEmployeeInCompanyDepartment(
+            $user,
+            [
+                'employees.offboarding.view',
+                'employees.offboarding.clearance-approve',
+            ],
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function canViewOffboardingCase(
+        User $user,
+        Employee $employee,
+        EmployeeOffboardingCase $case,
+    ): bool {
+        if ($this->canSeeFullOffboardingCase($user, $employee)) {
+            return true;
+        }
+
+        $employee->loadMissing('company');
+        $company = $employee->company;
+
+        if ($company === null) {
+            return false;
+        }
+
+        if ((int) $case->started_by === (int) $user->id) {
+            return true;
+        }
+
+        $case->loadMissing('items');
+
+        $itemApproval = app(OffboardingItemApprovalService::class);
+        if ($itemApproval->userCanActOnAnyPendingItemStep($user, $company, $case)) {
+            return true;
+        }
+
+        foreach ($case->items as $item) {
+            if ($item->stepApprovals()->where('approved_by', $user->id)->exists()) {
+                return true;
+            }
+        }
+
+        $clearanceApproval = app(OffboardingClearanceApprovalService::class);
+        if ($case->isPendingClearance()) {
+            $next = $clearanceApproval->getNextPendingStep($case);
+            if ($next !== null && $clearanceApproval->canUserApproveStep($user, $company, $case, $next)) {
+                return true;
+            }
+        }
+
+        return $case->clearanceStepApprovals()->where('approved_by', $user->id)->exists();
+    }
+
+    protected function abortUnlessCanViewOffboardingCase(
+        User $user,
+        Employee $employee,
+        EmployeeOffboardingCase $case,
+    ): void {
+        abort_unless($this->canViewOffboardingCase($user, $employee, $case), 403);
     }
 
     protected function canManageEmployees(User $user): bool

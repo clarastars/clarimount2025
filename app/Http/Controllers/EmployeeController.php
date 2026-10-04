@@ -515,6 +515,13 @@ class EmployeeController extends Controller
         $employee->loadCount(['assets', 'reportedTickets']);
         $employee->append(['remaining_annual_leave_balance', 'total_leave_days_used']);
 
+        $offboardingCaseService = app(\App\Services\OffboardingCaseService::class);
+        $activeOffboarding = $offboardingCaseService->activeCaseForEmployee($employee);
+        $offboardingCaseId = $activeOffboarding?->id
+            ?? $employee->offboardingCases()->where('status', 'cleared')->latest('id')->value('id');
+        $canViewOffboarding = $activeOffboarding !== null
+            && $this->canViewOffboardingCase($user, $employee, $activeOffboarding);
+
         return Inertia::render('Employees/Show', [
             'employee' => $employee,
             'documents' => app(EmployeeDocumentService::class)->documentsForEmployee($employee),
@@ -529,6 +536,11 @@ class EmployeeController extends Controller
             'canCreateLeaves' => $this->canCreateLeaveForEmployee($user, $employee),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustodyForEmployee($user, $employee),
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
+            'canStartEmployeeOffboarding' => $this->canStartEmployeeOffboardingForEmployee($user, $employee)
+                && $employee->employment_status !== 'terminated'
+                && $activeOffboarding === null,
+            'activeOffboardingCaseId' => $offboardingCaseId ? (int) $offboardingCaseId : null,
+            'canViewActiveOffboarding' => $canViewOffboarding,
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
             'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
             'canExportEmployeeProfile' => $this->canExportEmployeeProfileForEmployee($user, $employee),

@@ -23,8 +23,11 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDebtController;
 use App\Http\Controllers\EmployeeEntitlementSettlementController;
+use App\Http\Controllers\EmployeeOffboardingController;
 use App\Http\Controllers\EntitlementSettlementAttachmentController;
 use App\Http\Controllers\CompanyEntitlementSettlementApprovalStepsController;
+use App\Http\Controllers\CompanyOffboardingChecklistController;
+use App\Http\Controllers\CompanyOffboardingClearanceApprovalStepsController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\EmployeePortalLeaveController;
@@ -258,6 +261,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         [EmployeeEntitlementSettlementController::class, 'rejectWorkflowStep']
     )->name('employees.entitlement-settlement.reject-step');
 
+    // Employee offboarding / end of service
+    Route::post('employees/{employee}/offboarding', [EmployeeOffboardingController::class, 'store'])
+        ->name('employees.offboarding.store');
+    Route::get('employees/{employee}/offboarding/{offboardingCase}', [EmployeeOffboardingController::class, 'show'])
+        ->name('employees.offboarding.show');
+    Route::post(
+        'employees/{employee}/offboarding/{offboardingCase}/items/{offboardingItem}/approval-steps/{offboardingItemStep}/approve',
+        [EmployeeOffboardingController::class, 'approveItemStep']
+    )->name('employees.offboarding.approve-item-step');
+    Route::post(
+        'employees/{employee}/offboarding/{offboardingCase}/items/{offboardingItem}/approval-steps/{offboardingItemStep}/reject',
+        [EmployeeOffboardingController::class, 'rejectItemStep']
+    )->name('employees.offboarding.reject-item-step');
+    Route::post(
+        'employees/{employee}/offboarding/{offboardingCase}/clearance-steps/{offboardingClearanceStep}/approve',
+        [EmployeeOffboardingController::class, 'approveClearanceStep']
+    )->name('employees.offboarding.approve-clearance-step');
+    Route::post(
+        'employees/{employee}/offboarding/{offboardingCase}/clearance-steps/{offboardingClearanceStep}/reject',
+        [EmployeeOffboardingController::class, 'rejectClearanceStep']
+    )->name('employees.offboarding.reject-clearance-step');
+
     // Company Leaves routes
     Route::get('companies/{company}/leaves', [CompanyLeaveController::class, 'index'])->name('companies.leaves.index');
     Route::post('companies/{company}/leaves', [CompanyLeaveController::class, 'store'])->name('companies.leaves.store');
@@ -293,6 +318,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'update'])->name('companies.entitlement-settlement-approvals.update');
     Route::delete('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'destroy'])->name('companies.entitlement-settlement-approvals.destroy');
     Route::post('companies/{company}/entitlement-settlement-approvals/reorder', [CompanyEntitlementSettlementApprovalStepsController::class, 'reorder'])->name('companies.entitlement-settlement-approvals.reorder');
+
+    // Offboarding checklist + approval chains (per company)
+    Route::get('companies/{company}/offboarding-checklist', [CompanyOffboardingChecklistController::class, 'index'])->name('companies.offboarding-checklist.index');
+    Route::post('companies/{company}/offboarding-checklist', [CompanyOffboardingChecklistController::class, 'store'])->name('companies.offboarding-checklist.store');
+    Route::put('companies/{company}/offboarding-checklist/{offboardingTemplate}', [CompanyOffboardingChecklistController::class, 'update'])->name('companies.offboarding-checklist.update');
+    Route::delete('companies/{company}/offboarding-checklist/{offboardingTemplate}', [CompanyOffboardingChecklistController::class, 'destroy'])->name('companies.offboarding-checklist.destroy');
+    Route::post('companies/{company}/offboarding-checklist/reorder', [CompanyOffboardingChecklistController::class, 'reorder'])->name('companies.offboarding-checklist.reorder');
+    Route::get('companies/{company}/offboarding-checklist/{offboardingTemplate}/approvals', [CompanyOffboardingChecklistController::class, 'stepsIndex'])->name('companies.offboarding-item-approvals.index');
+    Route::post('companies/{company}/offboarding-checklist/{offboardingTemplate}/approvals', [CompanyOffboardingChecklistController::class, 'stepsStore'])->name('companies.offboarding-item-approvals.store');
+    Route::put('companies/{company}/offboarding-checklist/{offboardingTemplate}/approvals/{offboardingItemStep}', [CompanyOffboardingChecklistController::class, 'stepsUpdate'])->name('companies.offboarding-item-approvals.update');
+    Route::delete('companies/{company}/offboarding-checklist/{offboardingTemplate}/approvals/{offboardingItemStep}', [CompanyOffboardingChecklistController::class, 'stepsDestroy'])->name('companies.offboarding-item-approvals.destroy');
+    Route::post('companies/{company}/offboarding-checklist/{offboardingTemplate}/approvals/reorder', [CompanyOffboardingChecklistController::class, 'stepsReorder'])->name('companies.offboarding-item-approvals.reorder');
+
+    Route::get('companies/{company}/offboarding-clearance-approvals', [CompanyOffboardingClearanceApprovalStepsController::class, 'index'])->name('companies.offboarding-clearance-approvals.index');
+    Route::post('companies/{company}/offboarding-clearance-approvals', [CompanyOffboardingClearanceApprovalStepsController::class, 'store'])->name('companies.offboarding-clearance-approvals.store');
+    Route::put('companies/{company}/offboarding-clearance-approvals/{offboardingClearanceStep}', [CompanyOffboardingClearanceApprovalStepsController::class, 'update'])->name('companies.offboarding-clearance-approvals.update');
+    Route::delete('companies/{company}/offboarding-clearance-approvals/{offboardingClearanceStep}', [CompanyOffboardingClearanceApprovalStepsController::class, 'destroy'])->name('companies.offboarding-clearance-approvals.destroy');
+    Route::post('companies/{company}/offboarding-clearance-approvals/reorder', [CompanyOffboardingClearanceApprovalStepsController::class, 'reorder'])->name('companies.offboarding-clearance-approvals.reorder');
 
     Route::get('leave-attachments/{filename}', [LeaveAttachmentController::class, 'show'])
         ->where('filename', '[A-Za-z0-9._-]+')

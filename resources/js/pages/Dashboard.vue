@@ -70,6 +70,7 @@ interface PendingApprovals {
     advances: PendingBucket;
     entitlement_settlements: PendingBucket;
     salary_runs: PendingBucket;
+    offboarding: PendingBucket;
     total_count: number;
 }
 
@@ -107,6 +108,7 @@ const pending = computed((): PendingApprovals => props.pendingApprovals ?? {
     advances: emptyBucket(),
     entitlement_settlements: emptyBucket(),
     salary_runs: emptyBucket(),
+    offboarding: emptyBucket(),
     total_count: 0,
 });
 
@@ -145,6 +147,13 @@ const pendingSections = computed(() => [
         icon: Banknote,
         bucket: pending.value.salary_runs,
         tone: 'emerald',
+    },
+    {
+        key: 'offboarding',
+        title: t('dashboard.pending.offboarding'),
+        icon: FileText,
+        bucket: pending.value.offboarding,
+        tone: 'amber',
     },
 ].filter((section) => section.bucket.visible));
 

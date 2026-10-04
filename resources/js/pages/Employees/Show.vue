@@ -49,7 +49,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
+                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canStartEmployeeOffboarding || canViewActiveOffboarding || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -80,6 +80,25 @@
                             >
                                 <Link :href="route('employees.entitlement-settlement.create', employee.id)">
                                     {{ t('employees.settle_entitlements') }}
+                                </Link>
+                            </Button>
+                            <Button
+                                v-if="canStartEmployeeOffboarding"
+                                variant="destructive"
+                                size="sm"
+                                :disabled="isStartingOffboarding"
+                                @click="startOffboarding"
+                            >
+                                {{ isStartingOffboarding ? '...' : t('offboarding.start') }}
+                            </Button>
+                            <Button
+                                v-if="canViewActiveOffboarding && activeOffboardingCaseId"
+                                variant="secondary"
+                                size="sm"
+                                as-child
+                            >
+                                <Link :href="route('employees.offboarding.show', [employee.id, activeOffboardingCaseId])">
+                                    {{ t('offboarding.view_case') }}
                                 </Link>
                             </Button>
                             <Button
@@ -539,6 +558,9 @@ interface Props {
     canCreateLeaves?: boolean;
     canUpdateEmployeeCustody?: boolean;
     canSettleEmployeeEntitlements?: boolean;
+    canStartEmployeeOffboarding?: boolean;
+    canViewActiveOffboarding?: boolean;
+    activeOffboardingCaseId?: number | null;
     canSyncEmployeeFingerprintMonth?: boolean;
     canExcludeFromSalary?: boolean;
     canExportEmployeeProfile?: boolean;
@@ -553,10 +575,14 @@ const canManageEmployees = computed(() => props.canManageEmployees ?? true);
 const canCreateLeaves = computed(() => props.canCreateLeaves ?? false);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
+const canStartEmployeeOffboarding = computed(() => props.canStartEmployeeOffboarding ?? false);
+const canViewActiveOffboarding = computed(() => props.canViewActiveOffboarding ?? false);
+const activeOffboardingCaseId = computed(() => props.activeOffboardingCaseId ?? null);
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const canExcludeFromSalary = computed(() => props.canExcludeFromSalary ?? false);
 const canExportEmployeeProfile = computed(() => props.canExportEmployeeProfile ?? false);
 const canViewEmployeeAuditLog = computed(() => props.canViewEmployeeAuditLog ?? false);
+const isStartingOffboarding = ref(false);
 const isSyncingFingerprintMonth = ref(false);
 const isTogglingExcludeFromSalary = ref(false);
 const isExportingProfile = ref(false);
@@ -764,6 +790,23 @@ const formatPercent = (value: unknown): string => {
     }
 
     return `${value}%`;
+};
+
+const startOffboarding = () => {
+    if (isStartingOffboarding.value) {
+        return;
+    }
+
+    if (!window.confirm(t('offboarding.start_confirm'))) {
+        return;
+    }
+
+    isStartingOffboarding.value = true;
+    router.post(route('employees.offboarding.store', props.employee.id), {}, {
+        onFinish: () => {
+            isStartingOffboarding.value = false;
+        },
+    });
 };
 
 const syncFingerprintMonth = () => {

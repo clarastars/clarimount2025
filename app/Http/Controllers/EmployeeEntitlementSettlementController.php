@@ -444,8 +444,9 @@ class EmployeeEntitlementSettlementController extends Controller
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
-        $this->abortUnlessCanAccessEmployee($user, $employee);
         abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        // Approvers in the settlement chain may not have employees.readonly/manage.
+        $this->abortUnlessCanViewEntitlementSettlement($user, $employee, $entitlementSettlement);
 
         $employee->loadMissing('company');
         $company = $employee->company;
@@ -502,8 +503,9 @@ class EmployeeEntitlementSettlementController extends Controller
         $user = Auth::user();
         abort_unless($user !== null, 403);
 
-        $this->abortUnlessCanAccessEmployee($user, $employee);
         abort_unless((int) $entitlementSettlement->employee_id === (int) $employee->id, 404);
+        // Approvers in the settlement chain may not have employees.readonly/manage.
+        $this->abortUnlessCanViewEntitlementSettlement($user, $employee, $entitlementSettlement);
 
         $employee->loadMissing('company');
         $company = $employee->company;

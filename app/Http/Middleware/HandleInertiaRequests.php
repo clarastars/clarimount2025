@@ -141,6 +141,14 @@ class HandleInertiaRequests extends Middleware
                     || in_array('employees.entitlements.approve', $permissionNames, true)
                     || in_array('employees.entitlements.settle', $permissionNames, true)
                 ),
+                'can_view_offboarding_notifications' => $user !== null && (
+                    $isSuperAdmin
+                    || $user->ownedCompanies()->exists()
+                    || in_array('employees.offboarding.start', $permissionNames, true)
+                    || in_array('employees.offboarding.view', $permissionNames, true)
+                    || in_array('employees.offboarding.item-approve', $permissionNames, true)
+                    || in_array('employees.offboarding.clearance-approve', $permissionNames, true)
+                ),
                 'unread_notifications_count' => $user?->unreadNotifications()->count() ?? 0,
             ],
             'locale' => $userLanguage,

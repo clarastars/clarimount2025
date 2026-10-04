@@ -20,6 +20,8 @@ interface NotificationData {
     monthly_deduction?: string;
     months_count?: number;
     settlement_id?: number;
+    offboarding_case_id?: number;
+    item_title?: string;
     employee_id?: number;
     employee_name?: string;
     leave_type?: string;
@@ -64,6 +66,7 @@ const authProps = computed(() => (page.props.auth as {
     can_view_leave_request_notifications?: boolean;
     can_view_advance_notifications?: boolean;
     can_view_entitlement_settlement_notifications?: boolean;
+    can_view_offboarding_notifications?: boolean;
     is_employee?: boolean;
     unread_notifications_count?: number;
 }) ?? {});
@@ -73,6 +76,7 @@ const showBell = computed(() =>
     || authProps.value.can_view_leave_request_notifications === true
     || authProps.value.can_view_advance_notifications === true
     || authProps.value.can_view_entitlement_settlement_notifications === true
+    || authProps.value.can_view_offboarding_notifications === true
     || authProps.value.is_employee === true,
 );
 const unreadCount = ref(authProps.value.unread_notifications_count ?? 0);
@@ -370,6 +374,47 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         return t(
             settlementKeyMap[data.event_type] ?? 'notifications.entitlement_settlement_workflow_your_turn',
             settlementParams,
+        );
+    }
+
+    const offboardingWorkflowTypes = [
+        'offboarding_your_turn',
+        'offboarding_step_approved',
+        'offboarding_item_finalized',
+        'offboarding_clearance_started',
+        'offboarding_finalized',
+        'offboarding_rejected',
+        'offboarding_case_started',
+    ];
+
+    if (offboardingWorkflowTypes.includes(data.event_type)) {
+        const offboardingParams = {
+            employee: data.employee_name ?? '',
+            company: data.company_name ?? '',
+            item: data.item_title ?? '',
+            step: data.step_title ?? '',
+            name: data.actor_name ?? '',
+            remaining: data.remaining_steps ?? '',
+            reject_reason: data.reason ?? '',
+        };
+
+        if (data.event_type === 'offboarding_your_turn' && data.after_rejection) {
+            return t('notifications.offboarding_your_turn_after_rejection', offboardingParams);
+        }
+
+        const offboardingKeyMap: Record<string, string> = {
+            offboarding_your_turn: 'notifications.offboarding_your_turn',
+            offboarding_step_approved: 'notifications.offboarding_step_approved',
+            offboarding_item_finalized: 'notifications.offboarding_item_finalized',
+            offboarding_clearance_started: 'notifications.offboarding_clearance_started',
+            offboarding_finalized: 'notifications.offboarding_finalized',
+            offboarding_rejected: 'notifications.offboarding_rejected',
+            offboarding_case_started: 'notifications.offboarding_case_started',
+        };
+
+        return t(
+            offboardingKeyMap[data.event_type] ?? 'notifications.offboarding_your_turn',
+            offboardingParams,
         );
     }
 
