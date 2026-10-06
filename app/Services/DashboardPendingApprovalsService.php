@@ -299,6 +299,7 @@ class DashboardPendingApprovalsService
             ->get();
 
         $items = [];
+        $viewAllByCompany = [];
 
         foreach ($candidates as $settlement) {
             $employee = $settlement->employee;
@@ -314,6 +315,8 @@ class DashboardPendingApprovalsService
             $nextStep = $this->settlementApprovalService->hasActiveStepsForCompany($company)
                 ? $this->settlementApprovalService->getNextPendingStep($settlement)
                 : null;
+
+            $viewAllByCompany[(int) $company->id] = route('companies.entitlement-settlements.index', $company);
 
             $items[] = [
                 'id' => (int) $settlement->id,
@@ -333,7 +336,9 @@ class DashboardPendingApprovalsService
             ];
         }
 
-        return $this->bucketFromItems($items, null, $user);
+        $viewAllUrl = $viewAllByCompany !== [] ? reset($viewAllByCompany) : null;
+
+        return $this->bucketFromItems($items, $viewAllUrl, $user);
     }
 
     /**

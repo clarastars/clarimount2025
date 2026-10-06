@@ -772,6 +772,71 @@ trait AuthorizesEmployeeAccess
     }
 
     /**
+     * Permissions that allow viewing company entitlement settlements (all statuses).
+     *
+     * @return array<int, string>
+     */
+    protected function entitlementSettlementWorkflowAccessPermissions(): array
+    {
+        return [
+            'employees.entitlements.approve',
+            'employees.entitlements.settle',
+        ];
+    }
+
+    protected function canViewCompanyEntitlementSettlements(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        foreach ($this->entitlementSettlementWorkflowAccessPermissions() as $permission) {
+            if ($this->roleService()->canInAnyAssignedTeam($user, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function canAccessCompanyEntitlementSettlements(User $user, Company $company): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $permissions = $this->entitlementSettlementWorkflowAccessPermissions();
+
+        if ($this->roleService()->canAnyForCompany($user, $permissions, (int) $company->id)) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessCompanyViaDepartmentScope(
+            $user,
+            (int) $company->id,
+            $permissions,
+        );
+    }
+
+    protected function abortUnlessCanViewCompanyEntitlementSettlements(User $user): void
+    {
+        abort_unless($this->canViewCompanyEntitlementSettlements($user), 403);
+    }
+
+    protected function abortUnlessCanAccessCompanyEntitlementSettlements(User $user, Company $company): void
+    {
+        abort_unless($this->canAccessCompanyEntitlementSettlements($user, $company), 403);
+    }
+
+    /**
      * Permissions that allow seeing/acting on leave & salary-certificate requests for an employee.
      *
      * @return array<int, string>

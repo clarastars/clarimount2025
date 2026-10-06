@@ -38,6 +38,8 @@ class EntitlementSettlementApprovalNotificationService
             'step_title' => $firstStep->title,
         ];
 
+        $notifiedIds = [$actor->id];
+
         foreach ($this->getWorkflowStakeholders($settlement, $company) as $user) {
             if ($user->id === $actor->id) {
                 continue;
@@ -45,8 +47,11 @@ class EntitlementSettlementApprovalNotificationService
 
             if ($this->approvalService->canUserApproveStep($user, $company, $settlement, $firstStep)) {
                 $this->send($user, 'your_turn', $payload);
+                $notifiedIds[] = $user->id;
             }
         }
+
+        $this->broadcastToSuperAdmins('your_turn', $payload, $notifiedIds);
     }
 
     public function notifyStepApproved(
@@ -63,6 +68,7 @@ class EntitlementSettlementApprovalNotificationService
 
         $nextStep = $this->approvalService->getNextPendingStep($settlement);
         $stakeholders = $this->getWorkflowStakeholders($settlement, $company);
+        $notifiedIds = [$actor->id];
 
         foreach ($stakeholders as $user) {
             if ($user->id === $actor->id) {
@@ -75,12 +81,17 @@ class EntitlementSettlementApprovalNotificationService
                     'step_id' => $nextStep->id,
                     'step_title' => $nextStep->title,
                 ]);
+                $notifiedIds[] = $user->id;
 
                 continue;
             }
 
+            // Previous steps / rest of the chain: in-app + email progress notice.
             $this->send($user, 'step_approved', $basePayload);
+            $notifiedIds[] = $user->id;
         }
+
+        $this->broadcastToSuperAdmins('step_approved', $basePayload, $notifiedIds);
     }
 
     public function notifyWorkflowFinalized(
@@ -89,14 +100,19 @@ class EntitlementSettlementApprovalNotificationService
         User $actor,
     ): void {
         $payload = $this->buildBasePayload($settlement, $company, $actor);
+        $notifiedIds = [$actor->id];
 
+        // Entire prior chain (all step teams + prior approvers + creator) gets finalized notice.
         foreach ($this->getWorkflowStakeholders($settlement, $company) as $user) {
             if ($user->id === $actor->id) {
                 continue;
             }
 
             $this->send($user, 'finalized', $payload);
+            $notifiedIds[] = $user->id;
         }
+
+        $this->broadcastToSuperAdmins('finalized', $payload, $notifiedIds);
     }
 
     public function notifyStepRejected(
@@ -113,6 +129,7 @@ class EntitlementSettlementApprovalNotificationService
             'step_title' => $rejectedStep->title,
             'reason' => $reason,
         ];
+        $notifiedIds = [$actor->id];
 
         foreach ($this->getWorkflowStakeholders($settlement, $company) as $user) {
             if ($user->id === $actor->id) {
@@ -120,15 +137,21 @@ class EntitlementSettlementApprovalNotificationService
             }
 
             $this->send($user, 'rejected', $payload);
+            $notifiedIds[] = $user->id;
         }
+
+        $this->broadcastToSuperAdmins('rejected', $payload, $notifiedIds);
     }
 
     /**
+     * Stakeholders for workflow notices: all approval-step team members in scope,
+     * plus anyone who already approved a step on this settlement, plus the creator.
+     *
      * @return Collection<int, User>
      */
     public function getWorkflowStakeholders(EmployeeEntitlementSettlement $settlement, Company $company): Collection
     {
-        $settlement->loadMissing('employee');
+        $settlement->loadMissing(['employee', 'stepApprovals', 'creator']);
 
         $teamIds = $this->approvalService->activeStepsForCompany($company)
             ->pluck('team_id')
@@ -153,10 +176,29 @@ class EntitlementSettlementApprovalNotificationService
             $userIds = $userIds->merge($teamMemberIds);
         }
 
+        // Always keep prior approvers + creator in the loop (even if team/permission filter would drop them).
+        $guaranteedIds = $settlement->stepApprovals
+            ->pluck('approved_by')
+            ->push($settlement->created_by)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $userIds = $userIds->merge($guaranteedIds)->unique()->values();
+
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
         return User::query()
-            ->whereIn('id', $userIds->unique()->values())
+            ->whereIn('id', $userIds)
             ->get()
-            ->filter(function (User $user) use ($company, $settlement) {
+            ->filter(function (User $user) use ($company, $settlement, $guaranteedIds) {
+                if ($guaranteedIds->contains((int) $user->id)) {
+                    return true;
+                }
+
                 $employee = $settlement->employee;
                 if ($employee === null) {
                     return false;
@@ -164,23 +206,8 @@ class EntitlementSettlementApprovalNotificationService
 
                 return $this->userCanReceiveWorkflowNotifications($user, $company, $employee);
             })
+            ->unique('id')
             ->values();
-    }
-
-    private function userIsAssignedToApprovalStep(User $user, EntitlementSettlementApprovalStep $step, ?Employee $employee = null): bool
-    {
-        if ($step->team_id === null) {
-            return false;
-        }
-
-        $roleService = app(EmployeeUserRoleService::class);
-
-        return $roleService->userBelongsToTeamInCompanyScoped(
-            $user,
-            (int) $step->team_id,
-            (int) $step->company_id,
-            $roleService->departmentIdForEmployeeScope($employee),
-        );
     }
 
     private function userCanReceiveWorkflowNotifications(User $user, Company $company, Employee $employee): bool
@@ -226,7 +253,6 @@ class EntitlementSettlementApprovalNotificationService
     {
         $user->notify(new EntitlementSettlementApprovalWorkflowNotification($eventType, $payload));
         $this->sendWorkflowEmail($user, $eventType, $payload);
-        $this->broadcastToSuperAdmins($eventType, $payload, [$user->id]);
     }
 
     /**
@@ -260,7 +286,7 @@ class EntitlementSettlementApprovalNotificationService
      */
     private function broadcastToSuperAdmins(string $eventType, array $payload, array $excludeUserIds = []): void
     {
-        $excludeUserIds = array_values(array_unique($excludeUserIds));
+        $excludeUserIds = array_values(array_unique(array_map('intval', $excludeUserIds)));
 
         User::query()
             ->whereHas('roles', fn ($query) => $query->where('name', 'super-admin'))

@@ -66,6 +66,7 @@ class CompanyController extends Controller
      *     can_manage_employees: bool,
      *     can_view_company_leaves: bool,
      *     can_view_company_advances: bool,
+     *     can_view_company_entitlement_settlements: bool,
      *     can_view_attendance_readonly: bool,
      *     can_manage_attendance_adjustments: bool,
      *     can_view_salary_runs_readonly: bool,
@@ -82,6 +83,7 @@ class CompanyController extends Controller
                 'can_manage_employees' => false,
                 'can_view_company_leaves' => false,
                 'can_view_company_advances' => false,
+                'can_view_company_entitlement_settlements' => false,
                 'can_view_attendance_readonly' => false,
                 'can_manage_attendance_adjustments' => false,
                 'can_view_salary_runs_readonly' => false,
@@ -96,6 +98,7 @@ class CompanyController extends Controller
                 'can_manage_employees' => true,
                 'can_view_company_leaves' => true,
                 'can_view_company_advances' => true,
+                'can_view_company_entitlement_settlements' => true,
                 'can_view_attendance_readonly' => true,
                 'can_manage_attendance_adjustments' => true,
                 'can_view_salary_runs_readonly' => true,
@@ -119,6 +122,15 @@ class CompanyController extends Controller
                 $user,
                 ['advances.company.view', 'advances.create', 'advances.approve'],
                 $companyId
+            ),
+            'can_view_company_entitlement_settlements' => $roleService->canAnyForCompany(
+                $user,
+                ['employees.entitlements.approve', 'employees.entitlements.settle'],
+                $companyId
+            ) || $roleService->canAccessCompanyViaDepartmentScope(
+                $user,
+                $companyId,
+                ['employees.entitlements.approve', 'employees.entitlements.settle'],
             ),
             'can_view_attendance_readonly' => $roleService->canForCompany($user, 'attendance.readonly', $companyId),
             'can_manage_attendance_adjustments' => $roleService->canForCompany($user, 'attendance.adjustments.manage', $companyId),

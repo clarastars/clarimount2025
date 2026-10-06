@@ -26,6 +26,7 @@ use App\Http\Controllers\EmployeeEntitlementSettlementController;
 use App\Http\Controllers\EmployeeOffboardingController;
 use App\Http\Controllers\EntitlementSettlementAttachmentController;
 use App\Http\Controllers\CompanyEntitlementSettlementApprovalStepsController;
+use App\Http\Controllers\CompanyEntitlementSettlementController;
 use App\Http\Controllers\CompanyOffboardingChecklistController;
 use App\Http\Controllers\CompanyOffboardingClearanceApprovalStepsController;
 use App\Http\Controllers\EmployeeDocumentController;
@@ -373,6 +374,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/advance-requests/{advanceRequest}/reject', [CompanyAdvanceController::class, 'reject'])->name('companies.advance-requests.reject');
     Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/approve', [CompanyAdvanceController::class, 'approveWorkflowStep'])->name('companies.advance-requests.approve-step');
     Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/reject', [CompanyAdvanceController::class, 'rejectWorkflowStep'])->name('companies.advance-requests.reject-step');
+
+    // Company entitlement settlements (all statuses, scoped by department/company access)
+    Route::get('companies/{company}/entitlement-settlements', [CompanyEntitlementSettlementController::class, 'index'])
+        ->name('companies.entitlement-settlements.index');
 
     // Employee Debts routes
     Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {
