@@ -586,7 +586,7 @@ class EmployeeEntitlementSettlementService
             ? $this->parseDate($employee->hire_date)
             : null;
 
-        $lastRunItem = SalaryRunItem::query()
+        $runItems = SalaryRunItem::query()
             ->where('employee_id', $employee->id)
             ->whereHas('salaryRun', function ($query) use ($employee): void {
                 $query
@@ -596,28 +596,40 @@ class EmployeeEntitlementSettlementService
             ->join('salary_runs', 'salary_runs.id', '=', 'salary_run_items.salary_run_id')
             ->orderByDesc('salary_runs.year')
             ->orderByDesc('salary_runs.month')
-            ->select('salary_runs.year', 'salary_runs.month')
-            ->get()
-            ->first(function ($run) use ($settlementDate): bool {
-                // Only treat a month as paid once its calendar month has fully ended
-                // on or before the settlement date (avoids mid-month zero dues).
-                $monthEnd = Carbon::createFromDate(
-                    (int) $run->year,
-                    (int) $run->month,
+            ->select([
+                'salary_run_items.period_end',
+                'salary_runs.year',
+                'salary_runs.month',
+            ])
+            ->get();
+
+        $latestPaidThrough = null;
+
+        foreach ($runItems as $runItem) {
+            // Custom/supplementary periods use period_end; regular months use calendar month end.
+            // Skip periods that end after the settlement date (e.g. full current month mid-month).
+            if ($runItem->period_end !== null) {
+                $paidThrough = Carbon::parse((string) $runItem->period_end, self::TZ)->startOfDay();
+            } else {
+                $paidThrough = Carbon::createFromDate(
+                    (int) $runItem->year,
+                    (int) $runItem->month,
                     1,
                     self::TZ,
                 )->endOfMonth()->startOfDay();
+            }
 
-                return $monthEnd->lte($settlementDate);
-            });
+            if ($paidThrough->gt($settlementDate)) {
+                continue;
+            }
 
-        if ($lastRunItem !== null) {
-            $unpaidStart = Carbon::createFromDate(
-                (int) $lastRunItem->year,
-                (int) $lastRunItem->month,
-                1,
-                self::TZ,
-            )->addMonth()->startOfMonth();
+            if ($latestPaidThrough === null || $paidThrough->gt($latestPaidThrough)) {
+                $latestPaidThrough = $paidThrough;
+            }
+        }
+
+        if ($latestPaidThrough !== null) {
+            $unpaidStart = $latestPaidThrough->copy()->addDay()->startOfDay();
 
             if ($hireDate !== null && $unpaidStart->lt($hireDate)) {
                 return $hireDate->copy();
