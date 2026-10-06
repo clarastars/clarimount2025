@@ -290,6 +290,7 @@ class RedirectIfEmployeePortalUser
                 'employees.entitlement-settlement.destroy',
                 'employees.entitlement-settlement.print',
                 'employees.entitlement-settlement.attachments.show',
+                'companies.entitlement-settlements.index',
             ]);
         }
 
@@ -303,6 +304,7 @@ class RedirectIfEmployeePortalUser
                 'employees.entitlement-settlement.attachments.show',
                 'employees.entitlement-settlement.approve-step',
                 'employees.entitlement-settlement.reject-step',
+                'companies.entitlement-settlements.index',
                 'api.notifications.index',
                 'api.notifications.read',
                 'api.notifications.read-all',
