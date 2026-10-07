@@ -1189,6 +1189,8 @@ return [
                 'qualification' => 'المؤهل العلمي',
                 'cv' => 'السيرة الذاتية',
                 'iban' => 'الآيبان',
+                'job_offer' => 'العرض الوظيفي',
+                'work_commencement' => 'مباشرة العمل',
             ],
         ],
         'father_name' => 'اسم الأب',

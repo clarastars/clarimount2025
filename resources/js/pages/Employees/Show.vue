@@ -199,7 +199,7 @@
                         </div>
                         <div>
                             <p class="text-xs text-muted-foreground">{{ t('employees.documents.title') }}</p>
-                            <p class="text-xl font-bold">{{ documentsCount }}/5</p>
+                            <p class="text-xl font-bold">{{ documentsCount }}/{{ documentTypesCount }}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -518,7 +518,7 @@ import EmployeeShowSection from '@/components/employees/EmployeeShowSection.vue'
 import EmployeeAuditLogSection from '@/components/employees/EmployeeAuditLogSection.vue';
 import type { EmployeeAuditLogEntry } from '@/components/employees/EmployeeAuditLogSection.vue';
 import EmployeeInfoField from '@/components/employees/EmployeeInfoField.vue';
-import type { EmployeeDocumentItem } from '@/constants/employeeDocuments';
+import { EMPLOYEE_DOCUMENT_TYPES, type EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import { fetchWithCsrf } from '@/lib/csrf';
 import { downloadExcelResponse } from '@/lib/downloadExcel';
 import type { Employee, BreadcrumbItem } from '@/types';
@@ -683,6 +683,7 @@ async function downloadEmployeeProfile() {
 }
 
 const documentsCount = computed(() => props.documents?.length ?? 0);
+const documentTypesCount = EMPLOYEE_DOCUMENT_TYPES.length;
 
 const initials = computed(() => {
     const parts = [props.employee.first_name, props.employee.last_name]

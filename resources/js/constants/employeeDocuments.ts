@@ -4,6 +4,8 @@ export const EMPLOYEE_DOCUMENT_TYPES = [
     'qualification',
     'cv',
     'iban',
+    'job_offer',
+    'work_commencement',
 ] as const;
 
 export type EmployeeDocumentType = (typeof EMPLOYEE_DOCUMENT_TYPES)[number];

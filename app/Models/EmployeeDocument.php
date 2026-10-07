@@ -19,6 +19,10 @@ class EmployeeDocument extends Model
 
     public const TYPE_IBAN = 'iban';
 
+    public const TYPE_JOB_OFFER = 'job_offer';
+
+    public const TYPE_WORK_COMMENCEMENT = 'work_commencement';
+
     protected $fillable = [
         'employee_id',
         'type',
@@ -41,6 +45,8 @@ class EmployeeDocument extends Model
             self::TYPE_QUALIFICATION,
             self::TYPE_CV,
             self::TYPE_IBAN,
+            self::TYPE_JOB_OFFER,
+            self::TYPE_WORK_COMMENCEMENT,
         ];
     }
 

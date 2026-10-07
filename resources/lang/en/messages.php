@@ -1191,6 +1191,8 @@ return [
                 'qualification' => 'Academic Qualification',
                 'cv' => 'CV / Resume',
                 'iban' => 'IBAN',
+                'job_offer' => 'Job Offer',
+                'work_commencement' => 'Work Commencement',
             ],
         ],
         'father_name' => 'Father\'s Name',
