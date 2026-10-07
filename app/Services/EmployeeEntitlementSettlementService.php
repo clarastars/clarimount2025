@@ -458,14 +458,7 @@ class EmployeeEntitlementSettlementService
 
     public function previouslySettledLeaveDays(Employee $employee): float
     {
-        if ($employee->getKey() === null) {
-            return 0.0;
-        }
-
-        return round((float) EmployeeEntitlementSettlement::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', EmployeeEntitlementSettlement::STATUS_APPROVED)
-            ->sum('remaining_leave_days'), 2);
+        return $this->leaveAccrualService->approvedSettledLeaveDays($employee);
     }
 
     /**
@@ -560,8 +553,9 @@ class EmployeeEntitlementSettlementService
                 $paidLeaveDays = max(0.0, round((float) $lockedSettlement->remaining_leave_days, 2));
                 $currentAccrued = round((float) ($employee->leave_accrued_balance ?? 0), 2);
 
-                // Reduce accrued by the days actually paid in this settlement only.
-                // Leave used/reservations untouched so partial settlements keep the rest available.
+                // Reduce accrued by the days paid in this settlement.
+                // Sync/recalculate also subtracts approved settlement days so nightly
+                // leaves:sync-accrued-balances cannot restore paid-out leave.
                 $employee->update([
                     'leave_accrued_balance' => max(0.0, round($currentAccrued - $paidLeaveDays, 2)),
                 ]);

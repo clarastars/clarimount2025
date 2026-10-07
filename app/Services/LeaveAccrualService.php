@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\EmployeeEntitlementSettlement;
 use App\Models\LeaveAccrualLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -343,7 +344,45 @@ class LeaveAccrualService
         // Prefer the continuous total so month-log rounding never drifts from live balance.
         $runningBalance = $this->accruedDaysFromHireThrough($hireDate, $asOf, $monthlyDays);
 
+        // Approved entitlement settlements pay out leave by reducing accrued balance.
+        // Persist that reduction here so nightly sync cannot restore paid-out days.
+        $settledLeaveDays = $this->approvedSettledLeaveDays($employee);
+        if ($settledLeaveDays > 0) {
+            $runningBalance = max(0.0, round($runningBalance - $settledLeaveDays, 2));
+
+            if ($logRows !== []) {
+                $logRows[array_key_last($logRows)]['balance_after'] = $runningBalance;
+            }
+        }
+
         return $this->persistAccruedBalance($employee, $runningBalance, $logRows, $replaceExistingLogs);
+    }
+
+    /**
+     * Leave days already paid out via approved entitlement settlements (annual leave line included).
+     */
+    public function approvedSettledLeaveDays(Employee $employee): float
+    {
+        if ($employee->getKey() === null) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        $settlements = EmployeeEntitlementSettlement::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', EmployeeEntitlementSettlement::STATUS_APPROVED)
+            ->get(['remaining_leave_days', 'line_exclusions']);
+
+        foreach ($settlements as $settlement) {
+            if ($settlement->isLineExcluded('annual_leave_dues')) {
+                continue;
+            }
+
+            $total += max(0.0, (float) $settlement->remaining_leave_days);
+        }
+
+        return round($total, 2);
     }
 
     /**

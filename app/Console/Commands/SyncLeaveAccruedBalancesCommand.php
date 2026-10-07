@@ -13,7 +13,7 @@ class SyncLeaveAccruedBalancesCommand extends Command
     protected $signature = 'leaves:sync-accrued-balances
                             {--employee= : Recalculate for a single employee id only}';
 
-    protected $description = 'Recalculate leave_accrued_balance from hire_date through today (includes today; current month pro-rated). Skips employees without hire_date.';
+    protected $description = 'Recalculate leave_accrued_balance from hire_date through today (includes today; current month pro-rated), minus leave days paid out in approved entitlement settlements. Skips employees without hire_date.';
 
     public function handle(LeaveAccrualService $service): int
     {
