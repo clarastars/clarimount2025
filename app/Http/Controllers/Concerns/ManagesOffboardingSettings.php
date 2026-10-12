@@ -7,6 +7,9 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Company;
 use App\Models\OffboardingChecklistItemTemplate;
 use App\Models\OffboardingClearanceApprovalStep;
+use App\Models\OffboardingDefaultChecklistItem;
+use App\Models\OffboardingDefaultClearanceApprovalStep;
+use App\Models\OffboardingDefaultItemApprovalStep;
 use App\Models\OffboardingItemApprovalStep;
 use App\Models\Team;
 use Illuminate\Support\Facades\Auth;
@@ -162,5 +165,84 @@ trait ManagesOffboardingSettings
         }
 
         return collect();
+    }
+
+    protected function abortUnlessCanManageOffboardingDefaults(): void
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user->hasRole('super-admin') || $user->can('settings.access'),
+            403
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapOffboardingDefaultChecklistForUi(): array
+    {
+        return OffboardingDefaultChecklistItem::query()
+            ->withCount([
+                'approvalSteps as active_steps_count' => fn ($q) => $q->where('is_active', true),
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OffboardingDefaultChecklistItem $item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'sort_order' => $item->sort_order,
+                'attachment_mode' => $item->attachment_mode,
+                'is_active' => $item->is_active,
+                'active_steps_count' => (int) $item->active_steps_count,
+                'can_delete' => true,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapOffboardingDefaultItemStepsForUi(OffboardingDefaultChecklistItem $item): array
+    {
+        return OffboardingDefaultItemApprovalStep::query()
+            ->where('default_checklist_item_id', $item->id)
+            ->with('team')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OffboardingDefaultItemApprovalStep $step) => [
+                'id' => $step->id,
+                'title' => $step->title,
+                'sort_order' => $step->sort_order,
+                'team_id' => $step->team_id,
+                'team_name' => $step->team?->name,
+                'is_active' => $step->is_active,
+                'can_delete' => true,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapOffboardingDefaultClearanceStepsForUi(): array
+    {
+        return OffboardingDefaultClearanceApprovalStep::query()
+            ->with('team')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OffboardingDefaultClearanceApprovalStep $step) => [
+                'id' => $step->id,
+                'title' => $step->title,
+                'sort_order' => $step->sort_order,
+                'team_id' => $step->team_id,
+                'team_name' => $step->team?->name,
+                'is_active' => $step->is_active,
+                'can_delete' => true,
+            ])
+            ->all();
     }
 }

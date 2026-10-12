@@ -71,8 +71,27 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/leave-approvals', [LeaveApprovalStepsController::class, 'index'])->name('settings.leave-approvals.index');
     Route::get('settings/salary-certificate-approvals', [SalaryCertificateApprovalStepsController::class, 'index'])->name('settings.salary-certificate-approvals.index');
     Route::get('settings/advance-approvals', [AdvanceApprovalStepsController::class, 'index'])->name('settings.advance-approvals.index');
+    Route::post('settings/advance-approvals/defaults', [AdvanceApprovalStepsController::class, 'storeDefault'])->name('settings.advance-approvals.defaults.store');
+    Route::put('settings/advance-approvals/defaults/{advanceApprovalDefaultStep}', [AdvanceApprovalStepsController::class, 'updateDefault'])->name('settings.advance-approvals.defaults.update');
+    Route::delete('settings/advance-approvals/defaults/{advanceApprovalDefaultStep}', [AdvanceApprovalStepsController::class, 'destroyDefault'])->name('settings.advance-approvals.defaults.destroy');
+    Route::post('settings/advance-approvals/defaults/reorder', [AdvanceApprovalStepsController::class, 'reorderDefaults'])->name('settings.advance-approvals.defaults.reorder');
+    Route::post('settings/advance-approvals/defaults/apply-all', [AdvanceApprovalStepsController::class, 'applyDefaultsToAll'])->name('settings.advance-approvals.defaults.apply-all');
     Route::get('settings/entitlement-settlement-approvals', [EntitlementSettlementApprovalStepsController::class, 'index'])->name('settings.entitlement-settlement-approvals.index');
     Route::get('settings/offboarding', [OffboardingSettingsController::class, 'index'])->name('settings.offboarding.index');
+    Route::post('settings/offboarding/defaults/checklist', [OffboardingSettingsController::class, 'storeChecklistItem'])->name('settings.offboarding.defaults.checklist.store');
+    Route::put('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}', [OffboardingSettingsController::class, 'updateChecklistItem'])->name('settings.offboarding.defaults.checklist.update');
+    Route::delete('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}', [OffboardingSettingsController::class, 'destroyChecklistItem'])->name('settings.offboarding.defaults.checklist.destroy');
+    Route::post('settings/offboarding/defaults/checklist/reorder', [OffboardingSettingsController::class, 'reorderChecklistItems'])->name('settings.offboarding.defaults.checklist.reorder');
+    Route::get('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}/approvals', [OffboardingSettingsController::class, 'itemApprovalsIndex'])->name('settings.offboarding.defaults.item-approvals.index');
+    Route::post('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}/approvals', [OffboardingSettingsController::class, 'storeItemStep'])->name('settings.offboarding.defaults.item-approvals.store');
+    Route::put('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}/approvals/{offboardingDefaultItemStep}', [OffboardingSettingsController::class, 'updateItemStep'])->name('settings.offboarding.defaults.item-approvals.update');
+    Route::delete('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}/approvals/{offboardingDefaultItemStep}', [OffboardingSettingsController::class, 'destroyItemStep'])->name('settings.offboarding.defaults.item-approvals.destroy');
+    Route::post('settings/offboarding/defaults/checklist/{offboardingDefaultChecklistItem}/approvals/reorder', [OffboardingSettingsController::class, 'reorderItemSteps'])->name('settings.offboarding.defaults.item-approvals.reorder');
+    Route::post('settings/offboarding/defaults/clearance', [OffboardingSettingsController::class, 'storeClearanceStep'])->name('settings.offboarding.defaults.clearance.store');
+    Route::put('settings/offboarding/defaults/clearance/{offboardingDefaultClearanceStep}', [OffboardingSettingsController::class, 'updateClearanceStep'])->name('settings.offboarding.defaults.clearance.update');
+    Route::delete('settings/offboarding/defaults/clearance/{offboardingDefaultClearanceStep}', [OffboardingSettingsController::class, 'destroyClearanceStep'])->name('settings.offboarding.defaults.clearance.destroy');
+    Route::post('settings/offboarding/defaults/clearance/reorder', [OffboardingSettingsController::class, 'reorderClearanceSteps'])->name('settings.offboarding.defaults.clearance.reorder');
+    Route::post('settings/offboarding/defaults/apply-all', [OffboardingSettingsController::class, 'applyDefaultsToAll'])->name('settings.offboarding.defaults.apply-all');
     Route::middleware('role_or_permission:super-admin|settings.access|leave-types.manage')->group(function () {
         Route::get('settings/leave-types', [LeaveTypeController::class, 'index'])->name('settings.leave-types.index');
         Route::post('settings/leave-types', [LeaveTypeController::class, 'store'])->name('settings.leave-types.store');

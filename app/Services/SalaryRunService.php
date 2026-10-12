@@ -140,7 +140,9 @@ class SalaryRunService
             $calendarStart = $calendarRange['start'];
             $calendarEnd = $calendarRange['end'];
 
-            $nextSequence = ((int) SalaryRun::query()
+            // Include soft-deleted runs so sequence never collides with the unique
+            // index (company_id, year, month, sequence), which still covers trashed rows.
+            $nextSequence = ((int) SalaryRun::withTrashed()
                 ->where('company_id', $companyId)
                 ->where('year', $year)
                 ->where('month', $month)

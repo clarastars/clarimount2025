@@ -280,6 +280,7 @@ class CompanyController extends Controller
         app(EntitlementSettlementApprovalService::class)->seedDefaultStepsForCompany($company);
         app(AdvanceApprovalService::class)->seedDefaultStepsForCompany($company);
         app(\App\Services\OffboardingClearanceApprovalService::class)->seedDefaultStepsForCompany($company);
+        app(\App\Services\OffboardingDefaultsService::class)->seedChecklistForCompany($company);
 
         return redirect()->route('companies.show', $company)
             ->with('success', 'Company created successfully.');

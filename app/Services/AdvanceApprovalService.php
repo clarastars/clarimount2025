@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\AdvanceApprovalDefaultStep;
 use App\Models\AdvanceApprovalStep;
 use App\Models\AdvanceRequest;
 use App\Models\AdvanceRequestApprovalRejection;
@@ -45,9 +46,50 @@ class AdvanceApprovalService
         return $this->activeStepsForCompany($company)->isNotEmpty();
     }
 
+    /**
+     * @return Collection<int, AdvanceApprovalDefaultStep>
+     */
+    public function defaultSteps(): Collection
+    {
+        return AdvanceApprovalDefaultStep::query()
+            ->with('team')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, AdvanceApprovalDefaultStep>
+     */
+    public function activeDefaultSteps(): Collection
+    {
+        return AdvanceApprovalDefaultStep::query()
+            ->with('team')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+    }
+
     public function seedDefaultStepsForCompany(Company $company): void
     {
         if (AdvanceApprovalStep::query()->where('company_id', $company->id)->exists()) {
+            return;
+        }
+
+        $configuredDefaults = $this->activeDefaultSteps();
+
+        if ($configuredDefaults->isNotEmpty()) {
+            foreach ($configuredDefaults as $index => $step) {
+                AdvanceApprovalStep::query()->create([
+                    'company_id' => $company->id,
+                    'title' => $step->title,
+                    'sort_order' => $index + 1,
+                    'team_id' => $step->team_id,
+                    'is_active' => true,
+                ]);
+            }
+
             return;
         }
 
@@ -72,6 +114,111 @@ class AdvanceApprovalService
                 'is_active' => true,
             ]);
         }
+    }
+
+    /**
+     * Replace a company's advance approval steps with the global default chain.
+     *
+     * @return array{applied: bool, reason: string|null}
+     */
+    public function applyDefaultsToCompany(Company $company): array
+    {
+        $defaults = $this->activeDefaultSteps();
+
+        if ($defaults->isEmpty()) {
+            return [
+                'applied' => false,
+                'reason' => 'empty_defaults',
+            ];
+        }
+
+        $existingSteps = AdvanceApprovalStep::query()
+            ->where('company_id', $company->id)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($existingSteps as $step) {
+            if ($step->hasBlockingWorkflowUsage()) {
+                return [
+                    'applied' => false,
+                    'reason' => 'blocking_usage',
+                ];
+            }
+        }
+
+        DB::transaction(function () use ($company, $existingSteps, $defaults): void {
+            foreach ($existingSteps as $step) {
+                $step->delete();
+            }
+
+            foreach ($defaults as $index => $defaultStep) {
+                AdvanceApprovalStep::query()->create([
+                    'company_id' => $company->id,
+                    'title' => $defaultStep->title,
+                    'sort_order' => $index + 1,
+                    'team_id' => $defaultStep->team_id,
+                    'is_active' => true,
+                ]);
+            }
+        });
+
+        return [
+            'applied' => true,
+            'reason' => null,
+        ];
+    }
+
+    /**
+     * @return array{applied: int, skipped: int, skipped_reasons: array<string, int>}
+     */
+    public function applyDefaultsToAllCompanies(): array
+    {
+        $applied = 0;
+        $skipped = 0;
+        $skippedReasons = [
+            'empty_defaults' => 0,
+            'blocking_usage' => 0,
+        ];
+
+        $companies = Company::query()->orderBy('id')->get(['id']);
+
+        foreach ($companies as $company) {
+            $result = $this->applyDefaultsToCompany($company);
+
+            if ($result['applied']) {
+                $applied++;
+                continue;
+            }
+
+            $skipped++;
+            $reason = $result['reason'] ?? 'unknown';
+            $skippedReasons[$reason] = ($skippedReasons[$reason] ?? 0) + 1;
+
+            if ($reason === 'empty_defaults') {
+                break;
+            }
+        }
+
+        return [
+            'applied' => $applied,
+            'skipped' => $skipped,
+            'skipped_reasons' => $skippedReasons,
+        ];
+    }
+
+    /**
+     * @param  array<int, int|string>  $orderedIds
+     */
+    public function reorderDefaultSteps(array $orderedIds): void
+    {
+        DB::transaction(function () use ($orderedIds): void {
+            foreach (array_values($orderedIds) as $index => $stepId) {
+                AdvanceApprovalDefaultStep::query()
+                    ->whereKey($stepId)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
     }
 
     /**

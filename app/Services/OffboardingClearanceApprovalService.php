@@ -44,6 +44,15 @@ class OffboardingClearanceApprovalService
             return;
         }
 
+        $defaultsService = app(OffboardingDefaultsService::class);
+        $configuredDefaults = $defaultsService->activeClearanceSteps();
+
+        if ($configuredDefaults->isNotEmpty()) {
+            $defaultsService->seedClearanceForCompany($company);
+
+            return;
+        }
+
         $hrTeamId = Team::query()->where('name', 'الموارد البشرية')->value('id');
 
         OffboardingClearanceApprovalStep::query()->create([
