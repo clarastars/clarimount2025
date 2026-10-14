@@ -17,16 +17,17 @@ class AssetTemplateController extends Controller
     private function authorizeTemplateApiAccess(): void
     {
         $user = Auth::user();
+        $roleService = app(\App\Services\EmployeeUserRoleService::class);
 
         if (
             $user->hasRole('super-admin')
-            || $user->can('asset-inventory.access')
-            || $user->can('employees.custody.update')
+            || $roleService->canInAnyAssignedTeam($user, 'asset-inventory.access')
+            || $roleService->canInAnyAssignedTeam($user, 'employees.custody.update')
         ) {
             return;
         }
 
-        abort(403);
+        abort(403, 'USER DOES NOT HAVE ANY OF THE NECESSARY ACCESS RIGHTS.');
     }
 
     /**

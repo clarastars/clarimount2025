@@ -42,6 +42,7 @@ class TeamPermissionController extends Controller
         ['name' => 'advances.company.view', 'label' => 'اطّلاع على طلبات السلف'],
         ['name' => 'advances.create', 'label' => 'إكمال/رفض طلبات السلف بدون سلسلة أو إدارة'],
         ['name' => 'advances.approve', 'label' => 'اعتماد سلسلة السلف'],
+        ['name' => 'employees.advances.submit', 'label' => 'رفع طلب سلفة نيابة عن الموظف'],
         ['name' => 'employees.custody.update', 'label' => 'إمكانية تحديث العهدة'],
         ['name' => 'employees.entitlements.settle', 'label' => 'تسوية مستحقات الموظف'],
         ['name' => 'employees.entitlements.approve', 'label' => 'اعتماد تسوية مستحقات الموظف (سلسلة الاعتمادات)'],

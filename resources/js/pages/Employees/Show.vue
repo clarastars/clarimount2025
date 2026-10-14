@@ -49,7 +49,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canStartEmployeeOffboarding || canViewActiveOffboarding || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
+                            v-if="canManageEmployees || canCreateLeaves || canSubmitEmployeeAdvance || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canStartEmployeeOffboarding || canViewActiveOffboarding || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -128,6 +128,11 @@
                             <Button v-if="canCreateLeaves" size="sm" as-child>
                                 <Link :href="route('employees.leaves.create', employee.id)">
                                     {{ t('leaves.create_leave') }}
+                                </Link>
+                            </Button>
+                            <Button v-if="canSubmitEmployeeAdvance" size="sm" as-child>
+                                <Link :href="route('employees.advances.create', employee.id)">
+                                    {{ t('advances.submit_on_behalf') }}
                                 </Link>
                             </Button>
                         </div>
@@ -556,6 +561,7 @@ interface Props {
     }>;
     canManageEmployees?: boolean;
     canCreateLeaves?: boolean;
+    canSubmitEmployeeAdvance?: boolean;
     canUpdateEmployeeCustody?: boolean;
     canSettleEmployeeEntitlements?: boolean;
     canStartEmployeeOffboarding?: boolean;
@@ -573,6 +579,7 @@ const { t } = useI18n();
 
 const canManageEmployees = computed(() => props.canManageEmployees ?? true);
 const canCreateLeaves = computed(() => props.canCreateLeaves ?? false);
+const canSubmitEmployeeAdvance = computed(() => props.canSubmitEmployeeAdvance ?? false);
 const canUpdateEmployeeCustody = computed(() => props.canUpdateEmployeeCustody ?? false);
 const canSettleEmployeeEntitlements = computed(() => props.canSettleEmployeeEntitlements ?? false);
 const canStartEmployeeOffboarding = computed(() => props.canStartEmployeeOffboarding ?? false);

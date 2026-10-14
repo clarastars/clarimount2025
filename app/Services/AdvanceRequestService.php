@@ -23,7 +23,7 @@ class AdvanceRequestService
         private SalaryRunService $salaryRunService,
     ) {}
 
-    public function submitForEmployee(Employee $employee, Request $request): AdvanceRequest
+    public function submitForEmployee(Employee $employee, Request $request, ?User $submittedBy = null): AdvanceRequest
     {
         $entitlement = $this->entitlementService->entitlementFor($employee);
 
@@ -109,9 +109,11 @@ class AdvanceRequestService
             'status' => AdvanceRequest::STATUS_PENDING,
         ]);
 
-        $advanceRequest->load(['employee.company']);
+        $advanceRequest->load(['employee.company', 'employee.user']);
         $company = $advanceRequest->employee->company;
-        $actor = $advanceRequest->employee->user ?? User::make(['name' => $advanceRequest->employee->full_name]);
+        $actor = $submittedBy
+            ?? $advanceRequest->employee->user
+            ?? User::make(['name' => $advanceRequest->employee->full_name]);
 
         if ($company !== null && $this->approvalService->hasActiveStepsForCompany($company)) {
             $this->approvalNotificationService->notifyWorkflowStarted($advanceRequest, $company, $actor);

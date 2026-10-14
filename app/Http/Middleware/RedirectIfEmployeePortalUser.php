@@ -259,6 +259,15 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
+        if ($can('employees.advances.submit')) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.advances.create',
+                'employees.advances.store',
+            ]);
+        }
+
         if ($can('employees.custody.update')) {
             $allowed = array_merge($allowed, [
                 'employees.index',

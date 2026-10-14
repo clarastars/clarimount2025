@@ -687,6 +687,29 @@ trait AuthorizesEmployeeAccess
         return $this->roleService()->canInAnyAssignedTeam($user, 'advances.create');
     }
 
+    protected function canSubmitAdvanceForEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.advances.submit',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
+    protected function abortUnlessCanSubmitAdvanceForEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canSubmitAdvanceForEmployee($user, $employee), 403);
+    }
+
     protected function canApproveAdvances(User $user): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -1107,6 +1130,10 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanViewEmployeeProfile(User $user, Employee $employee): void
     {
         if ($this->canViewEmployees($user) && $this->canAccessEmployee($user, $employee)) {
+            return;
+        }
+
+        if ($this->canSubmitAdvanceForEmployee($user, $employee)) {
             return;
         }
 

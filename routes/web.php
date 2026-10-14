@@ -37,6 +37,7 @@ use App\Http\Controllers\EmployeePortalSalaryCertificateController;
 use App\Http\Controllers\FingerprintDeviceEmployeeController;
 use App\Http\Controllers\LaborLawRuleController;
 use App\Http\Controllers\LeaveAttachmentController;
+use App\Http\Controllers\EmployeeAdvanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
@@ -180,7 +181,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Locations management
-    Route::middleware('role_or_permission:super-admin|asset-inventory.access')->group(function () {
+    Route::middleware('permission_any_team:super-admin|asset-inventory.access')->group(function () {
         Route::resource('locations', LocationController::class);
 
         // Asset Categories management
@@ -232,6 +233,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Employee Leaves routes
     Route::get('employees/{employee}/leaves/create', [LeaveController::class, 'create'])->name('employees.leaves.create');
     Route::post('employees/{employee}/leaves', [LeaveController::class, 'store'])->name('employees.leaves.store');
+
+    // Submit advance on behalf of an employee
+    Route::get('employees/{employee}/advances/create', [EmployeeAdvanceController::class, 'create'])->name('employees.advances.create');
+    Route::post('employees/{employee}/advances', [EmployeeAdvanceController::class, 'store'])->name('employees.advances.store');
 
     Route::get('employees/{employee}/entitlement-settlement/create', [EmployeeEntitlementSettlementController::class, 'create'])
         ->name('employees.entitlement-settlement.create');

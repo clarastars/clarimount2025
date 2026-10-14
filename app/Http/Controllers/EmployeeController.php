@@ -534,6 +534,7 @@ class EmployeeController extends Controller
                 : [],
             'canManageEmployees' => $this->canManageEmployee($user, $employee),
             'canCreateLeaves' => $this->canCreateLeaveForEmployee($user, $employee),
+            'canSubmitEmployeeAdvance' => $this->canSubmitAdvanceForEmployee($user, $employee),
             'canUpdateEmployeeCustody' => $this->canUpdateEmployeeCustodyForEmployee($user, $employee),
             'canSettleEmployeeEntitlements' => $this->canSettleEmployeeEntitlementsForEmployee($user, $employee),
             'canStartEmployeeOffboarding' => $this->canStartEmployeeOffboardingForEmployee($user, $employee)
