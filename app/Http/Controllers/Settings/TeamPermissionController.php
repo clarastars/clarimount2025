@@ -14,6 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class TeamPermissionController extends Controller
 {
@@ -80,38 +81,76 @@ class TeamPermissionController extends Controller
             ->keyBy('name');
 
         $teams = Team::query()
-            ->where('owner_id', $user->id)
-            ->orWhere('id', $user->team_id)
+            ->withCount('users')
+            ->where(function ($query) use ($user): void {
+                $query->where('owner_id', $user->id)
+                    ->orWhere('id', $user->team_id);
+            })
             ->orderBy('name')
             ->get()
             ->unique('id')
             ->values()
             ->map(function (Team $team) use ($permissions) {
-                $role = Role::query()->firstOrCreate([
-                    'name' => 'team-member',
-                    'guard_name' => 'web',
-                    'team_id' => $team->id,
-                ]);
+                $registrar = app(PermissionRegistrar::class);
+                $previousTeamId = $registrar->getPermissionsTeamId();
+                $registrar->setPermissionsTeamId($team->id);
 
-                return [
-                    'id' => $team->id,
-                    'name' => $team->name,
-                    'description' => $team->description,
-                    'permissions' => collect(self::MANAGED_PERMISSIONS)
+                try {
+                    $role = Role::query()->firstOrCreate([
+                        'name' => 'team-member',
+                        'guard_name' => 'web',
+                        'team_id' => $team->id,
+                    ]);
+
+                    $role->unsetRelation('permissions');
+                    $enabledPermissionNames = $role->permissions()
+                        ->pluck('name')
+                        ->all();
+
+                    $teamPermissions = collect(self::MANAGED_PERMISSIONS)
                         ->map(fn (array $permission) => [
                             'name' => $permission['name'],
                             'label' => $permission['label'],
-                            'enabled' => $role->permissions()->where('name', $permission['name'])->exists(),
+                            'group' => $this->permissionGroup($permission['name']),
+                            'enabled' => in_array($permission['name'], $enabledPermissionNames, true),
                             'id' => $permissions[$permission['name']]->id ?? null,
                         ])
-                        ->values(),
-                ];
+                        ->values();
+
+                    return [
+                        'id' => $team->id,
+                        'name' => $team->name,
+                        'description' => $team->description,
+                        'users_count' => (int) $team->users_count,
+                        'enabled_permissions_count' => $teamPermissions->where('enabled', true)->count(),
+                        'permissions' => $teamPermissions,
+                    ];
+                } finally {
+                    $registrar->setPermissionsTeamId($previousTeamId);
+                }
             });
 
         return Inertia::render('settings/TeamPermissions', [
             'teams' => $teams,
             'availablePermissions' => self::MANAGED_PERMISSIONS,
         ]);
+    }
+
+    private function permissionGroup(string $permissionName): string
+    {
+        return match (true) {
+            str_starts_with($permissionName, 'asset-inventory') => 'assets',
+            str_starts_with($permissionName, 'settings') => 'settings',
+            str_starts_with($permissionName, 'company') => 'company',
+            str_starts_with($permissionName, 'employees') => 'employees',
+            str_starts_with($permissionName, 'departments') => 'departments',
+            str_starts_with($permissionName, 'leave-types'),
+            str_starts_with($permissionName, 'leaves') => 'leaves',
+            str_starts_with($permissionName, 'advances') => 'advances',
+            str_starts_with($permissionName, 'attendance') => 'attendance',
+            str_starts_with($permissionName, 'salary-runs') => 'salary_runs',
+            default => 'other',
+        };
     }
 
     public function storeTeam(Request $request): RedirectResponse

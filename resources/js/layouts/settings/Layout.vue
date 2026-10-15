@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 
 interface Props {
-    contentWidth?: 'default' | 'wide';
+    contentWidth?: 'default' | 'wide' | 'full';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -156,9 +156,23 @@ const sidebarNavItems = computed((): NavItem[] => {
 });
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
-const contentWidthClass = computed(() =>
-    props.contentWidth === 'wide' ? 'max-w-6xl' : 'max-w-xl',
-);
+const contentWidthClass = computed(() => {
+    if (props.contentWidth === 'full') {
+        return 'max-w-none';
+    }
+
+    return props.contentWidth === 'wide' ? 'max-w-6xl' : 'max-w-xl';
+});
+
+const contentShellClass = computed(() => {
+    if (props.contentWidth === 'full') {
+        return 'min-w-0 flex-1';
+    }
+
+    return props.contentWidth === 'wide'
+        ? 'min-w-0 flex-1 md:max-w-6xl'
+        : 'min-w-0 flex-1 md:max-w-2xl';
+});
 </script>
 
 <template>
@@ -185,7 +199,7 @@ const contentWidthClass = computed(() =>
 
             <Separator class="lg:hidden" />
 
-            <div :class="['min-w-0 flex-1', props.contentWidth === 'wide' ? 'md:max-w-6xl' : 'md:max-w-2xl']">
+            <div :class="contentShellClass">
                 <section :class="[contentWidthClass, 'space-y-8']">
                     <slot />
                 </section>
