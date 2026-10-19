@@ -49,7 +49,7 @@
                         </div>
 
                         <div
-                            v-if="canManageEmployees || canCreateLeaves || canSubmitEmployeeAdvance || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canStartEmployeeOffboarding || canViewActiveOffboarding || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile"
+                            v-if="canManageEmployees || canCreateLeaves || canSubmitEmployeeAdvance || canUpdateEmployeeCustody || canSettleEmployeeEntitlements || canStartEmployeeOffboarding || canViewActiveOffboarding || canSyncEmployeeFingerprintMonth || canExcludeFromSalary || canExportEmployeeProfile || canExportEmployeeAttendance"
                             class="flex flex-wrap gap-2"
                         >
                             <Button v-if="canManageEmployees" variant="outline" size="sm" as-child>
@@ -66,6 +66,15 @@
                             >
                                 <Icon name="FileSpreadsheet" class="h-4 w-4" />
                                 {{ t('employees.export_profile') }}
+                            </Button>
+                            <Button
+                                v-if="canExportEmployeeAttendance"
+                                variant="outline"
+                                size="sm"
+                                @click="openExportAttendanceDialog"
+                            >
+                                <Icon name="CalendarClock" class="h-4 w-4" />
+                                {{ t('employees.export_attendance') }}
                             </Button>
                             <Button v-if="canUpdateEmployeeCustody" variant="secondary" size="sm" as-child>
                                 <Link :href="route('employees.custody.show', employee.id)">
@@ -497,6 +506,52 @@
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <Dialog v-model:open="exportAttendanceDialogOpen">
+            <DialogContent class="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{{ t('employees.export_attendance_title') }}</DialogTitle>
+                    <DialogDescription>{{ t('employees.export_attendance_description') }}</DialogDescription>
+                </DialogHeader>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <Label for="attendance-export-start">{{ t('employees.export_attendance_start_date') }}</Label>
+                        <Input
+                            id="attendance-export-start"
+                            v-model="attendanceExportStartDate"
+                            type="date"
+                        />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="attendance-export-end">{{ t('employees.export_attendance_end_date') }}</Label>
+                        <Input
+                            id="attendance-export-end"
+                            v-model="attendanceExportEndDate"
+                            type="date"
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="exportAttendanceDialogOpen = false">
+                        {{ t('common.cancel') }}
+                    </Button>
+                    <Button
+                        type="button"
+                        :disabled="!canSubmitAttendanceExport || isExportingAttendance"
+                        @click="downloadEmployeeAttendance"
+                    >
+                        <Icon name="Download" class="h-4 w-4" />
+                        {{
+                            isExportingAttendance
+                                ? t('common.saving')
+                                : t('employees.export_attendance_download')
+                        }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </AppLayout>
 </template>
 
@@ -517,6 +572,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/Icon.vue';
 import EmployeeDocumentsSection from '@/components/employees/EmployeeDocumentsSection.vue';
 import EmployeeShowSection from '@/components/employees/EmployeeShowSection.vue';
@@ -570,6 +627,7 @@ interface Props {
     canSyncEmployeeFingerprintMonth?: boolean;
     canExcludeFromSalary?: boolean;
     canExportEmployeeProfile?: boolean;
+    canExportEmployeeAttendance?: boolean;
     canViewEmployeeAuditLog?: boolean;
     auditLogs?: EmployeeAuditLogEntry[];
 }
@@ -588,14 +646,80 @@ const activeOffboardingCaseId = computed(() => props.activeOffboardingCaseId ?? 
 const canSyncEmployeeFingerprintMonth = computed(() => props.canSyncEmployeeFingerprintMonth ?? false);
 const canExcludeFromSalary = computed(() => props.canExcludeFromSalary ?? false);
 const canExportEmployeeProfile = computed(() => props.canExportEmployeeProfile ?? false);
+const canExportEmployeeAttendance = computed(() => props.canExportEmployeeAttendance ?? false);
 const canViewEmployeeAuditLog = computed(() => props.canViewEmployeeAuditLog ?? false);
 const isStartingOffboarding = ref(false);
 const isSyncingFingerprintMonth = ref(false);
 const isTogglingExcludeFromSalary = ref(false);
 const isExportingProfile = ref(false);
 const exportProfileDialogOpen = ref(false);
+const isExportingAttendance = ref(false);
+const exportAttendanceDialogOpen = ref(false);
 const showBasicSalary = ref(false);
 const maskedCurrency = '•••••• SAR';
+
+function defaultAttendanceExportRange(): { start: string; end: string } {
+    const now = new Date();
+    const end = now.toISOString().slice(0, 10);
+    const startDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const start = startDate.toISOString().slice(0, 10);
+
+    return { start, end };
+}
+
+const defaultAttendanceRange = defaultAttendanceExportRange();
+const attendanceExportStartDate = ref(defaultAttendanceRange.start);
+const attendanceExportEndDate = ref(defaultAttendanceRange.end);
+
+const canSubmitAttendanceExport = computed(() => {
+    if (!attendanceExportStartDate.value || !attendanceExportEndDate.value) {
+        return false;
+    }
+
+    return attendanceExportStartDate.value <= attendanceExportEndDate.value;
+});
+
+function openExportAttendanceDialog() {
+    const range = defaultAttendanceExportRange();
+    attendanceExportStartDate.value = range.start;
+    attendanceExportEndDate.value = range.end;
+    exportAttendanceDialogOpen.value = true;
+}
+
+async function downloadEmployeeAttendance() {
+    if (!canSubmitAttendanceExport.value || isExportingAttendance.value) {
+        return;
+    }
+
+    isExportingAttendance.value = true;
+
+    try {
+        const response = await fetchWithCsrf(route('employees.export-attendance', props.employee.id), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            },
+            body: JSON.stringify({
+                start_date: attendanceExportStartDate.value,
+                end_date: attendanceExportEndDate.value,
+            }),
+        });
+
+        await downloadExcelResponse(
+            response,
+            `employee-attendance-${props.employee.id}-${attendanceExportStartDate.value}-to-${attendanceExportEndDate.value}.xlsx`,
+        );
+        exportAttendanceDialogOpen.value = false;
+    } catch (error) {
+        const details = error instanceof Error && error.message && !error.message.startsWith('HTTP')
+            ? `\n${error.message}`
+            : '';
+        window.alert(`${t('employees.export_attendance_failed')}${details}`);
+    } finally {
+        isExportingAttendance.value = false;
+    }
+}
 
 const exportProfileFields = computed(() =>
     (

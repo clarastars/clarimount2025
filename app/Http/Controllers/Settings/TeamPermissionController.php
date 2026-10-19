@@ -53,6 +53,7 @@ class TeamPermissionController extends Controller
         ['name' => 'employees.offboarding.clearance-approve', 'label' => 'اعتماد إنهاء الخدمات النهائي'],
         ['name' => 'employees.export-profile', 'label' => 'إصدار بيانات الموظف (Excel)'],
         ['name' => 'employees.export-company-profile', 'label' => 'إصدار بيانات موظفي الشركة (Excel)'],
+        ['name' => 'employees.attendance.export', 'label' => 'تصدير حضور الموظف (Excel)'],
         ['name' => 'employees.exclude-from-salary', 'label' => 'تعليق الموظف من مسير الرواتب / إعادته'],
         ['name' => 'employees.global-search', 'label' => 'البحث العلوي عن الموظفين (شركات الدور فقط)'],
         ['name' => 'attendance.readonly', 'label' => 'الاطلاع على الحضور (قراءة فقط)'],

@@ -249,6 +249,37 @@ trait AuthorizesEmployeeAccess
         );
     }
 
+    protected function canExportEmployeeAttendance(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'employees.attendance.export');
+    }
+
+    protected function canExportEmployeeAttendanceForEmployee(User $user, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($employee->company_id)->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.attendance.export',
+            (int) $employee->company_id,
+            $employee->department_id ? (string) $employee->department_id : null
+        );
+    }
+
     protected function canExportCompanyEmployeeProfiles(User $user): bool
     {
         if ($user->hasRole('super-admin')) {
@@ -1005,6 +1036,11 @@ trait AuthorizesEmployeeAccess
     protected function abortUnlessCanExportEmployeeProfileForEmployee(User $user, Employee $employee): void
     {
         abort_unless($this->canExportEmployeeProfileForEmployee($user, $employee), 403);
+    }
+
+    protected function abortUnlessCanExportEmployeeAttendanceForEmployee(User $user, Employee $employee): void
+    {
+        abort_unless($this->canExportEmployeeAttendanceForEmployee($user, $employee), 403);
     }
 
     protected function abortUnlessCanExportCompanyEmployeeProfilesForCompany(User $user, Company $company): void

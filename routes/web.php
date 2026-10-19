@@ -224,6 +224,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('employees/{employee}/exclude-from-salary', [EmployeeController::class, 'toggleExcludeFromSalary'])->name('employees.exclude-from-salary');
     Route::post('employees/export-company-profile', [EmployeeController::class, 'exportCompanyProfiles'])->name('employees.export-company-profile');
     Route::post('employees/{employee}/export-profile', [EmployeeController::class, 'exportProfile'])->name('employees.export-profile');
+    Route::post('employees/{employee}/export-attendance', [EmployeeController::class, 'exportAttendance'])->name('employees.export-attendance');
     Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
     Route::delete('employees/{employee}/documents/{type}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])

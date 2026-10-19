@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Exports\CompanyEmployeesProfileExport;
+use App\Exports\EmployeeAttendanceExport;
 use App\Exports\EmployeeProfileExport;
 use App\Http\Controllers\Concerns\AuthorizesEmployeeAccess;
+use App\Models\AttendanceDailyPresentation;
 use App\Models\Company;
 use App\Models\Country;
 use App\Models\Department;
@@ -12,6 +14,8 @@ use App\Models\Employee;
 use App\Models\Nationality;
 use App\Models\Shift;
 use App\Models\SystemSetting;
+use App\Models\ZkDailyAttendance;
+use Carbon\Carbon;
 use App\Services\EmployeeAuditLogPresenter;
 use App\Services\EmployeeDocumentService;
 use App\Services\EmployeeExpiryService;
@@ -545,11 +549,94 @@ class EmployeeController extends Controller
             'canSyncEmployeeFingerprintMonth' => $this->canSyncEmployeeFingerprintMonth($user, $employee),
             'canExcludeFromSalary' => $this->canExcludeEmployeeFromSalary($user, $employee),
             'canExportEmployeeProfile' => $this->canExportEmployeeProfileForEmployee($user, $employee),
+            'canExportEmployeeAttendance' => $this->canExportEmployeeAttendanceForEmployee($user, $employee),
             'canViewEmployeeAuditLog' => $this->canViewEmployeeAuditLog($user, $employee),
             'auditLogs' => $this->canViewEmployeeAuditLog($user, $employee)
                 ? app(EmployeeAuditLogPresenter::class)->forEmployee($employee)
                 : [],
         ]);
+    }
+
+    public function exportAttendance(
+        Request $request,
+        Employee $employee,
+    ): BinaryFileResponse|\Illuminate\Http\JsonResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+        $this->abortUnlessCanExportEmployeeAttendanceForEmployee($user, $employee);
+
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $startDate = Carbon::parse($validated['start_date'], 'Asia/Riyadh')->startOfDay();
+        $endDate = Carbon::parse($validated['end_date'], 'Asia/Riyadh')->startOfDay();
+
+        if ($startDate->diffInDays($endDate) > 366) {
+            return response()->json([
+                'message' => __('messages.employees.export_attendance_range_too_long'),
+            ], 422);
+        }
+
+        try {
+            $employee->append('full_name');
+
+            $rows = $this->attendanceRowsForExport(
+                $employee,
+                $startDate->toDateString(),
+                $endDate->toDateString(),
+            );
+
+            $filename = sprintf(
+                'employee-attendance-%d-%s-to-%s.xlsx',
+                $employee->id,
+                $startDate->format('Y-m-d'),
+                $endDate->format('Y-m-d'),
+            );
+
+            return Excel::download(
+                new EmployeeAttendanceExport(
+                    $rows,
+                    (string) ($employee->full_name ?: trim($employee->first_name.' '.$employee->last_name)),
+                ),
+                $filename,
+                \Maatwebsite\Excel\Excel::XLSX,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => __('messages.employees.export_attendance_failed'),
+            ], 500);
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    private function attendanceRowsForExport(Employee $employee, string $startDate, string $endDate)
+    {
+        $presentations = AttendanceDailyPresentation::query()
+            ->where('employee_id', $employee->id)
+            ->whereBetween('att_date', [$startDate, $endDate])
+            ->orderBy('att_date')
+            ->get(['att_date', 'first_punch', 'last_punch', 'punch_count']);
+
+        if ($presentations->isNotEmpty()) {
+            return $presentations;
+        }
+
+        $pin = trim((string) ($employee->fingerprint_device_id ?? ''));
+        if ($pin === '') {
+            return collect();
+        }
+
+        return ZkDailyAttendance::query()
+            ->where('device_pin', $pin)
+            ->whereBetween('att_date', [$startDate, $endDate])
+            ->orderBy('att_date')
+            ->get(['att_date', 'first_punch', 'last_punch', 'punch_count']);
     }
 
     public function exportProfile(
