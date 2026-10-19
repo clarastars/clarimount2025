@@ -1,6 +1,7 @@
 /**
  * Validate and trigger a browser download for an Excel (.xlsx) response.
- * Rejects HTML/JSON/login pages masquerading as successful downloads.
+ * Prefers ZIP magic-byte detection over Content-Type, because some browsers,
+ * proxies, and PHP responses mislabel successful .xlsx downloads.
  */
 export class ExcelDownloadError extends Error {
     constructor(message: string) {
@@ -42,21 +43,29 @@ async function looksLikeXlsx(blob: Blob): Promise<boolean> {
     return header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
 }
 
-async function readErrorMessage(response: Response): Promise<string | null> {
-    const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
-
+async function extractJsonMessage(blob: Blob): Promise<string | null> {
     try {
-        if (contentType.includes('application/json') || contentType.includes('text/json')) {
-            const data = await response.clone().json();
-            if (typeof data?.message === 'string' && data.message.trim() !== '') {
-                return data.message;
-            }
+        const text = await blob.text();
+        const data = JSON.parse(text) as { message?: unknown };
+        if (typeof data?.message === 'string' && data.message.trim() !== '') {
+            return data.message;
         }
     } catch {
         // ignore parse errors
     }
 
     return null;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
 }
 
 export async function downloadExcelResponse(
@@ -67,35 +76,42 @@ export async function downloadExcelResponse(
         throw new ExcelDownloadError('Redirected');
     }
 
-    if (!response.ok) {
-        const serverMessage = await readErrorMessage(response);
-        throw new ExcelDownloadError(serverMessage || `HTTP ${response.status}`);
-    }
-
     const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
-    if (
-        contentType.includes('text/html') ||
-        contentType.includes('application/json') ||
-        contentType.includes('text/json') ||
-        contentType.includes('application/problem+json')
-    ) {
-        const serverMessage = await readErrorMessage(response);
-        throw new ExcelDownloadError(serverMessage || 'Invalid content type');
-    }
-
     const blob = await response.blob();
-    if (!(await looksLikeXlsx(blob))) {
-        throw new ExcelDownloadError('Invalid excel payload');
+
+    // Successful Excel payload wins even when Content-Type is wrong/missing.
+    if (await looksLikeXlsx(blob)) {
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const filename = parseFilename(disposition, fallbackFilename);
+        triggerBlobDownload(blob, filename);
+        return;
     }
 
-    const disposition = response.headers.get('Content-Disposition') || '';
-    const filename = parseFilename(disposition, fallbackFilename);
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    const jsonMessage = await extractJsonMessage(blob);
+
+    if (!response.ok) {
+        throw new ExcelDownloadError(jsonMessage || `HTTP ${response.status}`);
+    }
+
+    if (response.redirected) {
+        throw new ExcelDownloadError(jsonMessage || 'Redirected');
+    }
+
+    if (
+        contentType.includes('text/html')
+        || blob.type.includes('text/html')
+    ) {
+        throw new ExcelDownloadError(jsonMessage || 'Invalid content type');
+    }
+
+    if (
+        contentType.includes('application/json')
+        || contentType.includes('text/json')
+        || contentType.includes('application/problem+json')
+        || blob.type.includes('json')
+    ) {
+        throw new ExcelDownloadError(jsonMessage || 'Invalid content type');
+    }
+
+    throw new ExcelDownloadError(jsonMessage || 'Invalid excel payload');
 }

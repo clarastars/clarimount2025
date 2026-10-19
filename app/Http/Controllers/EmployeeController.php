@@ -594,15 +594,30 @@ class EmployeeController extends Controller
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d'),
             );
+            $relativePath = 'exports/'.$filename;
 
-            return Excel::download(
+            Storage::disk('local')->makeDirectory('exports');
+
+            Excel::store(
                 new EmployeeAttendanceExport(
                     $rows,
                     (string) ($employee->full_name ?: trim($employee->first_name.' '.$employee->last_name)),
                 ),
-                $filename,
+                $relativePath,
+                'local',
                 \Maatwebsite\Excel\Excel::XLSX,
             );
+
+            abort_unless(Storage::disk('local')->exists($relativePath), 500, 'Export file missing');
+
+            $absolutePath = Storage::disk('local')->path($relativePath);
+            abort_unless(is_file($absolutePath) && filesize($absolutePath) > 32, 500, 'Export file invalid');
+
+            return response()->download($absolutePath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                'X-Content-Type-Options' => 'nosniff',
+            ])->deleteFileAfterSend(true);
         } catch (\Throwable $e) {
             report($e);
 

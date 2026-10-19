@@ -698,7 +698,7 @@ async function downloadEmployeeAttendance() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             },
             body: JSON.stringify({
                 start_date: attendanceExportStartDate.value,
