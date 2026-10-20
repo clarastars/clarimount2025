@@ -32,6 +32,7 @@ class RedirectIfEmployeePortalUser
 
         $roleService = app(\App\Services\EmployeeUserRoleService::class);
         $can = fn (string $permission): bool => $roleService->canInAnyAssignedTeam($user, $permission);
+        $ownsCompanies = $user->ownedCompanies()->exists();
 
         $allowed = [
             'dashboard',
@@ -155,6 +156,30 @@ class RedirectIfEmployeePortalUser
                 'employee-debts.store',
                 'employee-debts.update',
                 'employee-debts.destroy',
+            ]);
+        }
+
+        if ($can('employees.export-profile') || $ownsCompanies) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.export-profile',
+            ]);
+        }
+
+        if ($can('employees.export-company-profile') || $ownsCompanies) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.export-company-profile',
+            ]);
+        }
+
+        if ($can('employees.attendance.export') || $ownsCompanies) {
+            $allowed = array_merge($allowed, [
+                'employees.index',
+                'employees.show',
+                'employees.export-attendance',
+                'employees.export-attendance.download',
             ]);
         }
 
@@ -419,6 +444,14 @@ class RedirectIfEmployeePortalUser
 
         if ($request->routeIs($allowed)) {
             return $next($request);
+        }
+
+        // JSON/fetch clients should get a clear 403 instead of an HTML redirect,
+        // which breaks Excel download flows with "Invalid content type".
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'message' => 'Unauthorized.',
+            ], 403);
         }
 
         return redirect()->route('dashboard');

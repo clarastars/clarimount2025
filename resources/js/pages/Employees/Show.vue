@@ -582,7 +582,7 @@ import type { EmployeeAuditLogEntry } from '@/components/employees/EmployeeAudit
 import EmployeeInfoField from '@/components/employees/EmployeeInfoField.vue';
 import { EMPLOYEE_DOCUMENT_TYPES, type EmployeeDocumentItem } from '@/constants/employeeDocuments';
 import { fetchWithCsrf } from '@/lib/csrf';
-import { downloadExcelResponse } from '@/lib/downloadExcel';
+import { downloadExcelResponse, downloadViaBrowserNavigation } from '@/lib/downloadExcel';
 import type { Employee, BreadcrumbItem } from '@/types';
 
 type ExportProfileFieldKey =
@@ -698,7 +698,7 @@ async function downloadEmployeeAttendance() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                Accept: 'application/json',
             },
             body: JSON.stringify({
                 start_date: attendanceExportStartDate.value,
@@ -706,10 +706,19 @@ async function downloadEmployeeAttendance() {
             }),
         });
 
-        await downloadExcelResponse(
-            response,
-            `employee-attendance-${props.employee.id}-${attendanceExportStartDate.value}-to-${attendanceExportEndDate.value}.xlsx`,
-        );
+        let payload: { download_url?: string; message?: string } = {};
+        try {
+            payload = await response.json();
+        } catch {
+            payload = {};
+        }
+
+        if (!response.ok || !payload.download_url) {
+            throw new Error(payload.message || `HTTP ${response.status}`);
+        }
+
+        // Native browser download avoids blob/createObjectURL failures on many devices.
+        downloadViaBrowserNavigation(payload.download_url);
         exportAttendanceDialogOpen.value = false;
     } catch (error) {
         const details = error instanceof Error && error.message && !error.message.startsWith('HTTP')

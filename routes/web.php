@@ -225,6 +225,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('employees/export-company-profile', [EmployeeController::class, 'exportCompanyProfiles'])->name('employees.export-company-profile');
     Route::post('employees/{employee}/export-profile', [EmployeeController::class, 'exportProfile'])->name('employees.export-profile');
     Route::post('employees/{employee}/export-attendance', [EmployeeController::class, 'exportAttendance'])->name('employees.export-attendance');
+    Route::get('employees/export-attendance/download/{token}', [EmployeeController::class, 'downloadAttendanceExport'])
+        ->where('token', '[0-9a-fA-F-]{36}')
+        ->name('employees.export-attendance.download');
     Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
     Route::delete('employees/{employee}/documents/{type}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');
     Route::get('employees/expiring-documents', [EmployeeController::class, 'expiringDocuments'])

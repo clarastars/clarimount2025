@@ -560,7 +560,7 @@ class EmployeeController extends Controller
     public function exportAttendance(
         Request $request,
         Employee $employee,
-    ): BinaryFileResponse|\Illuminate\Http\JsonResponse {
+    ): \Illuminate\Http\JsonResponse {
         $user = Auth::user();
         abort_unless($user !== null, 403);
         $this->abortUnlessCanExportEmployeeAttendanceForEmployee($user, $employee);
@@ -594,9 +594,10 @@ class EmployeeController extends Controller
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d'),
             );
-            $relativePath = 'exports/'.$filename;
+            $token = (string) \Illuminate\Support\Str::uuid();
+            $relativePath = 'exports/attendance/'.$token.'.xlsx';
 
-            Storage::disk('local')->makeDirectory('exports');
+            Storage::disk('local')->makeDirectory('exports/attendance');
 
             Excel::store(
                 new EmployeeAttendanceExport(
@@ -613,11 +614,21 @@ class EmployeeController extends Controller
             $absolutePath = Storage::disk('local')->path($relativePath);
             abort_unless(is_file($absolutePath) && filesize($absolutePath) > 32, 500, 'Export file invalid');
 
-            return response()->download($absolutePath, $filename, [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate',
-                'X-Content-Type-Options' => 'nosniff',
-            ])->deleteFileAfterSend(true);
+            cache()->put(
+                'employee-attendance-export:'.$token,
+                [
+                    'user_id' => (int) $user->id,
+                    'employee_id' => (int) $employee->id,
+                    'path' => $relativePath,
+                    'filename' => $filename,
+                ],
+                now()->addMinutes(10),
+            );
+
+            return response()->json([
+                'download_url' => route('employees.export-attendance.download', ['token' => $token]),
+                'filename' => $filename,
+            ]);
         } catch (\Throwable $e) {
             report($e);
 
@@ -625,6 +636,36 @@ class EmployeeController extends Controller
                 'message' => __('messages.employees.export_attendance_failed'),
             ], 500);
         }
+    }
+
+    public function downloadAttendanceExport(string $token): BinaryFileResponse|\Illuminate\Http\JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $payload = cache()->pull('employee-attendance-export:'.$token);
+        if (! is_array($payload)) {
+            return response()->json([
+                'message' => __('messages.employees.export_attendance_failed'),
+            ], 410);
+        }
+
+        abort_unless((int) ($payload['user_id'] ?? 0) === (int) $user->id, 403);
+
+        $relativePath = (string) ($payload['path'] ?? '');
+        $filename = (string) ($payload['filename'] ?? 'employee-attendance.xlsx');
+
+        abort_unless($relativePath !== '' && Storage::disk('local')->exists($relativePath), 404);
+
+        $absolutePath = Storage::disk('local')->path($relativePath);
+        abort_unless(is_file($absolutePath) && filesize($absolutePath) > 32, 404);
+
+        return response()->download($absolutePath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ])->deleteFileAfterSend(true);
     }
 
     /**

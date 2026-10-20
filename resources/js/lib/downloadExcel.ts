@@ -62,10 +62,32 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
     const link = document.createElement('a');
     link.href = url;
     link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+    link.rel = 'noopener';
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+
+    // Revoking immediately cancels the download on Safari and some Chromium builds.
+    window.setTimeout(() => {
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    }, 60_000);
+}
+
+/**
+ * Native browser navigation download (most reliable across devices).
+ * Uses a hidden iframe so the current page state is preserved.
+ */
+export function downloadViaBrowserNavigation(url: string): void {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    window.setTimeout(() => {
+        iframe.remove();
+    }, 120_000);
 }
 
 export async function downloadExcelResponse(
