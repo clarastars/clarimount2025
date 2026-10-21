@@ -35,14 +35,22 @@ interface TeamItem {
     description?: string | null;
 }
 
+interface TransferTeamProps {
+    team_id: number | null;
+    team_name: string | null;
+}
+
 interface Props {
     companies: CompanyItem[];
     defaultSteps: StepItem[];
     teams: TeamItem[];
+    transferTeam?: TransferTeamProps;
     status?: string | null;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    transferTeam: () => ({ team_id: null, team_name: null }),
+});
 const page = usePage();
 const { t, locale } = useI18n();
 
@@ -144,6 +152,16 @@ const applyToAll = () => {
     }
 
     router.post(route('settings.advance-approvals.defaults.apply-all'), {}, {
+        preserveScroll: true,
+    });
+};
+
+const transferForm = useForm({
+    team_id: (props.transferTeam.team_id ?? '') as string | number,
+});
+
+const saveTransferTeam = () => {
+    transferForm.put(route('settings.advance-approvals.defaults.transfer-team'), {
         preserveScroll: true,
     });
 };
@@ -280,6 +298,39 @@ const applyToAll = () => {
                                 </div>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{{ t('settings.advance_transfer_team_title') }}</CardTitle>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            {{ t('settings.advance_transfer_team_description') }}
+                        </p>
+                    </CardHeader>
+                    <CardContent>
+                        <form class="space-y-4" @submit.prevent="saveTransferTeam">
+                            <div class="space-y-2">
+                                <Label for="default-transfer-team">{{ t('settings.advance_transfer_team_title') }}</Label>
+                                <select
+                                    id="default-transfer-team"
+                                    v-model="transferForm.team_id"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">{{ t('settings.advance_transfer_team_none') }}</option>
+                                    <option v-for="team in teams" :key="team.id" :value="team.id">
+                                        {{ team.name }}
+                                    </option>
+                                </select>
+                                <InputError :message="transferForm.errors.team_id" />
+                                <p v-if="transferTeam.team_name" class="text-xs text-muted-foreground">
+                                    {{ t('settings.advance_transfer_team_current') }}: {{ transferTeam.team_name }}
+                                </p>
+                            </div>
+                            <Button type="submit" :disabled="transferForm.processing">
+                                {{ t('common.save') }}
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
 

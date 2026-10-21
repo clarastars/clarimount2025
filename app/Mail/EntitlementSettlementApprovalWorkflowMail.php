@@ -74,6 +74,7 @@ class EntitlementSettlementApprovalWorkflowMail extends Mailable
             '{name}' => (string) ($this->payload['actor_name'] ?? ''),
             '{remaining}' => (string) ($this->payload['remaining_steps'] ?? ''),
             '{reject_reason}' => (string) ($this->payload['reason'] ?? ''),
+            '{paid_by}' => (string) ($this->payload['paid_by_name'] ?? $this->payload['actor_name'] ?? ''),
         ];
 
         $key = match ($this->eventType) {
@@ -85,6 +86,8 @@ class EntitlementSettlementApprovalWorkflowMail extends Mailable
             'rejected' => 'messages.notifications.entitlement_settlement_workflow_rejected',
             'workflow_rejected' => 'messages.notifications.entitlement_settlement_workflow_employee_rejected',
             'finalized', 'approved' => 'messages.notifications.entitlement_settlement_workflow_finalized',
+            'transfer_needed' => 'messages.notifications.entitlement_settlement_transfer_needed',
+            'transfer_completed' => 'messages.notifications.entitlement_settlement_transfer_completed',
             default => 'messages.notifications.entitlement_settlement_workflow_your_turn',
         };
 

@@ -29,12 +29,45 @@ class AdvanceApprovalStepsController extends Controller
             ])
             ->values();
 
+        $approvalService = app(AdvanceApprovalService::class);
+        $transferTeamId = $approvalService->defaultTransferTeamId();
+        $transferTeam = $transferTeamId !== null
+            ? \App\Models\Team::query()->find($transferTeamId)
+            : null;
+
         return Inertia::render('settings/AdvanceApprovalCompanyPicker', [
             'companies' => $companies,
             'defaultSteps' => $this->mapAdvanceApprovalDefaultStepsForUi(),
             'teams' => $this->accessibleTeamsForAdvanceApprovalSteps(),
+            'transferTeam' => [
+                'team_id' => $transferTeamId,
+                'team_name' => $transferTeam?->name,
+            ],
             'status' => session('status'),
         ]);
+    }
+
+    public function updateDefaultTransferTeam(
+        Request $request,
+        AdvanceApprovalService $approvalService,
+    ): RedirectResponse {
+        $this->abortUnlessCanManageAdvanceApprovalDefaults();
+
+        $validated = $request->validate([
+            'team_id' => ['nullable', 'exists:teams,id'],
+        ]);
+
+        $teamId = isset($validated['team_id']) && $validated['team_id'] !== ''
+            ? (int) $validated['team_id']
+            : null;
+
+        if ($teamId !== null) {
+            abort_unless($this->userCanUseTeamForAdvanceApprovalStep($teamId), 403);
+        }
+
+        $approvalService->updateDefaultTransferTeam($teamId);
+
+        return back()->with('status', __('messages.settings.advance_transfer_team_saved'));
     }
 
     public function storeDefault(Request $request): RedirectResponse

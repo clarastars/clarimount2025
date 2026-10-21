@@ -266,7 +266,7 @@ class RedirectIfEmployeePortalUser
             ]);
         }
 
-        if ($can('advances.create') || $can('advances.approve')) {
+        if ($can('advances.create') || $can('advances.approve') || $can('advances.transfer')) {
             $allowed = array_merge($allowed, [
                 'companies.advances.index',
                 'companies.advance-requests.approve-step',
@@ -281,6 +281,14 @@ class RedirectIfEmployeePortalUser
             $allowed = array_merge($allowed, [
                 'companies.advance-requests.approve',
                 'companies.advance-requests.reject',
+            ]);
+        }
+
+        if ($can('advances.transfer')) {
+            $allowed = array_merge($allowed, [
+                'companies.advances.index',
+                'companies.advance-requests.mark-paid',
+                'companies.advance-requests.payment-receipt',
             ]);
         }
 
@@ -339,6 +347,17 @@ class RedirectIfEmployeePortalUser
                 'employees.entitlement-settlement.approve-step',
                 'employees.entitlement-settlement.reject-step',
                 'companies.entitlement-settlements.index',
+                'api.notifications.index',
+                'api.notifications.read',
+                'api.notifications.read-all',
+            ]);
+        }
+
+        if ($can('employees.entitlements.transfer')) {
+            $allowed = array_merge($allowed, [
+                'companies.entitlement-settlements.index',
+                'companies.entitlement-settlements.mark-paid',
+                'companies.entitlement-settlements.payment-receipt',
                 'api.notifications.index',
                 'api.notifications.read',
                 'api.notifications.read-all',

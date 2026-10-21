@@ -120,17 +120,17 @@ class CompanyController extends Controller
             'can_view_company_leaves' => $roleService->canForCompany($user, 'leaves.company.view', $companyId),
             'can_view_company_advances' => $roleService->canAnyForCompany(
                 $user,
-                ['advances.company.view', 'advances.create', 'advances.approve'],
+                ['advances.company.view', 'advances.create', 'advances.approve', 'advances.transfer'],
                 $companyId
             ),
             'can_view_company_entitlement_settlements' => $roleService->canAnyForCompany(
                 $user,
-                ['employees.entitlements.approve', 'employees.entitlements.settle'],
+                ['employees.entitlements.approve', 'employees.entitlements.settle', 'employees.entitlements.transfer'],
                 $companyId
             ) || $roleService->canAccessCompanyViaDepartmentScope(
                 $user,
                 $companyId,
-                ['employees.entitlements.approve', 'employees.entitlements.settle'],
+                ['employees.entitlements.approve', 'employees.entitlements.settle', 'employees.entitlements.transfer'],
             ),
             'can_view_attendance_readonly' => $roleService->canForCompany($user, 'attendance.readonly', $companyId),
             'can_manage_attendance_adjustments' => $roleService->canForCompany($user, 'attendance.adjustments.manage', $companyId),

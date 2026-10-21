@@ -21,12 +21,44 @@ class CompanyAdvanceApprovalStepsController extends Controller
     {
         $this->abortUnlessCanManageAdvanceApprovalSteps($company);
 
+        $company->loadMissing('advanceTransferTeam:id,name');
+
         return Inertia::render('Companies/AdvanceApprovals', [
             'company' => $company->only(['id', 'name_en', 'name_ar']),
             'steps' => $this->mapAdvanceApprovalStepsForUi($company),
             'teams' => $this->accessibleTeamsForAdvanceApprovalSteps(),
+            'transferTeam' => [
+                'team_id' => $company->advance_transfer_team_id
+                    ? (int) $company->advance_transfer_team_id
+                    : null,
+                'team_name' => $company->advanceTransferTeam?->name,
+            ],
             'status' => session('status'),
         ]);
+    }
+
+    public function updateTransferTeam(
+        Request $request,
+        Company $company,
+        AdvanceApprovalService $approvalService,
+    ): RedirectResponse {
+        $this->abortUnlessCanManageAdvanceApprovalSteps($company);
+
+        $validated = $request->validate([
+            'team_id' => ['nullable', 'exists:teams,id'],
+        ]);
+
+        $teamId = isset($validated['team_id']) && $validated['team_id'] !== ''
+            ? (int) $validated['team_id']
+            : null;
+
+        if ($teamId !== null) {
+            abort_unless($this->userCanUseTeamForAdvanceApprovalStep($teamId), 403);
+        }
+
+        $approvalService->updateCompanyTransferTeam($company, $teamId);
+
+        return back()->with('status', __('messages.settings.advance_transfer_team_saved'));
     }
 
     public function store(Request $request, Company $company): RedirectResponse

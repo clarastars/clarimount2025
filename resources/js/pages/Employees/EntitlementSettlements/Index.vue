@@ -56,9 +56,18 @@
                                 <td class="px-4 py-3 whitespace-nowrap">{{ formatDate(item.settlement_date) }}</td>
                                 <td class="px-4 py-3 max-w-[220px] truncate" :title="item.reason">{{ item.reason }}</td>
                                 <td class="px-4 py-3">
-                                    <span :class="statusBadgeClass(item.status)">
-                                        {{ t(`entitlement_settlement.status_${item.status}`) }}
-                                    </span>
+                                    <div class="flex flex-col items-start gap-1">
+                                        <span :class="statusBadgeClass(item.status)">
+                                            {{ t(`entitlement_settlement.status_${item.status}`) }}
+                                        </span>
+                                        <span
+                                            v-if="item.status === 'approved'"
+                                            class="inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                                        >
+                                            {{ t('entitlement_settlement.payment_status') }}:
+                                            {{ t(`entitlement_settlement.payment_status_${item.payment_status || 'unpaid'}`) }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 tabular-nums whitespace-nowrap">{{ formatCurrency(item.total_dues) }}</td>
                                 <td class="px-4 py-3 tabular-nums whitespace-nowrap">{{ formatCurrency(item.total_deductions) }}</td>
@@ -117,6 +126,7 @@ type SettlementSummary = {
     settlement_date: string | null;
     reason: string;
     status: 'pending' | 'approved' | 'rejected';
+    payment_status?: string;
     total_dues: number;
     total_deductions: number;
     net_due: number;

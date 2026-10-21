@@ -118,6 +118,8 @@ class EmployeePortalAdvanceController extends Controller
             'months_count' => (int) $request->months_count,
             'repayment_schedule' => $request->schedule(),
             'status' => $request->status,
+            'payment_status' => $request->payment_status ?? AdvanceRequest::PAYMENT_UNPAID,
+            'paid_at' => $request->paid_at?->toIso8601String(),
             'review_notes' => $request->review_notes,
             'created_at' => $request->created_at?->toIso8601String(),
             'reviewed_at' => $request->reviewed_at?->toIso8601String(),

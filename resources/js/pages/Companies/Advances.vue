@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { Wallet } from 'lucide-vue-next';
 
 import AppLayout from '@/layouts/AppLayout.vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { showFlashFeedback } from '@/lib/flashFeedback';
 import type { BreadcrumbItem } from '@/types';
+
+interface ApprovalAssignee {
+    id: number;
+    name: string;
+    email: string | null;
+}
 
 interface ApprovalStepState {
     id: number;
@@ -26,6 +33,7 @@ interface ApprovalStepState {
     can_reject: boolean;
     waiting_previous: boolean;
     is_final_step?: boolean;
+    assignees?: ApprovalAssignee[];
 }
 
 interface LatestRejectionState {
@@ -50,6 +58,13 @@ interface AdvanceRequestItem {
     months_count: number;
     repayment_schedule: ScheduleRow[];
     status?: string;
+    payment_status?: string;
+    payment_notes?: string | null;
+    paid_at?: string | null;
+    paid_by_name?: string | null;
+    has_payment_receipt?: boolean;
+    payment_receipt_url?: string | null;
+    can_mark_paid?: boolean;
     review_notes?: string | null;
     created_at?: string | null;
     reviewed_at?: string | null;
@@ -77,6 +92,7 @@ const props = withDefaults(defineProps<{
     approvedRequests?: AdvanceRequestItem[];
     rejectedRequests?: AdvanceRequestItem[];
     canReviewRequests?: boolean;
+    canTransferAdvances?: boolean;
     hasApprovalWorkflow?: boolean;
     isReadOnly?: boolean;
 }>(), {
@@ -84,6 +100,7 @@ const props = withDefaults(defineProps<{
     approvedRequests: () => [],
     rejectedRequests: () => [],
     canReviewRequests: false,
+    canTransferAdvances: false,
     hasApprovalWorkflow: false,
     isReadOnly: false,
 });
@@ -108,11 +125,17 @@ const breadcrumbs = computed((): BreadcrumbItem[] => [
 const detailsDialogOpen = ref(false);
 const rejectDialogOpen = ref(false);
 const approveDialogOpen = ref(false);
+const markPaidDialogOpen = ref(false);
 const selectedRequest = ref<AdvanceRequestItem | null>(null);
 const rejectingStepId = ref<number | null>(null);
 const approvingStepId = ref<number | null>(null);
 const approvingRequestId = ref<number | null>(null);
 const requestsTab = ref<'pending' | 'approved' | 'rejected'>('pending');
+
+const markPaidForm = useForm({
+    receipt: null as File | null,
+    payment_notes: '',
+});
 
 const activeRequests = computed(() => {
     if (requestsTab.value === 'approved') {
@@ -148,6 +171,54 @@ const statusVariant = (status: string): 'default' | 'secondary' | 'destructive' 
     if (status === 'approved') return 'default';
     if (status === 'rejected') return 'destructive';
     return 'secondary';
+};
+
+const paymentStatusLabel = (status?: string) => {
+    const key = `advances.payment_status_${status || 'unpaid'}`;
+    const translated = t(key);
+    return translated === key ? (status || 'unpaid') : translated;
+};
+
+const paymentStatusVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    return status === 'paid' ? 'default' : 'outline';
+};
+
+const openMarkPaid = (request: AdvanceRequestItem) => {
+    selectedRequest.value = request;
+    markPaidForm.reset();
+    markPaidForm.clearErrors();
+    markPaidDialogOpen.value = true;
+};
+
+const closeMarkPaid = () => {
+    markPaidDialogOpen.value = false;
+    markPaidForm.reset();
+    markPaidForm.clearErrors();
+};
+
+const submitMarkPaid = () => {
+    if (!selectedRequest.value) {
+        return;
+    }
+
+    markPaidForm.post(
+        route('companies.advance-requests.mark-paid', [props.company.id, selectedRequest.value.id]),
+        {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: (page) => {
+                closeMarkPaid();
+                const flash = (page.props.flash ?? {}) as { success?: string };
+                showFlashFeedback(flash.success ?? t('advances.payment_marked_paid_success'), 'success');
+            },
+        },
+    );
+};
+
+const onReceiptSelected = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    markPaidForm.receipt = file;
 };
 
 const formatCurrency = (amount: number | null | undefined) =>
@@ -224,6 +295,19 @@ function rejectFromList(request: AdvanceRequestItem) {
 
 const approvalList = computed(() => selectedRequest.value?.approval_steps ?? []);
 const latestRejection = computed(() => selectedRequest.value?.latest_rejection ?? null);
+const expandedAssigneeStepIds = ref<number[]>([]);
+
+const isAssigneesOpen = (stepId: number): boolean =>
+    expandedAssigneeStepIds.value.includes(stepId);
+
+const toggleAssignees = (stepId: number) => {
+    if (isAssigneesOpen(stepId)) {
+        expandedAssigneeStepIds.value = expandedAssigneeStepIds.value.filter((id) => id !== stepId);
+        return;
+    }
+
+    expandedAssigneeStepIds.value = [...expandedAssigneeStepIds.value, stepId];
+};
 
 const approveForm = useForm({
     review_notes: '',
@@ -489,6 +573,12 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                         >
                                             {{ statusLabel(request.status) }}
                                         </Badge>
+                                        <Badge
+                                            v-if="requestsTab === 'approved'"
+                                            :variant="paymentStatusVariant(request.payment_status)"
+                                        >
+                                            {{ t('advances.payment_status') }}: {{ paymentStatusLabel(request.payment_status) }}
+                                        </Badge>
                                     </div>
                                     <p v-if="request.employee.job_title" class="text-sm text-muted-foreground mt-1">
                                         {{ request.employee.job_title }}
@@ -519,6 +609,13 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                 <div class="flex flex-wrap gap-2 shrink-0">
                                     <Button size="sm" variant="outline" @click="openRequestDetails(request)">
                                         {{ t('advances.request_details') }}
+                                    </Button>
+                                    <Button
+                                        v-if="request.can_mark_paid"
+                                        size="sm"
+                                        @click="openMarkPaid(request)"
+                                    >
+                                        {{ t('advances.mark_paid') }}
                                     </Button>
                                     <template v-if="canReviewOnList(request)">
                                         <Button
@@ -585,6 +682,33 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                 <p class="text-xs text-muted-foreground mb-0.5">{{ t('advances.review_notes') }}</p>
                                 <p class="font-medium whitespace-pre-wrap">{{ selectedRequest.review_notes }}</p>
                             </div>
+                            <template v-if="selectedRequest.status === 'approved'">
+                                <div class="rounded-md border px-3 py-2.5">
+                                    <p class="text-xs text-muted-foreground mb-0.5">{{ t('advances.payment_status') }}</p>
+                                    <p class="font-medium">{{ paymentStatusLabel(selectedRequest.payment_status) }}</p>
+                                </div>
+                                <div v-if="selectedRequest.paid_at" class="rounded-md border px-3 py-2.5">
+                                    <p class="text-xs text-muted-foreground mb-0.5">{{ t('advances.paid_at') }}</p>
+                                    <p class="font-medium">
+                                        {{ formatDateTime(selectedRequest.paid_at) }}
+                                        <span v-if="selectedRequest.paid_by_name"> — {{ selectedRequest.paid_by_name }}</span>
+                                    </p>
+                                </div>
+                                <div v-if="selectedRequest.payment_notes" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                    <p class="text-xs text-muted-foreground mb-0.5">{{ t('advances.payment_notes') }}</p>
+                                    <p class="font-medium whitespace-pre-wrap">{{ selectedRequest.payment_notes }}</p>
+                                </div>
+                                <div v-if="selectedRequest.payment_receipt_url" class="rounded-md border px-3 py-2.5 sm:col-span-2">
+                                    <a
+                                        :href="selectedRequest.payment_receipt_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="text-sm font-medium text-primary underline"
+                                    >
+                                        {{ t('advances.view_payment_receipt') }}
+                                    </a>
+                                </div>
+                            </template>
                         </div>
 
                         <div class="space-y-2 border-t pt-4">
@@ -644,7 +768,30 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                                     class="rounded-lg border p-4 flex flex-col justify-between"
                                     :class="approval.approved_at ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800' : 'border-gray-200 dark:border-gray-700'"
                                 >
-                                    <div class="font-medium text-sm mb-1">{{ approval.title }}</div>
+                                    <div class="font-medium text-sm mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span>{{ approval.title }}</span>
+                                        <button
+                                            v-if="approval.assignees?.length"
+                                            type="button"
+                                            class="text-xs font-normal text-primary hover:underline"
+                                            @click="toggleAssignees(approval.id)"
+                                        >
+                                            {{
+                                                isAssigneesOpen(approval.id)
+                                                    ? t('leaves.approval_hide_assignees')
+                                                    : t('leaves.approval_show_assignees')
+                                            }}
+                                        </button>
+                                    </div>
+                                    <div
+                                        v-if="isAssigneesOpen(approval.id) && approval.assignees?.length"
+                                        class="text-xs text-muted-foreground mb-2 space-y-0.5 rounded-md border border-dashed px-2 py-1.5"
+                                    >
+                                        <div v-for="person in approval.assignees" :key="person.id">
+                                            <span class="font-medium text-foreground/80">{{ person.name }}</span>
+                                            <span v-if="person.email"> — {{ person.email }}</span>
+                                        </div>
+                                    </div>
                                     <div v-if="approval.team_name" class="text-xs text-muted-foreground mb-2">
                                         {{ approval.team_name }}
                                     </div>
@@ -696,10 +843,59 @@ const formatApprovalTime = (iso: string | null | undefined): string => {
                     </div>
 
                     <DialogFooter class="flex-wrap gap-2">
+                        <Button
+                            v-if="selectedRequest?.can_mark_paid"
+                            @click="() => selectedRequest && openMarkPaid(selectedRequest)"
+                        >
+                            {{ t('advances.mark_paid') }}
+                        </Button>
                         <Button variant="outline" @click="closeRequestDetails">
                             {{ t('common.close') }}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog :open="markPaidDialogOpen" @update:open="(open: boolean) => (open ? undefined : closeMarkPaid())">
+                <DialogContent class="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{{ t('advances.mark_paid_title') }}</DialogTitle>
+                        <DialogDescription>{{ t('advances.mark_paid_hint') }}</DialogDescription>
+                    </DialogHeader>
+                    <form class="space-y-4" @submit.prevent="submitMarkPaid">
+                        <p v-if="selectedRequest" class="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                            {{ selectedRequest.employee.full_name }} —
+                            {{ formatCurrency(selectedRequest.amount) }}
+                        </p>
+                        <div class="space-y-2">
+                            <Label for="advance-receipt">{{ t('advances.payment_receipt') }}</Label>
+                            <Input
+                                id="advance-receipt"
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                required
+                                @change="onReceiptSelected"
+                            />
+                            <InputError :message="markPaidForm.errors.receipt" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="advance-payment-notes">{{ t('advances.payment_notes') }}</Label>
+                            <Input
+                                id="advance-payment-notes"
+                                v-model="markPaidForm.payment_notes"
+                                :placeholder="t('advances.payment_notes_placeholder')"
+                            />
+                            <InputError :message="markPaidForm.errors.payment_notes" />
+                        </div>
+                        <DialogFooter class="gap-2">
+                            <Button type="button" variant="outline" @click="closeMarkPaid">
+                                {{ t('common.cancel') }}
+                            </Button>
+                            <Button type="submit" :disabled="markPaidForm.processing || !markPaidForm.receipt">
+                                {{ markPaidForm.processing ? t('common.saving') : t('advances.mark_paid') }}
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
 

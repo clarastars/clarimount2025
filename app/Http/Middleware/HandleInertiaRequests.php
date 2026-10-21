@@ -90,7 +90,8 @@ class HandleInertiaRequests extends Middleware
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('advances.company.view', $permissionNames, true)
                     || in_array('advances.create', $permissionNames, true)
-                    || in_array('advances.approve', $permissionNames, true),
+                    || in_array('advances.approve', $permissionNames, true)
+                    || in_array('advances.transfer', $permissionNames, true),
                 'can_update_employee_custody' => $isSuperAdmin
                     || ($user !== null && $user->ownedCompanies()->exists())
                     || in_array('employees.custody.update', $permissionNames, true),
@@ -134,12 +135,14 @@ class HandleInertiaRequests extends Middleware
                     || in_array('advances.company.view', $permissionNames, true)
                     || in_array('advances.create', $permissionNames, true)
                     || in_array('advances.approve', $permissionNames, true)
+                    || in_array('advances.transfer', $permissionNames, true)
                 ),
                 'can_view_entitlement_settlement_notifications' => $user !== null && (
                     $isSuperAdmin
                     || $user->ownedCompanies()->exists()
                     || in_array('employees.entitlements.approve', $permissionNames, true)
                     || in_array('employees.entitlements.settle', $permissionNames, true)
+                    || in_array('employees.entitlements.transfer', $permissionNames, true)
                 ),
                 'can_view_offboarding_notifications' => $user !== null && (
                     $isSuperAdmin

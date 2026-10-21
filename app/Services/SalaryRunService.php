@@ -866,7 +866,7 @@ class SalaryRunService
                 }
 
                 $debt = EmployeeDebt::query()->find($debtId);
-                if ($debt === null || ! $debt->isAdvance() || ! $debt->paysOutViaSalaryRun()) {
+                if ($debt === null || ! $debt->isAdvance()) {
                     return true;
                 }
 
@@ -897,8 +897,7 @@ class SalaryRunService
                 continue;
             }
 
-            if ($debt->isAdvance() && $debt->paysOutViaSalaryRun()
-                && ! $this->advanceInstallmentEligibleForRun($debt, $salaryRun)) {
+            if ($debt->isAdvance() && ! $this->advanceInstallmentEligibleForRun($debt, $salaryRun)) {
                 continue;
             }
 
@@ -943,6 +942,8 @@ class SalaryRunService
     /**
      * Schedule the advance payout on the company's open draft salary run.
      * Installment deductions begin only on later salary runs.
+     *
+     * @deprecated Legacy path for advances that still pay out via salary run.
      */
     public function includeAdvancePayoutInOpenDraft(EmployeeDebt $debt): void
     {
@@ -988,6 +989,40 @@ class SalaryRunService
             $calendarRange['start'],
             $calendarRange['end'],
         );
+    }
+
+    /**
+     * Start installment deductions from the next open draft (or current calendar month).
+     * Does not add an advance payout addition to the salary run.
+     */
+    public function scheduleAdvanceInstallmentsFromApproval(EmployeeDebt $debt): void
+    {
+        $debt->loadMissing('employee');
+        $employee = $debt->employee;
+        if ($employee === null || $employee->company_id === null) {
+            return;
+        }
+
+        $salaryRun = $this->resolveOpenDraftSalaryRunForAdvance((int) $employee->company_id);
+
+        if ($salaryRun !== null) {
+            $debt->update([
+                'installment_start_year' => (int) $salaryRun->year,
+                'installment_start_month' => (int) $salaryRun->month,
+                'pays_out_via_salary_run' => false,
+            ]);
+
+            $this->includeAutoDebtInOpenDraft($debt->fresh() ?? $debt);
+
+            return;
+        }
+
+        $now = now();
+        $debt->update([
+            'installment_start_year' => (int) $now->year,
+            'installment_start_month' => (int) $now->month,
+            'pays_out_via_salary_run' => false,
+        ]);
     }
 
     /** @deprecated Use includeAdvancePayoutInOpenDraft() */
@@ -1143,9 +1178,25 @@ class SalaryRunService
             return false;
         }
 
+        // New flow: cash transfer outside payroll — deduct from installment_start month onward.
+        if (! $debt->paysOutViaSalaryRun()) {
+            $startYear = $debt->installment_start_year;
+            $startMonth = $debt->installment_start_month;
+
+            if ($startYear === null || $startMonth === null) {
+                return false;
+            }
+
+            return ((int) $salaryRun->year > (int) $startYear)
+                || (
+                    (int) $salaryRun->year === (int) $startYear
+                    && (int) $salaryRun->month >= (int) $startMonth
+                );
+        }
+
         $disbursementRunId = $debt->advance_disbursement_salary_run_id;
         if ($disbursementRunId === null) {
-            // Approved but not yet assigned to a payout run — do not deduct yet.
+            // Legacy: approved but not yet assigned to a payout run — do not deduct yet.
             return false;
         }
 

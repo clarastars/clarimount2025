@@ -74,6 +74,7 @@ class AdvanceApprovalWorkflowMail extends Mailable
             '{name}' => (string) ($this->payload['actor_name'] ?? ''),
             '{reason}' => (string) ($this->payload['reason'] ?? ''),
             '{remaining}' => (string) ($this->payload['remaining_steps'] ?? ''),
+            '{paid_by}' => (string) ($this->payload['paid_by_name'] ?? $this->payload['actor_name'] ?? ''),
         ];
 
         $translationKey = match ($this->eventType) {
@@ -83,6 +84,8 @@ class AdvanceApprovalWorkflowMail extends Mailable
             'rejected' => 'messages.notifications.advance_request_workflow_rejected',
             'workflow_rejected' => 'messages.notifications.advance_request_workflow_employee_rejected',
             'finalized', 'approved' => 'messages.notifications.advance_request_workflow_finalized',
+            'transfer_needed' => 'messages.notifications.advance_request_transfer_needed',
+            'transfer_completed' => 'messages.notifications.advance_request_transfer_completed',
             default => 'messages.notifications.advance_request_workflow_your_turn',
         };
 

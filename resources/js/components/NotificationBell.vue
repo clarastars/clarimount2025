@@ -295,6 +295,8 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         'advance_request_finalized',
         'advance_request_approved',
         'advance_request_rejected',
+        'advance_request_transfer_needed',
+        'advance_request_transfer_completed',
     ];
 
     if (advanceWorkflowTypes.includes(data.event_type)) {
@@ -308,6 +310,7 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
             name: data.actor_name ?? '',
             reason: data.reason ?? '',
             remaining: data.remaining_steps ?? '',
+            paid_by: data.paid_by_name ?? data.actor_name ?? '',
         };
 
         const keyMap: Record<string, string> = {
@@ -320,6 +323,8 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
             advance_request_rejected: data.step_title
                 ? 'notifications.advance_request_workflow_rejected'
                 : 'notifications.advance_request_rejected',
+            advance_request_transfer_needed: 'notifications.advance_request_transfer_needed',
+            advance_request_transfer_completed: 'notifications.advance_request_transfer_completed',
         };
 
         let message = t(keyMap[data.event_type] ?? 'notifications.advance_request_workflow_your_turn', params);
@@ -342,6 +347,8 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
         'entitlement_settlement_workflow_rejected',
         'entitlement_settlement_finalized',
         'entitlement_settlement_approved',
+        'entitlement_settlement_transfer_needed',
+        'entitlement_settlement_transfer_completed',
     ];
 
     if (entitlementSettlementWorkflowTypes.includes(data.event_type)) {
@@ -355,6 +362,7 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
             name: data.actor_name ?? '',
             remaining: data.remaining_steps ?? '',
             reject_reason: data.reason ?? '',
+            paid_by: data.paid_by_name ?? data.actor_name ?? '',
         };
 
         if (data.event_type === 'entitlement_settlement_your_turn' && data.after_rejection) {
@@ -369,6 +377,8 @@ const formatNotificationMessage = (notification: NotificationItem): string => {
             entitlement_settlement_workflow_rejected: 'notifications.entitlement_settlement_workflow_employee_rejected',
             entitlement_settlement_finalized: 'notifications.entitlement_settlement_workflow_finalized',
             entitlement_settlement_approved: 'notifications.entitlement_settlement_workflow_finalized',
+            entitlement_settlement_transfer_needed: 'notifications.entitlement_settlement_transfer_needed',
+            entitlement_settlement_transfer_completed: 'notifications.entitlement_settlement_transfer_completed',
         };
 
         return t(

@@ -92,8 +92,10 @@ class DashboardPendingApprovalsService
             'advances.approve',
             'advances.company.view',
             'advances.create',
+            'advances.transfer',
             'employees.entitlements.approve',
             'employees.entitlements.settle',
+            'employees.entitlements.transfer',
             'employees.offboarding.item-approve',
             'employees.offboarding.clearance-approve',
             'employees.offboarding.start',
@@ -231,7 +233,9 @@ class DashboardPendingApprovalsService
             return $this->emptyBucket(visible: $visible);
         }
 
-        $candidates = AdvanceRequest::query()
+        $items = [];
+
+        $pendingCandidates = AdvanceRequest::query()
             ->where('status', AdvanceRequest::STATUS_PENDING)
             ->whereHas('employee', fn ($q) => $q->whereIn('company_id', $companyIds))
             ->with(['employee:id,first_name,father_name,last_name,company_id,department_id', 'employee.company:id,name_ar,name_en'])
@@ -239,9 +243,7 @@ class DashboardPendingApprovalsService
             ->limit(self::CANDIDATE_LIMIT)
             ->get();
 
-        $items = [];
-
-        foreach ($candidates as $request) {
+        foreach ($pendingCandidates as $request) {
             $employee = $request->employee;
             $company = $employee?->company;
             if ($employee === null || $company === null) {
@@ -273,6 +275,43 @@ class DashboardPendingApprovalsService
             ];
         }
 
+        $transferCandidates = AdvanceRequest::query()
+            ->where('status', AdvanceRequest::STATUS_APPROVED)
+            ->where('payment_status', AdvanceRequest::PAYMENT_UNPAID)
+            ->whereHas('employee', fn ($q) => $q->whereIn('company_id', $companyIds))
+            ->with(['employee:id,first_name,father_name,last_name,company_id,department_id', 'employee.company:id,name_ar,name_en,advance_transfer_team_id'])
+            ->latest('reviewed_at')
+            ->limit(self::CANDIDATE_LIMIT)
+            ->get();
+
+        foreach ($transferCandidates as $request) {
+            $employee = $request->employee;
+            $company = $employee?->company;
+            if ($employee === null || $company === null) {
+                continue;
+            }
+
+            if (! $this->userCanTransferAdvance($user, $company, $employee)) {
+                continue;
+            }
+
+            $items[] = [
+                'id' => (int) $request->id,
+                'type' => 'advance_transfer',
+                'title' => $employee->full_name,
+                'subtitle' => trim(sprintf(
+                    '%s SAR · %s',
+                    number_format((float) $request->amount, 2),
+                    __('messages.dashboard.pending.advance_transfer_fallback'),
+                )),
+                'meta' => $company->name_ar ?: $company->name_en,
+                'step_title' => __('messages.dashboard.pending.advance_transfer_step'),
+                'url' => route('companies.advances.index', $company),
+                'created_at' => $request->reviewed_at?->toIso8601String() ?? $request->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
+            ];
+        }
+
         return $this->bucketFromItems($items, $items[0]['url'] ?? null, $user);
     }
 
@@ -284,7 +323,8 @@ class DashboardPendingApprovalsService
     {
         $visible = $user->hasRole('super-admin')
             || $user->ownedCompanies()->exists()
-            || $this->roleService->canInAnyAssignedTeam($user, 'employees.entitlements.approve');
+            || $this->roleService->canInAnyAssignedTeam($user, 'employees.entitlements.approve')
+            || $this->roleService->canInAnyAssignedTeam($user, 'employees.entitlements.transfer');
 
         if (! $visible || $companyIds === []) {
             return $this->emptyBucket(visible: $visible);
@@ -332,6 +372,45 @@ class DashboardPendingApprovalsService
                 'step_title' => $nextStep?->title,
                 'url' => route('employees.entitlement-settlement.show', [$employee, $settlement]),
                 'created_at' => $settlement->created_at?->toIso8601String(),
+                'department_id' => $employee->department_id ? (string) $employee->department_id : null,
+            ];
+        }
+
+        $transferCandidates = EmployeeEntitlementSettlement::query()
+            ->where('status', EmployeeEntitlementSettlement::STATUS_APPROVED)
+            ->where('payment_status', EmployeeEntitlementSettlement::PAYMENT_UNPAID)
+            ->whereHas('employee', fn ($q) => $q->whereIn('company_id', $companyIds))
+            ->with(['employee:id,first_name,father_name,last_name,company_id,department_id', 'employee.company:id,name_ar,name_en,entitlement_settlement_transfer_team_id'])
+            ->latest('reviewed_at')
+            ->limit(self::CANDIDATE_LIMIT)
+            ->get();
+
+        foreach ($transferCandidates as $settlement) {
+            $employee = $settlement->employee;
+            $company = $employee?->company;
+            if ($employee === null || $company === null) {
+                continue;
+            }
+
+            if (! $this->userCanTransferSettlement($user, $company, $employee)) {
+                continue;
+            }
+
+            $viewAllByCompany[(int) $company->id] = route('companies.entitlement-settlements.index', $company);
+
+            $items[] = [
+                'id' => (int) $settlement->id,
+                'type' => 'entitlement_settlement_transfer',
+                'title' => $employee->full_name,
+                'subtitle' => trim(sprintf(
+                    '%s SAR · %s',
+                    number_format((float) $settlement->net_due, 2),
+                    __('messages.dashboard.pending.settlement_transfer_fallback'),
+                )),
+                'meta' => $company->name_ar ?: $company->name_en,
+                'step_title' => __('messages.dashboard.pending.settlement_transfer_step'),
+                'url' => route('companies.entitlement-settlements.index', $company),
+                'created_at' => $settlement->reviewed_at?->toIso8601String() ?? $settlement->created_at?->toIso8601String(),
                 'department_id' => $employee->department_id ? (string) $employee->department_id : null,
             ];
         }
@@ -575,7 +654,52 @@ class DashboardPendingApprovalsService
         return $user->hasRole('super-admin')
             || $user->ownedCompanies()->exists()
             || $this->roleService->canInAnyAssignedTeam($user, 'advances.approve')
-            || $this->roleService->canInAnyAssignedTeam($user, 'advances.create');
+            || $this->roleService->canInAnyAssignedTeam($user, 'advances.create')
+            || $this->roleService->canInAnyAssignedTeam($user, 'advances.transfer');
+    }
+
+    private function userCanTransferAdvance(User $user, Company $company, $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $transferTeamId = $company->advance_transfer_team_id
+            ? (int) $company->advance_transfer_team_id
+            : null;
+        $departmentId = $this->roleService->departmentIdForEmployeeScope($employee);
+
+        if ($transferTeamId !== null) {
+            if (! $this->roleService->userBelongsToTeamInCompanyScoped(
+                $user,
+                $transferTeamId,
+                (int) $company->id,
+                $departmentId,
+            )) {
+                return false;
+            }
+
+            $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
+            $registrar->setPermissionsTeamId($transferTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+            $can = $user->can('advances.transfer');
+            $registrar->setPermissionsTeamId($previous);
+
+            return $can;
+        }
+
+        return $this->roleService->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'advances.transfer',
+            (int) $company->id,
+            $departmentId,
+        );
     }
 
     private function userCanActOnAdvance(
@@ -622,6 +746,50 @@ class DashboardPendingApprovalsService
 
         return $nextStep !== null
             && $this->settlementApprovalService->canUserApproveStep($user, $company, $settlement, $nextStep);
+    }
+
+    private function userCanTransferSettlement(User $user, Company $company, $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $transferTeamId = $company->entitlement_settlement_transfer_team_id
+            ? (int) $company->entitlement_settlement_transfer_team_id
+            : null;
+        $departmentId = $this->roleService->departmentIdForEmployeeScope($employee);
+
+        if ($transferTeamId !== null) {
+            if (! $this->roleService->userBelongsToTeamInCompanyScoped(
+                $user,
+                $transferTeamId,
+                (int) $company->id,
+                $departmentId,
+            )) {
+                return false;
+            }
+
+            $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
+            $registrar->setPermissionsTeamId($transferTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+            $can = $user->can('employees.entitlements.transfer');
+            $registrar->setPermissionsTeamId($previous);
+
+            return $can;
+        }
+
+        return $this->roleService->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.entitlements.transfer',
+            (int) $company->id,
+            $departmentId,
+        );
     }
 
     /**

@@ -10,6 +10,13 @@
                         <span :class="statusBadgeClass(settlement.status)">
                             {{ t(`entitlement_settlement.status_${settlement.status}`) }}
                         </span>
+                        <span
+                            v-if="settlement.status === 'approved'"
+                            class="inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                        >
+                            {{ t('entitlement_settlement.payment_status') }}:
+                            {{ t(`entitlement_settlement.payment_status_${settlement.payment_status || 'unpaid'}`) }}
+                        </span>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">
                         {{ employee.full_name }} — {{ formatDate(settlement.settlement_date) }}
@@ -63,7 +70,30 @@
                     >
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <p class="font-medium">{{ step.title }}</p>
+                                <div class="font-medium text-sm mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span>{{ step.title }}</span>
+                                    <button
+                                        v-if="step.assignees?.length"
+                                        type="button"
+                                        class="text-xs font-normal text-primary hover:underline"
+                                        @click="toggleAssignees(step.id)"
+                                    >
+                                        {{
+                                            isAssigneesOpen(step.id)
+                                                ? t('leaves.approval_hide_assignees')
+                                                : t('leaves.approval_show_assignees')
+                                        }}
+                                    </button>
+                                </div>
+                                <div
+                                    v-if="isAssigneesOpen(step.id) && step.assignees?.length"
+                                    class="text-xs text-muted-foreground mb-2 space-y-0.5 rounded-md border border-dashed px-2 py-1.5"
+                                >
+                                    <div v-for="person in step.assignees" :key="person.id">
+                                        <span class="font-medium text-foreground/80">{{ person.name }}</span>
+                                        <span v-if="person.email"> — {{ person.email }}</span>
+                                    </div>
+                                </div>
                                 <p class="text-xs text-muted-foreground">
                                     <span v-if="step.team_name">{{ step.team_name }} · </span>
                                     <span v-if="step.status === 'approved' || step.approved_at">
@@ -292,6 +322,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import type { BreadcrumbItem } from '@/types';
 
+type ApprovalAssignee = {
+    id: number;
+    name: string;
+    email: string | null;
+};
+
 type ApprovalStep = {
     id: number;
     title: string;
@@ -304,6 +340,7 @@ type ApprovalStep = {
     can_approve: boolean;
     can_reject: boolean;
     waiting_previous: boolean;
+    assignees?: ApprovalAssignee[];
 };
 
 type SettlementDetail = {
@@ -311,6 +348,7 @@ type SettlementDetail = {
     settlement_date: string | null;
     reason: string;
     status: 'pending' | 'approved' | 'rejected';
+    payment_status?: string;
     last_settlement_date?: string | null;
     service_days: number;
     gross_salary: number;
@@ -352,12 +390,24 @@ const props = defineProps<{
 
 const { t, locale } = useI18n();
 const approvalProcessing = ref(false);
+const openAssigneeStepIds = ref<number[]>([]);
 const rejectingStepId = ref<number | null>(null);
 const rejectReason = ref('');
 const isDeleting = ref(false);
 
 const has_approval_workflow = computed(() => props.has_approval_workflow ?? false);
 const approval_steps = computed(() => props.approval_steps ?? []);
+
+const isAssigneesOpen = (stepId: number) => openAssigneeStepIds.value.includes(stepId);
+
+const toggleAssignees = (stepId: number) => {
+    if (isAssigneesOpen(stepId)) {
+        openAssigneeStepIds.value = openAssigneeStepIds.value.filter((id) => id !== stepId);
+        return;
+    }
+
+    openAssigneeStepIds.value = [...openAssigneeStepIds.value, stepId];
+};
 
 const breadcrumbs = computed((): BreadcrumbItem[] => [
     { title: t('nav.dashboard'), href: '/dashboard' },

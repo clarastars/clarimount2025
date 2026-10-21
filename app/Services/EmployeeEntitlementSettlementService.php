@@ -181,6 +181,7 @@ class EmployeeEntitlementSettlementService
             'line_exclusions' => $preview['line_exclusions'] === [] ? null : $preview['line_exclusions'],
             'attachment_paths' => $payload['attachment_paths'] ?? null,
             'status' => $payload['status'] ?? EmployeeEntitlementSettlement::STATUS_PENDING,
+            'payment_status' => $payload['payment_status'] ?? EmployeeEntitlementSettlement::PAYMENT_UNPAID,
             'reviewed_by' => $payload['reviewed_by'] ?? null,
             'reviewed_at' => $payload['reviewed_at'] ?? null,
             'review_notes' => $payload['review_notes'] ?? null,

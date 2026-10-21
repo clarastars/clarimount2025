@@ -12,12 +12,15 @@ use App\Models\User;
 use App\Services\AdvanceAmountService;
 use App\Services\AdvanceApprovalNotificationService;
 use App\Services\AdvanceApprovalService;
+use App\Services\AdvancePaymentReceiptService;
 use App\Services\AdvanceRequestService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompanyAdvanceController extends Controller
 {
@@ -28,6 +31,7 @@ class CompanyAdvanceController extends Controller
         private AdvanceApprovalService $approvalService,
         private AdvanceApprovalNotificationService $approvalNotificationService,
         private AdvanceAmountService $amountService,
+        private AdvancePaymentReceiptService $receiptService,
     ) {}
 
     public function index(Company $company): Response
@@ -40,6 +44,7 @@ class CompanyAdvanceController extends Controller
 
         $hasApprovalWorkflow = $this->approvalService->hasActiveStepsForCompany($company);
         $canCreateAdvances = $this->canCreateAdvances($user);
+        $canTransfer = $this->canTransferAdvances($user);
 
         $pendingRequests = $this->getCompanyRequestsByStatus(
             $company,
@@ -71,8 +76,9 @@ class CompanyAdvanceController extends Controller
             'canReviewRequests' => $hasApprovalWorkflow
                 ? $this->canApproveAdvances($user)
                 : $canCreateAdvances,
+            'canTransferAdvances' => $canTransfer,
             'hasApprovalWorkflow' => $hasApprovalWorkflow,
-            'isReadOnly' => ! $canCreateAdvances && ! $this->canApproveAdvances($user),
+            'isReadOnly' => ! $canCreateAdvances && ! $this->canApproveAdvances($user) && ! $canTransfer,
         ]);
     }
 
@@ -230,6 +236,65 @@ class CompanyAdvanceController extends Controller
         return back()->with('success', __('messages.advances.request_rejected_success'));
     }
 
+    public function markPaid(
+        Request $request,
+        Company $company,
+        AdvanceRequest $advanceRequest,
+    ): RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $this->abortUnlessCanAccessCompanyAdvances($user, $company);
+        $this->abortUnlessRequestBelongsToCompany($advanceRequest, $company, $user);
+
+        $employee = $advanceRequest->employee;
+        abort_unless($employee !== null, 404);
+        $this->abortUnlessCanTransferAdvanceRequest($user, $company, $employee);
+
+        $validated = $request->validate($this->receiptService->validationRules());
+
+        $receiptPath = $this->receiptService->store(
+            $request->file('receipt'),
+            (int) $employee->id,
+            (int) $advanceRequest->id,
+        );
+
+        try {
+            $this->requestService->markPaid(
+                $advanceRequest,
+                $user,
+                $receiptPath,
+                $validated['payment_notes'] ?? null,
+            );
+        } catch (\Throwable $exception) {
+            $this->receiptService->delete($receiptPath);
+            throw $exception;
+        }
+
+        return back()->with('success', __('messages.advances.payment_marked_paid_success'));
+    }
+
+    public function downloadPaymentReceipt(
+        Company $company,
+        AdvanceRequest $advanceRequest,
+    ): StreamedResponse|RedirectResponse {
+        $user = Auth::user();
+        abort_unless($user !== null, 403);
+
+        $this->abortUnlessCanAccessCompanyAdvances($user, $company);
+        $this->abortUnlessRequestBelongsToCompany($advanceRequest, $company, $user);
+
+        $path = $advanceRequest->payment_receipt_path;
+        abort_unless(is_string($path) && $path !== '', 404);
+
+        $disk = Storage::disk($this->receiptService->diskName());
+        abort_unless($disk->exists($path), 404);
+
+        $filename = basename($path);
+
+        return $disk->download($path, $filename);
+    }
+
     private function abortUnlessStepIsApprovable(
         User $user,
         Company $company,
@@ -288,6 +353,7 @@ class CompanyAdvanceController extends Controller
             ->with([
                 'employee:id,first_name,father_name,last_name,company_id,job_title,department_id,hire_date,basic_salary,allowances',
                 'reviewer:id,name',
+                'paidByUser:id,name',
             ]);
 
         if ($descending) {
@@ -319,6 +385,10 @@ class CompanyAdvanceController extends Controller
     ): array {
         $employee = $request->employee;
 
+        $canMarkPaid = $request->awaitsTransfer()
+            && $employee !== null
+            && $this->canTransferAdvanceRequest($user, $company, $employee);
+
         $payload = [
             'id' => $request->id,
             'amount' => (float) $request->amount,
@@ -327,6 +397,17 @@ class CompanyAdvanceController extends Controller
             'months_count' => (int) $request->months_count,
             'repayment_schedule' => $request->schedule(),
             'status' => $request->status,
+            'payment_status' => $request->payment_status ?? AdvanceRequest::PAYMENT_UNPAID,
+            'payment_notes' => $request->payment_notes,
+            'paid_at' => $request->paid_at?->toIso8601String(),
+            'paid_by_name' => $request->paidByUser?->name,
+            'has_payment_receipt' => is_string($request->payment_receipt_path) && $request->payment_receipt_path !== '',
+            'payment_receipt_url' => (
+                is_string($request->payment_receipt_path) && $request->payment_receipt_path !== ''
+            )
+                ? route('companies.advance-requests.payment-receipt', [$company, $request])
+                : null,
+            'can_mark_paid' => $canMarkPaid,
             'review_notes' => $request->review_notes,
             'created_at' => $request->created_at?->toIso8601String(),
             'reviewed_at' => $request->reviewed_at?->toIso8601String(),

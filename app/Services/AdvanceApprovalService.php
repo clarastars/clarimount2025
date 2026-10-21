@@ -9,7 +9,9 @@ use App\Models\AdvanceApprovalStep;
 use App\Models\AdvanceRequest;
 use App\Models\AdvanceRequestApprovalRejection;
 use App\Models\AdvanceRequestStepApproval;
+use App\Models\AdvanceTransferDefault;
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -18,6 +20,13 @@ use Spatie\Permission\PermissionRegistrar;
 
 class AdvanceApprovalService
 {
+    /**
+     * Cached step assignees keyed by "{companyId}:{teamId}:{departmentId|company}".
+     *
+     * @var array<string, list<array{id: int, name: string, email: string|null}>>
+     */
+    private array $assigneesCache = [];
+
     /** @var list<string> Steps auto-created by seedDefaultStepsForCompany. */
     public const DEFAULT_STEP_TITLES = [
         'مراجعة الموارد البشرية',
@@ -90,6 +99,8 @@ class AdvanceApprovalService
                 ]);
             }
 
+            $this->applyTransferTeamDefaultToCompany($company);
+
             return;
         }
 
@@ -114,6 +125,33 @@ class AdvanceApprovalService
                 'is_active' => true,
             ]);
         }
+
+        $this->applyTransferTeamDefaultToCompany($company);
+    }
+
+    public function defaultTransferTeamId(): ?int
+    {
+        $teamId = AdvanceTransferDefault::current()->team_id;
+
+        return $teamId !== null ? (int) $teamId : null;
+    }
+
+    public function updateDefaultTransferTeam(?int $teamId): void
+    {
+        $default = AdvanceTransferDefault::current();
+        $default->update(['team_id' => $teamId]);
+    }
+
+    public function updateCompanyTransferTeam(Company $company, ?int $teamId): void
+    {
+        $company->update(['advance_transfer_team_id' => $teamId]);
+    }
+
+    public function applyTransferTeamDefaultToCompany(Company $company): void
+    {
+        $company->update([
+            'advance_transfer_team_id' => $this->defaultTransferTeamId(),
+        ]);
     }
 
     /**
@@ -161,6 +199,8 @@ class AdvanceApprovalService
                     'is_active' => true,
                 ]);
             }
+
+            $this->applyTransferTeamDefaultToCompany($company);
         });
 
         return [
@@ -229,6 +269,7 @@ class AdvanceApprovalService
         User $user,
         Company $company,
     ): array {
+        $request->loadMissing('employee');
         $steps = $this->activeStepsForCompany($company);
         $approvedByStepId = AdvanceRequestStepApproval::query()
             ->where('advance_request_id', $request->id)
@@ -264,6 +305,7 @@ class AdvanceApprovalService
                 'can_reject' => $canApprove,
                 'waiting_previous' => ! $previousStepsApproved && ! $isApproved,
                 'is_final_step' => $isLastStep,
+                'assignees' => $this->assigneesForStep($step, $company, $request->employee),
             ];
 
             if (! $isApproved) {
@@ -563,6 +605,83 @@ class AdvanceApprovalService
                 'cleared_approvals_count' => $clearedCount,
             ]);
         });
+    }
+
+    /**
+     * Users assigned to the step's team for this employee (department first, else company-wide).
+     *
+     * @return list<array{id: int, name: string, email: string|null}>
+     */
+    public function assigneesForStep(
+        AdvanceApprovalStep $step,
+        Company $company,
+        ?Employee $employee = null,
+    ): array {
+        if ($step->team_id === null) {
+            return [];
+        }
+
+        $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($employee);
+        $cacheKey = (int) $company->id.':'.(int) $step->team_id.':'.($departmentId ?? 'company');
+
+        if (isset($this->assigneesCache[$cacheKey])) {
+            return $this->assigneesCache[$cacheKey];
+        }
+
+        $userIds = $roleService->userIdsForTeamInCompanyScoped(
+            (int) $step->team_id,
+            (int) $company->id,
+            $departmentId,
+        );
+
+        if ($userIds === []) {
+            return $this->assigneesCache[$cacheKey] = [];
+        }
+
+        $users = User::query()
+            ->whereIn('id', $userIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        $teamId = (int) $step->team_id;
+        $registrar = app(PermissionRegistrar::class);
+        $previousTeamId = $registrar->getPermissionsTeamId();
+        $assignees = [];
+
+        try {
+            $registrar->setPermissionsTeamId($teamId);
+
+            foreach ($users as $user) {
+                $user->unsetRelation('roles');
+                $user->unsetRelation('permissions');
+
+                if (! $user->can('advances.approve')) {
+                    continue;
+                }
+
+                $assignees[] = [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'email' => $user->email,
+                ];
+            }
+        } finally {
+            $registrar->setPermissionsTeamId($previousTeamId);
+        }
+
+        if ($assignees === []) {
+            $assignees = $users
+                ->map(static fn (User $user): array => [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $this->assigneesCache[$cacheKey] = $assignees;
     }
 
     /**

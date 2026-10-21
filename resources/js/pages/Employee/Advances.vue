@@ -50,6 +50,8 @@ interface AdvanceRequestRow {
     months_count: number;
     repayment_schedule: ScheduleRow[];
     status: string;
+    payment_status?: string;
+    paid_at?: string | null;
     review_notes?: string | null;
     created_at?: string | null;
     reviewed_at?: string | null;
@@ -475,7 +477,15 @@ const stepStatusLabel = (step: ApprovalProgressStep): string => {
                                             <span class="line-clamp-2">{{ request.reason }}</span>
                                         </td>
                                         <td class="py-3 px-2">
-                                            <Badge :variant="statusVariant(request.status)">{{ statusLabel(request.status) }}</Badge>
+                                            <div class="flex flex-col gap-1">
+                                                <Badge :variant="statusVariant(request.status)">{{ statusLabel(request.status) }}</Badge>
+                                                <Badge
+                                                    v-if="request.status === 'approved'"
+                                                    :variant="request.payment_status === 'paid' ? 'default' : 'outline'"
+                                                >
+                                                    {{ t(`advances.payment_status_${request.payment_status || 'unpaid'}`) }}
+                                                </Badge>
+                                            </div>
                                         </td>
                                         <td class="py-3 px-2">
                                             <div class="flex flex-wrap gap-2">

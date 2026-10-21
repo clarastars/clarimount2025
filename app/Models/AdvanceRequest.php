@@ -18,11 +18,20 @@ class AdvanceRequest extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const PAYMENT_UNPAID = 'unpaid';
+
+    public const PAYMENT_PAID = 'paid';
+
     public const STATUSES = [
         self::STATUS_PENDING,
         self::STATUS_APPROVED,
         self::STATUS_REJECTED,
         self::STATUS_CANCELLED,
+    ];
+
+    public const PAYMENT_STATUSES = [
+        self::PAYMENT_UNPAID,
+        self::PAYMENT_PAID,
     ];
 
     protected $fillable = [
@@ -33,6 +42,11 @@ class AdvanceRequest extends Model
         'months_count',
         'repayment_schedule',
         'status',
+        'payment_status',
+        'paid_at',
+        'paid_by',
+        'payment_receipt_path',
+        'payment_notes',
         'reviewed_by',
         'reviewed_at',
         'review_notes',
@@ -45,6 +59,7 @@ class AdvanceRequest extends Model
         'months_count' => 'integer',
         'repayment_schedule' => 'array',
         'reviewed_at' => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo
@@ -55,6 +70,11 @@ class AdvanceRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function paidByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_by');
     }
 
     public function employeeDebt(): BelongsTo
@@ -80,6 +100,21 @@ class AdvanceRequest extends Model
     public function isApproved(): bool
     {
         return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isPaymentUnpaid(): bool
+    {
+        return $this->payment_status === self::PAYMENT_UNPAID;
+    }
+
+    public function isPaymentPaid(): bool
+    {
+        return $this->payment_status === self::PAYMENT_PAID;
+    }
+
+    public function awaitsTransfer(): bool
+    {
+        return $this->isApproved() && $this->isPaymentUnpaid();
     }
 
     /**

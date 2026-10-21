@@ -231,6 +231,7 @@ class EmployeeEntitlementSettlementController extends Controller
             $validated['status'] = EmployeeEntitlementSettlement::STATUS_PENDING;
         } else {
             $validated['status'] = EmployeeEntitlementSettlement::STATUS_APPROVED;
+            $validated['payment_status'] = EmployeeEntitlementSettlement::PAYMENT_UNPAID;
             $validated['reviewed_by'] = $user->id;
             $validated['reviewed_at'] = now();
         }
@@ -241,6 +242,7 @@ class EmployeeEntitlementSettlementController extends Controller
             $this->approvalNotificationService->notifyWorkflowStarted($settlement, $company, $user);
         } else {
             $this->settlementService->applyApprovedSettlementAdjustments($settlement);
+            $this->approvalNotificationService->notifyTransferNeeded($settlement, $company, $user);
         }
 
             return redirect()
@@ -480,6 +482,11 @@ class EmployeeEntitlementSettlementController extends Controller
                 $company,
                 $user,
             );
+            $this->approvalNotificationService->notifyTransferNeeded(
+                $entitlementSettlement->fresh(),
+                $company,
+                $user,
+            );
 
             return back()->with('success', __('messages.entitlement_settlement.request_approved_success'));
         }
@@ -561,6 +568,7 @@ class EmployeeEntitlementSettlementController extends Controller
             'settlement_date' => $settlement->settlement_date?->toDateString(),
             'reason' => $settlement->reason,
             'status' => $settlement->status,
+            'payment_status' => $settlement->payment_status ?? EmployeeEntitlementSettlement::PAYMENT_UNPAID,
             'service_days' => (int) $settlement->service_days,
             'total_dues' => (float) $settlement->total_dues,
             'total_deductions' => (float) $settlement->total_deductions,

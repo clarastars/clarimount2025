@@ -21,12 +21,44 @@ class CompanyEntitlementSettlementApprovalStepsController extends Controller
     {
         $this->abortUnlessCanManageEntitlementSettlementApprovalSteps($company);
 
+        $company->loadMissing('entitlementSettlementTransferTeam:id,name');
+
         return Inertia::render('Companies/EntitlementSettlementApprovals', [
             'company' => $company->only(['id', 'name_en', 'name_ar']),
             'steps' => $this->mapEntitlementSettlementApprovalStepsForUi($company),
             'teams' => $this->accessibleTeamsForEntitlementSettlementApprovalSteps(),
+            'transferTeam' => [
+                'team_id' => $company->entitlement_settlement_transfer_team_id
+                    ? (int) $company->entitlement_settlement_transfer_team_id
+                    : null,
+                'team_name' => $company->entitlementSettlementTransferTeam?->name,
+            ],
             'status' => session('status'),
         ]);
+    }
+
+    public function updateTransferTeam(
+        Request $request,
+        Company $company,
+        EntitlementSettlementApprovalService $approvalService,
+    ): RedirectResponse {
+        $this->abortUnlessCanManageEntitlementSettlementApprovalSteps($company);
+
+        $validated = $request->validate([
+            'team_id' => ['nullable', 'exists:teams,id'],
+        ]);
+
+        $teamId = isset($validated['team_id']) && $validated['team_id'] !== ''
+            ? (int) $validated['team_id']
+            : null;
+
+        if ($teamId !== null) {
+            abort_unless($this->userCanUseTeamForEntitlementSettlementApprovalStep($teamId), 403);
+        }
+
+        $approvalService->updateCompanyTransferTeam($company, $teamId);
+
+        return back()->with('status', __('messages.settings.entitlement_settlement_transfer_team_saved'));
     }
 
     public function store(Request $request, Company $company): RedirectResponse

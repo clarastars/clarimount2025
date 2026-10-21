@@ -26,6 +26,8 @@ class EmployeeDebt extends Model
         'advance_request_id',
         'pays_out_via_salary_run',
         'advance_disbursement_salary_run_id',
+        'installment_start_year',
+        'installment_start_month',
     ];
 
     protected $casts = [
@@ -33,6 +35,8 @@ class EmployeeDebt extends Model
         'original_amount' => 'decimal:2',
         'monthly_installment' => 'decimal:2',
         'pays_out_via_salary_run' => 'boolean',
+        'installment_start_year' => 'integer',
+        'installment_start_month' => 'integer',
     ];
 
     /**

@@ -115,6 +115,51 @@ class EntitlementSettlementApprovalNotificationService
         $this->broadcastToSuperAdmins('finalized', $payload, $notifiedIds);
     }
 
+    public function notifyTransferNeeded(
+        EmployeeEntitlementSettlement $settlement,
+        Company $company,
+        User $actor,
+    ): void {
+        $payload = $this->buildBasePayload($settlement, $company, $actor);
+        $notifiedIds = [$actor->id];
+
+        foreach ($this->getTransferAssignees($company, $settlement->employee) as $user) {
+            if ($user->id === $actor->id) {
+                continue;
+            }
+
+            $this->send($user, 'transfer_needed', $payload);
+            $notifiedIds[] = $user->id;
+        }
+
+        $this->broadcastToSuperAdmins('transfer_needed', $payload, $notifiedIds);
+    }
+
+    public function notifyTransferCompleted(
+        EmployeeEntitlementSettlement $settlement,
+        Company $company,
+        User $actor,
+    ): void {
+        $payload = [
+            ...$this->buildBasePayload($settlement, $company, $actor),
+            'paid_by_name' => $actor->name,
+        ];
+
+        $this->send($actor, 'transfer_completed', $payload);
+        $notifiedIds = [$actor->id];
+
+        foreach ($this->getWorkflowStakeholders($settlement, $company) as $user) {
+            if (in_array($user->id, $notifiedIds, true)) {
+                continue;
+            }
+
+            $this->send($user, 'transfer_completed', $payload);
+            $notifiedIds[] = $user->id;
+        }
+
+        $this->broadcastToSuperAdmins('transfer_completed', $payload, $notifiedIds);
+    }
+
     public function notifyStepRejected(
         EmployeeEntitlementSettlement $settlement,
         Company $company,
@@ -207,6 +252,86 @@ class EntitlementSettlementApprovalNotificationService
                 return $this->userCanReceiveWorkflowNotifications($user, $company, $employee);
             })
             ->unique('id')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function getTransferAssignees(Company $company, ?Employee $employee = null): Collection
+    {
+        $roleService = app(EmployeeUserRoleService::class);
+        $departmentId = $roleService->departmentIdForEmployeeScope($employee);
+        $transferTeamId = $company->entitlement_settlement_transfer_team_id
+            ? (int) $company->entitlement_settlement_transfer_team_id
+            : null;
+
+        $userIds = collect([$company->owner_id])->filter();
+
+        if ($transferTeamId !== null) {
+            $userIds = $userIds->merge(
+                $roleService->userIdsForTeamInCompanyScoped(
+                    $transferTeamId,
+                    (int) $company->id,
+                    $departmentId,
+                )
+            );
+        } else {
+            $candidateIds = User::query()
+                ->where(function ($query) use ($company) {
+                    $query->whereHas('accessibleCompanies', function ($companyQuery) use ($company) {
+                        $companyQuery->where('companies.id', $company->id);
+                    })->orWhereHas('ownedCompanies', function ($companyQuery) use ($company) {
+                        $companyQuery->where('id', $company->id);
+                    });
+                })
+                ->pluck('id');
+
+            $userIds = $userIds
+                ->merge($candidateIds)
+                ->merge($roleService->userIdsAssignedToDepartment($departmentId));
+        }
+
+        return User::query()
+            ->whereIn('id', $userIds->unique()->filter()->values())
+            ->get()
+            ->filter(function (User $user) use ($company, $employee, $transferTeamId, $roleService): bool {
+                if ($user->hasRole('super-admin')) {
+                    return true;
+                }
+
+                if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+                    return true;
+                }
+
+                if ($transferTeamId !== null) {
+                    if (! $roleService->userBelongsToTeamInCompanyScoped(
+                        $user,
+                        $transferTeamId,
+                        (int) $company->id,
+                        $roleService->departmentIdForEmployeeScope($employee),
+                    )) {
+                        return false;
+                    }
+
+                    $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+                    $previous = $registrar->getPermissionsTeamId();
+                    $registrar->setPermissionsTeamId($transferTeamId);
+                    $user->unsetRelation('roles');
+                    $user->unsetRelation('permissions');
+                    $can = $user->can('employees.entitlements.transfer');
+                    $registrar->setPermissionsTeamId($previous);
+
+                    return $can;
+                }
+
+                return $roleService->canAccessEmployeeInCompanyDepartment(
+                    $user,
+                    'employees.entitlements.transfer',
+                    (int) $company->id,
+                    $roleService->departmentIdForEmployeeScope($employee),
+                );
+            })
             ->values();
     }
 

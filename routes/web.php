@@ -318,12 +318,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Advance (loan) approval steps (per company)
     Route::get('companies/{company}/advance-approvals', [CompanyAdvanceApprovalStepsController::class, 'index'])->name('companies.advance-approvals.index');
     Route::post('companies/{company}/advance-approvals', [CompanyAdvanceApprovalStepsController::class, 'store'])->name('companies.advance-approvals.store');
+    Route::put('companies/{company}/advance-approvals/transfer-team', [CompanyAdvanceApprovalStepsController::class, 'updateTransferTeam'])->name('companies.advance-approvals.transfer-team');
+    Route::post('companies/{company}/advance-approvals/reorder', [CompanyAdvanceApprovalStepsController::class, 'reorder'])->name('companies.advance-approvals.reorder');
     Route::put('companies/{company}/advance-approvals/{advanceApprovalStep}', [CompanyAdvanceApprovalStepsController::class, 'update'])->name('companies.advance-approvals.update');
     Route::delete('companies/{company}/advance-approvals/{advanceApprovalStep}', [CompanyAdvanceApprovalStepsController::class, 'destroy'])->name('companies.advance-approvals.destroy');
-    Route::post('companies/{company}/advance-approvals/reorder', [CompanyAdvanceApprovalStepsController::class, 'reorder'])->name('companies.advance-approvals.reorder');
 
     // Entitlement settlement approval steps (per company)
     Route::get('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'index'])->name('companies.entitlement-settlement-approvals.index');
+    Route::put('companies/{company}/entitlement-settlement-approvals/transfer-team', [CompanyEntitlementSettlementApprovalStepsController::class, 'updateTransferTeam'])->name('companies.entitlement-settlement-approvals.transfer-team');
     Route::post('companies/{company}/entitlement-settlement-approvals', [CompanyEntitlementSettlementApprovalStepsController::class, 'store'])->name('companies.entitlement-settlement-approvals.store');
     Route::put('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'update'])->name('companies.entitlement-settlement-approvals.update');
     Route::delete('companies/{company}/entitlement-settlement-approvals/{settlementApprovalStep}', [CompanyEntitlementSettlementApprovalStepsController::class, 'destroy'])->name('companies.entitlement-settlement-approvals.destroy');
@@ -383,10 +385,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('companies/{company}/advance-requests/{advanceRequest}/reject', [CompanyAdvanceController::class, 'reject'])->name('companies.advance-requests.reject');
     Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/approve', [CompanyAdvanceController::class, 'approveWorkflowStep'])->name('companies.advance-requests.approve-step');
     Route::post('companies/{company}/advance-requests/{advanceRequest}/approval-steps/{advanceApprovalStep}/reject', [CompanyAdvanceController::class, 'rejectWorkflowStep'])->name('companies.advance-requests.reject-step');
+    Route::post('companies/{company}/advance-requests/{advanceRequest}/mark-paid', [CompanyAdvanceController::class, 'markPaid'])->name('companies.advance-requests.mark-paid');
+    Route::get('companies/{company}/advance-requests/{advanceRequest}/payment-receipt', [CompanyAdvanceController::class, 'downloadPaymentReceipt'])->name('companies.advance-requests.payment-receipt');
 
     // Company entitlement settlements (all statuses, scoped by department/company access)
     Route::get('companies/{company}/entitlement-settlements', [CompanyEntitlementSettlementController::class, 'index'])
         ->name('companies.entitlement-settlements.index');
+    Route::post('companies/{company}/entitlement-settlements/{entitlementSettlement}/mark-paid', [CompanyEntitlementSettlementController::class, 'markPaid'])
+        ->name('companies.entitlement-settlements.mark-paid');
+    Route::get('companies/{company}/entitlement-settlements/{entitlementSettlement}/payment-receipt', [CompanyEntitlementSettlementController::class, 'downloadPaymentReceipt'])
+        ->name('companies.entitlement-settlements.payment-receipt');
 
     // Employee Debts routes
     Route::prefix('employees/{employee}/debts')->name('employee-debts.')->group(function () {

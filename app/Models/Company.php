@@ -35,6 +35,8 @@ class Company extends Model
         'logo',
         'website',
         'owner_id',
+        'advance_transfer_team_id',
+        'entitlement_settlement_transfer_team_id',
         'is_active',
         'settings',
     ];
@@ -75,6 +77,16 @@ class Company extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function advanceTransferTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'advance_transfer_team_id');
+    }
+
+    public function entitlementSettlementTransferTeam(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'entitlement_settlement_transfer_team_id');
     }
 
     /**

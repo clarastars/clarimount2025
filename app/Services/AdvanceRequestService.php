@@ -125,8 +125,9 @@ class AdvanceRequestService
     }
 
     /**
-     * Final approval: records the decision, creates the linked debt and schedules the
-     * first installment in the company's open draft salary run.
+     * Final approval: creates the linked debt, schedules installment deductions from the
+     * next open draft salary run (without paying out via payroll), and leaves payment unpaid
+     * until the transfer role records the cash disbursement.
      */
     public function approve(
         AdvanceRequest $advanceRequest,
@@ -151,16 +152,17 @@ class AdvanceRequestService
                     'original_amount' => $amount,
                     'monthly_installment' => round((float) $advanceRequest->monthly_deduction, 2),
                     'debt_type' => EmployeeDebt::TYPE_ADVANCE,
-                    'pays_out_via_salary_run' => true,
+                    'pays_out_via_salary_run' => false,
                 ],
             );
 
-            if (! $debt->pays_out_via_salary_run) {
-                $debt->update(['pays_out_via_salary_run' => true]);
+            if ($debt->pays_out_via_salary_run) {
+                $debt->update(['pays_out_via_salary_run' => false]);
             }
 
             $advanceRequest->update([
                 'status' => AdvanceRequest::STATUS_APPROVED,
+                'payment_status' => AdvanceRequest::PAYMENT_UNPAID,
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),
                 'review_notes' => $reviewNotes,
@@ -170,12 +172,47 @@ class AdvanceRequestService
             return $debt;
         });
 
-        $this->salaryRunService->includeAdvancePayoutInOpenDraft($debt);
+        $this->salaryRunService->scheduleAdvanceInstallmentsFromApproval($debt);
 
-        $fresh = $advanceRequest->fresh() ?? $advanceRequest;
+        $fresh = $advanceRequest->fresh(['employee.company', 'employee.user']) ?? $advanceRequest;
+        $company = $fresh->employee?->company;
+
+        if ($company !== null) {
+            $this->approvalNotificationService->notifyTransferNeeded($fresh, $company, $reviewer);
+        }
 
         if (! $skipEmployeeNotification) {
             $this->notificationService->notifyEmployeeApproved($fresh);
+        }
+
+        return $fresh;
+    }
+
+    public function markPaid(
+        AdvanceRequest $advanceRequest,
+        User $actor,
+        string $receiptPath,
+        ?string $paymentNotes = null,
+    ): AdvanceRequest {
+        if (! $advanceRequest->awaitsTransfer()) {
+            throw ValidationException::withMessages([
+                'payment_status' => [__('messages.advances.payment_already_processed')],
+            ]);
+        }
+
+        $advanceRequest->update([
+            'payment_status' => AdvanceRequest::PAYMENT_PAID,
+            'paid_at' => now(),
+            'paid_by' => $actor->id,
+            'payment_receipt_path' => $receiptPath,
+            'payment_notes' => $paymentNotes,
+        ]);
+
+        $fresh = $advanceRequest->fresh(['employee.company', 'employee.user', 'paidByUser']) ?? $advanceRequest;
+        $company = $fresh->employee?->company;
+
+        if ($company !== null) {
+            $this->approvalNotificationService->notifyTransferCompleted($fresh, $company, $actor);
         }
 
         return $fresh;

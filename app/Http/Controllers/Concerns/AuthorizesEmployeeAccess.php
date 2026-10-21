@@ -766,7 +766,73 @@ trait AuthorizesEmployeeAccess
             'advances.approve',
             'advances.company.view',
             'advances.create',
+            'advances.transfer',
         ];
+    }
+
+    protected function canTransferAdvances(User $user): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->exists()) {
+            return true;
+        }
+
+        return $this->roleService()->canInAnyAssignedTeam($user, 'advances.transfer');
+    }
+
+    protected function canTransferAdvanceRequest(User $user, Company $company, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $transferTeamId = $company->advance_transfer_team_id
+            ? (int) $company->advance_transfer_team_id
+            : null;
+        $departmentId = $employee->department_id ? (string) $employee->department_id : null;
+
+        if ($transferTeamId !== null) {
+            if (! $this->roleService()->userBelongsToTeamInCompanyScoped(
+                $user,
+                $transferTeamId,
+                (int) $company->id,
+                $departmentId,
+            )) {
+                return false;
+            }
+
+            $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
+            $registrar->setPermissionsTeamId($transferTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+            $can = $user->can('advances.transfer');
+            $registrar->setPermissionsTeamId($previous);
+
+            return $can;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'advances.transfer',
+            (int) $company->id,
+            $departmentId,
+        );
+    }
+
+    protected function abortUnlessCanTransferAdvanceRequest(
+        User $user,
+        Company $company,
+        Employee $employee,
+    ): void {
+        abort_unless($this->canTransferAdvanceRequest($user, $company, $employee), 403);
     }
 
     protected function canAccessEmployeeForAdvanceWorkflow(User $user, Employee $employee): bool
@@ -835,7 +901,60 @@ trait AuthorizesEmployeeAccess
         return [
             'employees.entitlements.approve',
             'employees.entitlements.settle',
+            'employees.entitlements.transfer',
         ];
+    }
+
+    protected function canTransferEntitlementSettlement(User $user, Company $company, Employee $employee): bool
+    {
+        if ($user->hasRole('super-admin')) {
+            return true;
+        }
+
+        if ($user->ownedCompanies()->whereKey($company->id)->exists()) {
+            return true;
+        }
+
+        $transferTeamId = $company->entitlement_settlement_transfer_team_id
+            ? (int) $company->entitlement_settlement_transfer_team_id
+            : null;
+        $departmentId = $employee->department_id ? (string) $employee->department_id : null;
+
+        if ($transferTeamId !== null) {
+            if (! $this->roleService()->userBelongsToTeamInCompanyScoped(
+                $user,
+                $transferTeamId,
+                (int) $company->id,
+                $departmentId,
+            )) {
+                return false;
+            }
+
+            $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+            $previous = $registrar->getPermissionsTeamId();
+            $registrar->setPermissionsTeamId($transferTeamId);
+            $user->unsetRelation('roles');
+            $user->unsetRelation('permissions');
+            $can = $user->can('employees.entitlements.transfer');
+            $registrar->setPermissionsTeamId($previous);
+
+            return $can;
+        }
+
+        return $this->roleService()->canAccessEmployeeInCompanyDepartment(
+            $user,
+            'employees.entitlements.transfer',
+            (int) $company->id,
+            $departmentId,
+        );
+    }
+
+    protected function abortUnlessCanTransferEntitlementSettlement(
+        User $user,
+        Company $company,
+        Employee $employee,
+    ): void {
+        abort_unless($this->canTransferEntitlementSettlement($user, $company, $employee), 403);
     }
 
     protected function canViewCompanyEntitlementSettlements(User $user): bool

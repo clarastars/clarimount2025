@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\Company;
+use App\Models\EntitlementSettlementApprovalDefaultStep;
 use App\Models\EntitlementSettlementApprovalStep;
 use App\Models\Team;
 use Illuminate\Support\Facades\Auth;
@@ -75,6 +76,38 @@ trait ManagesEntitlementSettlementApprovalSteps
                 'can_delete' => ! $step->hasBlockingWorkflowUsage(),
             ])
             ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapEntitlementSettlementApprovalDefaultStepsForUi(): array
+    {
+        return EntitlementSettlementApprovalDefaultStep::query()
+            ->with('team')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (EntitlementSettlementApprovalDefaultStep $step) => [
+                'id' => $step->id,
+                'title' => $step->title,
+                'sort_order' => $step->sort_order,
+                'team_id' => $step->team_id,
+                'team_name' => $step->team?->name,
+                'is_active' => $step->is_active,
+                'can_delete' => true,
+            ])
+            ->all();
+    }
+
+    protected function abortUnlessCanManageEntitlementSettlementApprovalDefaults(): void
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user->hasRole('super-admin') || $user->can('settings.access'),
+            403
+        );
     }
 
     protected function userCanUseTeamForEntitlementSettlementApprovalStep(int $teamId): bool

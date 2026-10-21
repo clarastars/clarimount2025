@@ -16,6 +16,10 @@ class EmployeeEntitlementSettlement extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const PAYMENT_UNPAID = 'unpaid';
+
+    public const PAYMENT_PAID = 'paid';
+
     protected $fillable = [
         'employee_id',
         'created_by',
@@ -48,6 +52,11 @@ class EmployeeEntitlementSettlement extends Model
         'line_exclusions',
         'attachment_paths',
         'status',
+        'payment_status',
+        'paid_at',
+        'paid_by',
+        'payment_receipt_path',
+        'payment_notes',
         'reviewed_by',
         'reviewed_at',
         'review_notes',
@@ -81,6 +90,7 @@ class EmployeeEntitlementSettlement extends Model
         'attachment_paths' => 'array',
         'line_exclusions' => 'array',
         'reviewed_at' => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     /**
@@ -127,6 +137,11 @@ class EmployeeEntitlementSettlement extends Model
         return $this->belongsTo(User::class, 'reviewed_by');
     }
 
+    public function paidByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'paid_by');
+    }
+
     public function stepApprovals(): HasMany
     {
         return $this->hasMany(EntitlementSettlementStepApproval::class, 'settlement_id');
@@ -150,6 +165,16 @@ class EmployeeEntitlementSettlement extends Model
     public function isRejected(): bool
     {
         return $this->status === self::STATUS_REJECTED;
+    }
+
+    public function isPaymentUnpaid(): bool
+    {
+        return ($this->payment_status ?? self::PAYMENT_UNPAID) === self::PAYMENT_UNPAID;
+    }
+
+    public function awaitsTransfer(): bool
+    {
+        return $this->isApproved() && $this->isPaymentUnpaid();
     }
 
     /**
