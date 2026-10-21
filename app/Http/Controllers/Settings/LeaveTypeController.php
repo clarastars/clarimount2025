@@ -14,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,6 +49,8 @@ class LeaveTypeController extends Controller
             'name_ar' => trim((string) $validated['name_ar']),
             'min_notice_days' => (int) $validated['min_notice_days'],
             'allow_past_dates' => $request->boolean('allow_past_dates'),
+            'balance_deduction_mode' => $validated['balance_deduction_mode'],
+            'pay_mode' => $validated['pay_mode'],
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ]);
@@ -66,6 +69,8 @@ class LeaveTypeController extends Controller
             'name_ar' => trim((string) $validated['name_ar']),
             'min_notice_days' => (int) $validated['min_notice_days'],
             'allow_past_dates' => $request->boolean('allow_past_dates'),
+            'balance_deduction_mode' => $validated['balance_deduction_mode'],
+            'pay_mode' => $validated['pay_mode'],
             'sort_order' => (int) ($validated['sort_order'] ?? 0),
             'is_active' => true,
         ]);
@@ -126,6 +131,16 @@ class LeaveTypeController extends Controller
             'name_ar' => ['required', 'string', 'max:255'],
             'min_notice_days' => ['required', 'integer', 'min:0', 'max:365'],
             'allow_past_dates' => ['sometimes', 'boolean'],
+            'balance_deduction_mode' => ['required', 'string', Rule::in([
+                LeaveType::BALANCE_DEDUCT,
+                LeaveType::BALANCE_NO_DEDUCT,
+                LeaveType::BALANCE_EMPLOYEE,
+            ])],
+            'pay_mode' => ['required', 'string', Rule::in([
+                LeaveType::PAY_PAID,
+                LeaveType::PAY_UNPAID,
+                LeaveType::PAY_EMPLOYEE,
+            ])],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:10000'],
         ]);
     }

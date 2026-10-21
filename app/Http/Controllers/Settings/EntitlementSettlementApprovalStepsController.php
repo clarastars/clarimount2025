@@ -72,7 +72,7 @@ class EntitlementSettlementApprovalStepsController extends Controller
 
     public function updateDefault(
         Request $request,
-        EntitlementSettlementApprovalDefaultStep $entitlementSettlementApprovalDefaultStep,
+        EntitlementSettlementApprovalDefaultStep $defaultStep,
     ): RedirectResponse {
         $this->abortUnlessCanManageEntitlementSettlementApprovalDefaults();
 
@@ -84,22 +84,22 @@ class EntitlementSettlementApprovalStepsController extends Controller
 
         abort_unless($this->userCanUseTeamForEntitlementSettlementApprovalStep((int) $validated['team_id']), 403);
 
-        $entitlementSettlementApprovalDefaultStep->update([
+        $defaultStep->update([
             'title' => $validated['title'],
             'team_id' => $validated['team_id'],
-            'is_active' => $validated['is_active'] ?? $entitlementSettlementApprovalDefaultStep->is_active,
+            'is_active' => $validated['is_active'] ?? $defaultStep->is_active,
         ]);
 
         return back()->with('status', __('messages.settings.entitlement_settlement_approvals_defaults_saved'));
     }
 
     public function destroyDefault(
-        EntitlementSettlementApprovalDefaultStep $entitlementSettlementApprovalDefaultStep,
+        EntitlementSettlementApprovalDefaultStep $defaultStep,
         EntitlementSettlementApprovalService $approvalService,
     ): RedirectResponse {
         $this->abortUnlessCanManageEntitlementSettlementApprovalDefaults();
 
-        $entitlementSettlementApprovalDefaultStep->delete();
+        $defaultStep->delete();
 
         $remaining = EntitlementSettlementApprovalDefaultStep::query()
             ->orderBy('sort_order')

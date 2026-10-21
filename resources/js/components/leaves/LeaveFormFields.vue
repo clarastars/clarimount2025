@@ -89,7 +89,10 @@
 
         <div>
             <Label class="mb-2 block">{{ t('leaves.deduct_from_balance_label') }}</Label>
-            <div class="flex gap-6">
+            <div v-if="balanceChoiceLocked" class="text-sm text-muted-foreground">
+                {{ balanceLockedMessage }}
+            </div>
+            <div v-else class="flex gap-6">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input
                         v-model="form.deduct_from_balance"
@@ -136,7 +139,10 @@
 
         <div>
             <Label class="mb-2 block">{{ t('leaves.paid_leave_label') }}</Label>
-            <div class="flex gap-6">
+            <div v-if="payChoiceLocked" class="text-sm text-muted-foreground">
+                {{ payLockedMessage }}
+            </div>
+            <div v-else class="flex gap-6">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input
                         v-model="form.is_paid"
@@ -172,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -190,6 +196,8 @@ interface LeaveTypeOption {
     label: string;
     min_notice_days: number;
     allow_past_dates?: boolean;
+    balance_deduction_mode?: 'deduct' | 'no_deduct' | 'employee';
+    pay_mode?: 'paid' | 'unpaid' | 'employee';
 }
 
 interface LeaveForm {
@@ -220,6 +228,52 @@ const props = defineProps<{
 }>();
 
 const selectedLeaveType = computed(() => props.leaveTypes.find((item) => item.key === props.form.leave_type) ?? null);
+
+const balanceChoiceLocked = computed(() => {
+    const mode = selectedLeaveType.value?.balance_deduction_mode ?? 'employee';
+
+    return mode === 'deduct' || mode === 'no_deduct';
+});
+
+const payChoiceLocked = computed(() => {
+    const mode = selectedLeaveType.value?.pay_mode ?? 'employee';
+
+    return mode === 'paid' || mode === 'unpaid';
+});
+
+const balanceLockedMessage = computed(() => {
+    if (selectedLeaveType.value?.balance_deduction_mode === 'no_deduct') {
+        return t('leaves.balance_mode_locked_no_deduct');
+    }
+
+    return t('leaves.balance_mode_locked_deduct');
+});
+
+const payLockedMessage = computed(() => {
+    if (selectedLeaveType.value?.pay_mode === 'unpaid') {
+        return t('leaves.pay_mode_locked_unpaid');
+    }
+
+    return t('leaves.pay_mode_locked_paid');
+});
+
+watch(selectedLeaveType, (leaveType) => {
+    if (!leaveType) {
+        return;
+    }
+
+    if (leaveType.balance_deduction_mode === 'deduct') {
+        props.form.deduct_from_balance = true;
+    } else if (leaveType.balance_deduction_mode === 'no_deduct') {
+        props.form.deduct_from_balance = false;
+    }
+
+    if (leaveType.pay_mode === 'paid') {
+        props.form.is_paid = true;
+    } else if (leaveType.pay_mode === 'unpaid') {
+        props.form.is_paid = false;
+    }
+});
 
 const selectedEmployee = computed(() => {
     if (!props.showEmployeeSelect || props.form.employee_id === undefined || props.form.employee_id === '') {

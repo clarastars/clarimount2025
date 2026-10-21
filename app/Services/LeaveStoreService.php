@@ -31,17 +31,21 @@ class LeaveStoreService
             ...$this->leaveAttachmentService->validationRules(),
         ]);
 
-        if ($this->leaveTypeService->findActiveByKey((string) $validated['leave_type']) === null) {
+        $leaveType = $this->leaveTypeService->findActiveByKey((string) $validated['leave_type']);
+        if ($leaveType === null) {
             throw ValidationException::withMessages([
                 'leave_type' => [__('messages.leaves.invalid_leave_type')],
             ]);
         }
 
+        $deductFromBalance = $leaveType->resolvedDeductFromBalance(filter_var($validated['deduct_from_balance'], FILTER_VALIDATE_BOOLEAN));
+        $isPaid = $leaveType->resolvedIsPaid(filter_var($validated['is_paid'], FILTER_VALIDATE_BOOLEAN));
+
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
         $days = (int) ($startDate->diffInDays($endDate) + 1);
 
-        if ($validated['deduct_from_balance']) {
+        if ($deductFromBalance) {
             $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
@@ -55,8 +59,8 @@ class LeaveStoreService
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'days' => $days,
-            'deduct_from_balance' => $validated['deduct_from_balance'],
-            'is_paid' => $validated['is_paid'],
+            'deduct_from_balance' => $deductFromBalance,
+            'is_paid' => $isPaid,
             'notes' => $validated['notes'] ?? null,
             'attachment_path' => $attachmentPayload['attachment_path'],
             'attachment_paths' => $attachmentPayload['attachment_paths'],

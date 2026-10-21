@@ -47,6 +47,9 @@ class LeaveRequestService
         $this->leaveTypeService->ensureStartDateAllowed($leaveType, (string) $validated['start_date'], $employee);
         $this->leaveTypeService->ensureMinimumNoticeDays($leaveType, (string) $validated['start_date'], $employee);
 
+        $deductFromBalance = $leaveType->resolvedDeductFromBalance(filter_var($validated['deduct_from_balance'], FILTER_VALIDATE_BOOLEAN));
+        $isPaid = $leaveType->resolvedIsPaid(filter_var($validated['is_paid'], FILTER_VALIDATE_BOOLEAN));
+
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
         $days = (int) ($startDate->diffInDays($endDate) + 1);
@@ -55,7 +58,7 @@ class LeaveRequestService
         $this->assertNoOverlappingApprovedLeaves($employee, $startDate, $endDate);
 
         $forecast = null;
-        if ($validated['deduct_from_balance']) {
+        if ($deductFromBalance) {
             $forecast = $this->leaveBalanceService->assertSufficientBalance($employee, $startDate, $days);
         }
 
@@ -71,8 +74,8 @@ class LeaveRequestService
             'days' => $days,
             'current_remaining_at_submit' => $forecast['current_remaining'] ?? null,
             'projected_remaining_at_start' => $forecast['projected_remaining'] ?? null,
-            'deduct_from_balance' => $validated['deduct_from_balance'],
-            'is_paid' => $validated['is_paid'],
+            'deduct_from_balance' => $deductFromBalance,
+            'is_paid' => $isPaid,
             'notes' => $validated['notes'] ?? null,
             'attachment_path' => $attachmentPayload['attachment_path'],
             'attachment_paths' => $attachmentPayload['attachment_paths'],

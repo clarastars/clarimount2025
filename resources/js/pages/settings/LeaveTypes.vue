@@ -22,6 +22,8 @@ interface LeaveTypeItem {
     name_ar: string;
     min_notice_days: number;
     allow_past_dates: boolean;
+    balance_deduction_mode: 'deduct' | 'no_deduct' | 'employee';
+    pay_mode: 'paid' | 'unpaid' | 'employee';
     sort_order: number;
     is_active: boolean;
 }
@@ -63,6 +65,8 @@ const createForm = useForm({
     name_ar: '',
     min_notice_days: 0,
     allow_past_dates: false,
+    balance_deduction_mode: 'employee' as 'deduct' | 'no_deduct' | 'employee',
+    pay_mode: 'employee' as 'paid' | 'unpaid' | 'employee',
     sort_order: 0,
 });
 
@@ -73,6 +77,8 @@ const editForm = useForm({
     name_ar: '',
     min_notice_days: 0,
     allow_past_dates: false,
+    balance_deduction_mode: 'employee' as 'deduct' | 'no_deduct' | 'employee',
+    pay_mode: 'employee' as 'paid' | 'unpaid' | 'employee',
     sort_order: 0,
 });
 
@@ -118,6 +124,8 @@ function createLeaveType() {
         onSuccess: () => {
             createForm.reset();
             createForm.allow_past_dates = false;
+            createForm.balance_deduction_mode = 'employee';
+            createForm.pay_mode = 'employee';
             createDialogOpen.value = false;
         },
     });
@@ -129,6 +137,8 @@ function startEdit(item: LeaveTypeItem) {
     editForm.name_ar = item.name_ar;
     editForm.min_notice_days = item.min_notice_days;
     editForm.allow_past_dates = item.allow_past_dates;
+    editForm.balance_deduction_mode = item.balance_deduction_mode || 'employee';
+    editForm.pay_mode = item.pay_mode || 'employee';
     editForm.sort_order = item.sort_order;
     editForm.clearErrors();
 }
@@ -179,6 +189,30 @@ function addExemption() {
     });
 }
 
+function balanceModeLabel(mode: string): string {
+    if (mode === 'deduct') {
+        return t('settings.leave_type_balance_mode_deduct');
+    }
+
+    if (mode === 'no_deduct') {
+        return t('settings.leave_type_balance_mode_no_deduct');
+    }
+
+    return t('settings.leave_type_balance_mode_employee');
+}
+
+function payModeLabel(mode: string): string {
+    if (mode === 'paid') {
+        return t('settings.leave_type_pay_mode_paid');
+    }
+
+    if (mode === 'unpaid') {
+        return t('settings.leave_type_pay_mode_unpaid');
+    }
+
+    return t('settings.leave_type_pay_mode_employee');
+}
+
 function removeExemption(item: ExemptionItem) {
     if (!window.confirm(t('settings.leave_type_exemptions_remove_confirm', { name: item.full_name }))) {
         return;
@@ -210,12 +244,14 @@ function removeExemption(item: ExemptionItem) {
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[1040px] text-sm">
+                            <table class="w-full min-w-[1280px] text-sm">
                                 <thead>
                                     <tr class="border-b text-center">
                                         <th class="py-2">{{ t('settings.name_en') }}</th>
                                         <th class="py-2">{{ t('settings.name_ar') }}</th>
                                         <th class="py-2">{{ t('settings.leave_type_min_notice_days') }}</th>
+                                        <th class="py-2">{{ t('settings.leave_type_balance_mode') }}</th>
+                                        <th class="py-2">{{ t('settings.leave_type_pay_mode') }}</th>
                                         <th class="py-2">{{ t('settings.leave_type_allow_past_dates') }}</th>
                                         <th class="py-2">{{ t('settings.leave_type_sort_order') }}</th>
                                         <th class="py-2">{{ t('common.actions') }}</th>
@@ -226,6 +262,8 @@ function removeExemption(item: ExemptionItem) {
                                         <td class="py-2 text-center">{{ item.name_en }}</td>
                                         <td class="py-2 text-center">{{ item.name_ar }}</td>
                                         <td class="py-2 text-center">{{ item.min_notice_days }}</td>
+                                        <td class="py-2 text-center">{{ balanceModeLabel(item.balance_deduction_mode) }}</td>
+                                        <td class="py-2 text-center">{{ payModeLabel(item.pay_mode) }}</td>
                                         <td class="py-2 text-center">
                                             {{ item.allow_past_dates ? t('common.yes') : t('common.no') }}
                                         </td>
@@ -269,6 +307,30 @@ function removeExemption(item: ExemptionItem) {
                                 <Label>{{ t('settings.leave_type_sort_order') }}</Label>
                                 <Input v-model="editForm.sort_order" type="number" min="0" />
                                 <InputError class="mt-1" :message="editForm.errors.sort_order" />
+                            </div>
+                            <div>
+                                <Label>{{ t('settings.leave_type_balance_mode') }}</Label>
+                                <select
+                                    v-model="editForm.balance_deduction_mode"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="employee">{{ t('settings.leave_type_balance_mode_employee') }}</option>
+                                    <option value="deduct">{{ t('settings.leave_type_balance_mode_deduct') }}</option>
+                                    <option value="no_deduct">{{ t('settings.leave_type_balance_mode_no_deduct') }}</option>
+                                </select>
+                                <InputError class="mt-1" :message="editForm.errors.balance_deduction_mode" />
+                            </div>
+                            <div>
+                                <Label>{{ t('settings.leave_type_pay_mode') }}</Label>
+                                <select
+                                    v-model="editForm.pay_mode"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="employee">{{ t('settings.leave_type_pay_mode_employee') }}</option>
+                                    <option value="paid">{{ t('settings.leave_type_pay_mode_paid') }}</option>
+                                    <option value="unpaid">{{ t('settings.leave_type_pay_mode_unpaid') }}</option>
+                                </select>
+                                <InputError class="mt-1" :message="editForm.errors.pay_mode" />
                             </div>
                             <div class="md:col-span-2 flex items-start gap-2 pt-6">
                                 <input
@@ -404,6 +466,32 @@ function removeExemption(item: ExemptionItem) {
                                 <Label for="leave-type-sort-order">{{ t('settings.leave_type_sort_order') }}</Label>
                                 <Input id="leave-type-sort-order" v-model="createForm.sort_order" type="number" min="0" />
                                 <InputError class="mt-1" :message="createForm.errors.sort_order" />
+                            </div>
+                            <div>
+                                <Label for="leave-type-balance-mode">{{ t('settings.leave_type_balance_mode') }}</Label>
+                                <select
+                                    id="leave-type-balance-mode"
+                                    v-model="createForm.balance_deduction_mode"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="employee">{{ t('settings.leave_type_balance_mode_employee') }}</option>
+                                    <option value="deduct">{{ t('settings.leave_type_balance_mode_deduct') }}</option>
+                                    <option value="no_deduct">{{ t('settings.leave_type_balance_mode_no_deduct') }}</option>
+                                </select>
+                                <InputError class="mt-1" :message="createForm.errors.balance_deduction_mode" />
+                            </div>
+                            <div>
+                                <Label for="leave-type-pay-mode">{{ t('settings.leave_type_pay_mode') }}</Label>
+                                <select
+                                    id="leave-type-pay-mode"
+                                    v-model="createForm.pay_mode"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="employee">{{ t('settings.leave_type_pay_mode_employee') }}</option>
+                                    <option value="paid">{{ t('settings.leave_type_pay_mode_paid') }}</option>
+                                    <option value="unpaid">{{ t('settings.leave_type_pay_mode_unpaid') }}</option>
+                                </select>
+                                <InputError class="mt-1" :message="createForm.errors.pay_mode" />
                             </div>
                             <div class="md:col-span-2 flex items-start gap-2">
                                 <input

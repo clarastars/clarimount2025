@@ -46,6 +46,8 @@ class LeaveTypeService
                 'name_ar' => $leaveType->name_ar,
                 'min_notice_days' => $leaveType->min_notice_days,
                 'allow_past_dates' => (bool) $leaveType->allow_past_dates,
+                'balance_deduction_mode' => $leaveType->balance_deduction_mode ?: LeaveType::BALANCE_EMPLOYEE,
+                'pay_mode' => $leaveType->pay_mode ?: LeaveType::PAY_EMPLOYEE,
                 'sort_order' => $leaveType->sort_order,
                 'is_active' => $leaveType->is_active,
             ])
@@ -287,6 +289,8 @@ class LeaveTypeService
             'label' => $leaveType->displayName($locale),
             'min_notice_days' => $leaveType->min_notice_days,
             'allow_past_dates' => (bool) $leaveType->allow_past_dates,
+            'balance_deduction_mode' => $leaveType->balance_deduction_mode ?: LeaveType::BALANCE_EMPLOYEE,
+            'pay_mode' => $leaveType->pay_mode ?: LeaveType::PAY_EMPLOYEE,
         ];
     }
 }
