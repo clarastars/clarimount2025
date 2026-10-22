@@ -266,7 +266,7 @@ const stepMessage = computed(() => {
             </div>
 
             <p class="mt-8 text-center text-xs text-muted-foreground">
-                © {{ currentYear }} إعتمال — منصة إدارة الموارد البشرية
+                © {{ currentYear }} منصة إدارة الموارد البشرية
             </p>
         </div>
     </div>
